@@ -95,6 +95,29 @@
 </head>
 <body>
 <div id="root"></div>
+
+<!-- AudioWorklet module defined outside Babel so nested backticks don't confuse the JSX parser -->
+<script>
+window._CHUNKER_TARGET = Math.round(16000 * 0.96); // 15360 samples
+window._CHUNKER_SRC = [
+  'class Chunker extends AudioWorkletProcessor {',
+  '  constructor(){super();this._buf=[];this._target='+window._CHUNKER_TARGET+';}',
+  '  process(inputs){',
+  '    var ch=inputs[0][0];if(!ch)return true;',
+  '    for(var i=0;i<ch.length;i++){this._buf.push(ch[i]);}',
+  '    while(this._buf.length>=this._target){',
+  '      this.port.postMessage(this._buf.splice(0,this._target));',
+  '    }',
+  '    return true;',
+  '  }',
+  '}',
+  'registerProcessor("chunker",Chunker);'
+].join('\n');
+window._CHUNKER_URL = URL.createObjectURL(
+  new Blob([window._CHUNKER_SRC], {type:'application/javascript'})
+);
+</script>
+
 <script type="text/babel">
 const {useState,useEffect,useRef} = React;
 const loadColor = v => v<33?'var(--ok)':v<66?'var(--warn)':'var(--crit)';
@@ -232,7 +255,6 @@ function Audio({audio, ws, liveAudio}){
   const ctxRef = React.useRef(null);
 
   const SAMPLE_RATE = 16000;
-  const CHUNK_SAMPLES = SAMPLE_RATE * 0.96; // 0.96s chunks match YAMNet window
 
   const startMic = async () => {
     try {
@@ -240,20 +262,7 @@ function Audio({audio, ws, liveAudio}){
       const ctx = new AudioContext({sampleRate: SAMPLE_RATE});
       ctxRef.current = ctx;
       const src = ctx.createMediaStreamSource(stream);
-      await ctx.audioWorklet.addModule('data:application/javascript,' + encodeURIComponent(`
-        class Chunker extends AudioWorkletProcessor {
-          constructor(){super();this._buf=[];this._target=${Math.round(CHUNK_SAMPLES)};}
-          process(inputs){
-            const ch=inputs[0][0];if(!ch)return true;
-            for(let i=0;i<ch.length;i++){this._buf.push(ch[i]);}
-            while(this._buf.length>=this._target){
-              this.port.postMessage(this._buf.splice(0,this._target));
-            }
-            return true;
-          }
-        }
-        registerProcessor('chunker',Chunker);
-      `));
+      await ctx.audioWorklet.addModule(window._CHUNKER_URL);
       const node = new AudioWorkletNode(ctx, 'chunker');
       node.port.onmessage = e => {
         if(ws.current && ws.current.readyState===1)
@@ -393,7 +402,7 @@ function DemoBar({scenario}){
     <div className="demo-bar">
       <div className="demo-info">
         <div className="demo-title">
-          {running ? `Step ${step+1}/${DEMO_STEPS.length}: ${DEMO_STEPS[step]?.label}`
+          {running ? ('Step '+(step+1)+'/'+DEMO_STEPS.length+': '+(DEMO_STEPS[step]?.label||''))
                    : 'Auto-Play Demo — walk judges through every use case'}
         </div>
         {running && <>
@@ -441,7 +450,7 @@ function App(){
   useEffect(()=>{
     fetch('/api/scenarios').then(r=>r.json()).then(d=>setScenarios(d.scenarios)).catch(()=>{});
     fetch('/api/caps').then(r=>r.json()).then(d=>{setLiveAudio(d.live_audio);setLiveVision(d.live_vision);}).catch(()=>{});
-    const sock=new WebSocket(`ws://${location.host}/ws`);
+    const sock=new WebSocket('ws://'+location.host+'/ws');
     ws.current=sock;
     sock.onopen=()=>setConn(true);
     sock.onclose=()=>setConn(false);
