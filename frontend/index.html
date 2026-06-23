@@ -95,6 +95,21 @@
 </head>
 <body>
 <div id="root"></div>
+<div id="err" style="display:none;position:fixed;inset:0;background:#0a0e14;color:#ff4d4f;
+  font-family:monospace;font-size:13px;padding:40px;white-space:pre-wrap;z-index:9999"></div>
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  var d = document.getElementById('err');
+  d.style.display = 'block';
+  d.textContent = 'JS ERROR\n' + msg + '\n\nFile: ' + src + ':' + line + ':' + col +
+    (err ? '\n\nStack:\n' + err.stack : '');
+};
+window.addEventListener('unhandledrejection', function(e) {
+  var d = document.getElementById('err');
+  d.style.display = 'block';
+  d.textContent = 'UNHANDLED PROMISE\n' + (e.reason?.stack || e.reason);
+});
+</script>
 
 <!-- AudioWorklet module defined outside Babel so nested backticks don't confuse the JSX parser -->
 <script>
@@ -118,7 +133,7 @@ window._CHUNKER_URL = URL.createObjectURL(
 );
 </script>
 
-<script type="text/babel">
+<script type="text/babel" data-presets="react">
 const {useState,useEffect,useRef} = React;
 const loadColor = v => v<33?'var(--ok)':v<66?'var(--warn)':'var(--crit)';
 const fmt = s => s.replace(/_/g,' ');
