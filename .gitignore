@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Model weights (large binaries — download on first run)
+backend/models/
+backend/*.pt
+backend/yolov8n.pt
+
+# HuggingFace / torch cache
+~/.cache/
+
+# Data outputs / logs
+*.log
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db

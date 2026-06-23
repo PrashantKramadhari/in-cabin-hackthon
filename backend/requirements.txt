@@ -1,0 +1,10 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+numpy
+# PyTorch CPU (install via: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu)
+torch
+torchaudio
+transformers          # AST audio classifier (AudioSet 527 classes, replaces YAMNet)
+# Day-2 vision node:
+# mediapipe           # face / driver state
+# ultralytics         # YOLOv8n seatbelt / object detection

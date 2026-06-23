@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CabinSense — In-Cabin Disturbance Intelligence</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#121821; --panel2:#19212e; --line:#222c3a;
+    --txt:#e6edf3; --dim:#8b98a9; --accent:#36e0c0; --warn:#f5a623;
+    --crit:#ff4d4f; --ok:#3ddc84; --advisory:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"Inter",system-ui,Segoe UI,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .app{max-width:1280px;margin:0 auto;padding:20px}
+  header{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  header h1{font-size:20px;margin:0;letter-spacing:.5px}
+  header .tag{color:var(--accent);font-weight:600}
+  header .sub{color:var(--dim);font-size:13px}
+  .status{margin-left:auto;font-size:12px;color:var(--dim)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+    background:var(--crit);margin-right:6px;vertical-align:middle}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .grid{display:grid;grid-template-columns:1.1fr 1.5fr 1.2fr;gap:16px;margin-top:16px}
+  .col{display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;
+    color:var(--dim);margin:0 0 12px}
+  /* gauge */
+  .gauge{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .gauge .num{font-size:46px;font-weight:700;line-height:1}
+  .gauge .lbl{color:var(--dim);font-size:12px}
+  .bar{height:8px;border-radius:6px;background:var(--panel2);overflow:hidden;width:100%}
+  .bar > span{display:block;height:100%;transition:width .3s,background .3s}
+  .factors{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:11px;background:var(--panel2);border:1px solid var(--line);
+    padding:3px 8px;border-radius:20px;color:var(--dim)}
+  /* cabin map */
+  .cabin{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .seat{background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    padding:12px;min-height:92px;transition:.2s}
+  .seat.empty{opacity:.45}
+  .seat .row{display:flex;justify-content:space-between;align-items:center}
+  .seat .name{font-size:12px;color:var(--dim);text-transform:capitalize}
+  .seat .who{font-weight:600;font-size:14px;text-transform:capitalize}
+  .seat .vit{font-size:12px;color:var(--dim);margin-top:8px;display:flex;gap:12px}
+  .seat .vit b{color:var(--txt);font-weight:600}
+  .pill{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600}
+  .pill.belt{background:rgba(61,220,132,.15);color:var(--ok)}
+  .pill.nobelt{background:rgba(255,77,79,.15);color:var(--crit)}
+  .telem{display:flex;gap:18px;flex-wrap:wrap;font-size:13px}
+  .telem div span{color:var(--dim);display:block;font-size:11px}
+  .telem div b{font-size:16px}
+  /* mitigations */
+  .mit{border-left:3px solid var(--advisory);background:var(--panel2);
+    border-radius:10px;padding:12px;margin-bottom:10px}
+  .mit.warning{border-color:var(--warn)}
+  .mit.critical{border-color:var(--crit);animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(255,77,79,0)}
+    50%{box-shadow:0 0 16px rgba(255,77,79,.4)}}
+  .mit .top{display:flex;justify-content:space-between;align-items:center}
+  .mit .title{font-weight:600;font-size:14px}
+  .mit .uc{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .mit .detail{font-size:12px;color:var(--dim);margin:8px 0}
+  .mit .acts{display:flex;gap:8px}
+  button{font-family:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+    padding:7px 12px;font-size:12px;background:var(--panel2);color:var(--txt)}
+  button.primary{background:var(--accent);color:#04201b;border-color:var(--accent);font-weight:600}
+  button.ghost{background:transparent;color:var(--dim)}
+  .st{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px}
+  .st.active{background:rgba(61,220,132,.15);color:var(--ok)}
+  .st.proposed{background:rgba(90,169,255,.15);color:var(--advisory)}
+  .st.dismissed{background:var(--panel);color:var(--dim)}
+  .empty-mit{color:var(--dim);font-size:13px;text-align:center;padding:20px}
+  /* scenarios */
+  .scenarios{display:flex;flex-wrap:wrap;gap:8px}
+  .scenarios button.sel{background:var(--accent);color:#04201b;border-color:var(--accent)}
+  /* demo autoplay */
+  .demo-bar{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px}
+  .demo-bar .demo-info{flex:1}
+  .demo-bar .demo-title{font-size:13px;font-weight:600;margin-bottom:6px}
+  .demo-bar .demo-sub{font-size:11px;color:var(--dim)}
+  .demo-progress{height:5px;border-radius:3px;background:var(--panel2);overflow:hidden;margin-top:8px}
+  .demo-progress > span{display:block;height:100%;background:var(--accent);transition:width .5s}
+  button.demo-btn{padding:9px 18px;font-size:13px;font-weight:600;
+    background:var(--accent);color:#04201b;border-color:var(--accent);white-space:nowrap}
+  button.demo-btn:disabled{opacity:.5;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+const loadColor = v => v<33?'var(--ok)':v<66?'var(--warn)':'var(--crit)';
+const fmt = s => s.replace(/_/g,' ');
+
+function Gauge({value,factors}){
+  return (
+    <div className="card">
+      <h2>Cognitive Load / Attention Risk</h2>
+      <div className="gauge">
+        <div className="num" style={{color:loadColor(value)}}>{value}</div>
+        <div className="lbl">0 = relaxed · 100 = overloaded</div>
+        <div className="bar"><span style={{width:value+'%',background:loadColor(value)}}/></div>
+      </div>
+      <div className="factors">
+        {factors.length===0 && <span className="chip">nominal</span>}
+        {factors.map((f,i)=><span key={i} className="chip">{f}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function Vision({visionDriver, visionObjects, ws, liveVision}){
+  const [camOn, setCamOn] = React.useState(false);
+  const videoRef = React.useRef(null);
+  const timerRef = React.useRef(null);
+
+  const startCam = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      const canvas = document.createElement('canvas');
+      canvas.width = 320; canvas.height = 240;
+      const ctx2d = canvas.getContext('2d');
+      timerRef.current = setInterval(()=>{
+        ctx2d.drawImage(videoRef.current,0,0,320,240);
+        const b64 = canvas.toDataURL('image/jpeg',0.7).split(',')[1];
+        if(ws.current && ws.current.readyState===1)
+          ws.current.send(JSON.stringify({cmd:'vision_frame',data:b64}));
+      }, 200); // 5 fps
+      setCamOn(true);
+    } catch(e){ alert('Camera access denied: '+e.message); }
+  };
+
+  const stopCam = () => {
+    clearInterval(timerRef.current);
+    videoRef.current?.srcObject?.getTracks().forEach(t=>t.stop());
+    setCamOn(false);
+  };
+
+  const vd = visionDriver || {};
+  const dets = (visionObjects?.detections || []).slice(0,3);
+  const emoColor = {calm:'var(--ok)',happy:'var(--ok)',stressed:'var(--warn)',tired:'var(--crit)'};
+
+  return (
+    <div className="card">
+      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span>Vision · Face + Objects</span>
+        {liveVision && (
+          <button onClick={camOn?stopCam:startCam}
+            style={{fontSize:11,padding:'3px 10px',background:camOn?'rgba(255,77,79,.15)':'var(--panel2)',
+              color:camOn?'var(--crit)':'var(--dim)',borderColor:camOn?'var(--crit)':'var(--line)'}}>
+            {camOn ? '⏹ cam live' : '📷 use cam'}
+          </button>
+        )}
+      </h2>
+      <video ref={videoRef} style={{display:'none'}} muted playsInline/>
+      {vd.face_detected ? (
+        <div style={{display:'flex',gap:18,flexWrap:'wrap',fontSize:13}}>
+          <div><span style={{color:'var(--dim)',display:'block',fontSize:11}}>emotion</span>
+            <b style={{color:emoColor[vd.emotion]||'var(--txt)'}}>{vd.emotion}</b></div>
+          <div><span style={{color:'var(--dim)',display:'block',fontSize:11}}>EAR</span>
+            <b style={{color:vd.drowsy?'var(--crit)':'var(--txt)'}}>{vd.ear}</b></div>
+          <div><span style={{color:'var(--dim)',display:'block',fontSize:11}}>drowsy</span>
+            <b style={{color:vd.drowsy?'var(--crit)':'var(--ok)'}}>{vd.drowsy?'yes':'no'}</b></div>
+        </div>
+      ) : (
+        <div style={{color:'var(--dim)',fontSize:13}}>{camOn?'scanning…':'no face'}</div>
+      )}
+      {dets.length>0 && (
+        <div style={{marginTop:10}}>
+          <div style={{fontSize:11,color:'var(--dim)',marginBottom:4}}>YOLO detections</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {dets.map((d,i)=><span key={i} className="chip">{d.label} {Math.round(d.confidence*100)}%</span>)}
+          </div>
+        </div>
+      )}
+      {!liveVision && <div style={{fontSize:11,color:'var(--dim)',marginTop:8}}>
+        synthetic mode — mediapipe + ultralytics required for live cam
+      </div>}
+    </div>
+  );
+}
+
+function Seat({s}){
+  if(!s.occupied) return (
+    <div className="seat empty"><div className="row"><span className="name">{fmt(s.seat)}</span></div>
+      <div className="who">empty</div></div>);
+  return (
+    <div className="seat">
+      <div className="row">
+        <span className="name">{fmt(s.seat)}</span>
+        <span className={'pill '+(s.buckled?'belt':'nobelt')}>{s.buckled?'belted':'no belt'}</span>
+      </div>
+      <div className="who">{s.occupant}</div>
+      <div className="vit">
+        {s.heart_rate_bpm!=null && <span>♥ <b>{Math.round(s.heart_rate_bpm)}</b> bpm</span>}
+        {s.respiration_rpm!=null && <span>≈ <b>{Math.round(s.respiration_rpm)}</b> rpm</span>}
+      </div>
+    </div>
+  );
+}
+
+function Cabin({radar,vehicle}){
+  const seats = (radar.seats||[]);
+  const order = ["driver","front_passenger","rear_left","rear_right"];
+  const sorted = order.map(o=>seats.find(s=>s.seat===o)).filter(Boolean);
+  return (
+    <div className="card">
+      <h2>In-Cabin Radar · {radar.point_count||0} pts</h2>
+      <div className="cabin">{sorted.map(s=><Seat key={s.seat} s={s}/>)}</div>
+      <div className="telem" style={{marginTop:14}}>
+        <div><span>speed</span><b>{Math.round(vehicle.speed_kmh||0)} km/h</b></div>
+        <div><span>visibility</span><b>{vehicle.visibility||'—'}</b></div>
+        <div><span>rough road in</span><b>{vehicle.pothole_ahead_m!=null?Math.round(vehicle.pothole_ahead_m)+' m':'—'}</b></div>
+      </div>
+    </div>
+  );
+}
+
+function Audio({audio, ws, liveAudio}){
+  const [micOn, setMicOn] = React.useState(false);
+  const processorRef = React.useRef(null);
+  const ctxRef = React.useRef(null);
+
+  const SAMPLE_RATE = 16000;
+  const CHUNK_SAMPLES = SAMPLE_RATE * 0.96; // 0.96s chunks match YAMNet window
+
+  const startMic = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio:{sampleRate:SAMPLE_RATE,channelCount:1}});
+      const ctx = new AudioContext({sampleRate: SAMPLE_RATE});
+      ctxRef.current = ctx;
+      const src = ctx.createMediaStreamSource(stream);
+      await ctx.audioWorklet.addModule('data:application/javascript,' + encodeURIComponent(`
+        class Chunker extends AudioWorkletProcessor {
+          constructor(){super();this._buf=[];this._target=${Math.round(CHUNK_SAMPLES)};}
+          process(inputs){
+            const ch=inputs[0][0];if(!ch)return true;
+            for(let i=0;i<ch.length;i++){this._buf.push(ch[i]);}
+            while(this._buf.length>=this._target){
+              this.port.postMessage(this._buf.splice(0,this._target));
+            }
+            return true;
+          }
+        }
+        registerProcessor('chunker',Chunker);
+      `));
+      const node = new AudioWorkletNode(ctx, 'chunker');
+      node.port.onmessage = e => {
+        if(ws.current && ws.current.readyState===1)
+          ws.current.send(JSON.stringify({cmd:'audio_chunk', data: Array.from(e.data)}));
+      };
+      src.connect(node);
+      processorRef.current = {stream, node, src};
+      setMicOn(true);
+    } catch(e){ alert('Mic access denied: '+e.message); }
+  };
+
+  const stopMic = () => {
+    processorRef.current?.stream?.getTracks().forEach(t=>t.stop());
+    ctxRef.current?.close();
+    processorRef.current = null;
+    setMicOn(false);
+  };
+
+  const active = audio.label && audio.label!=='none';
+  return (
+    <div className="card">
+      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span>Acoustic Anomaly</span>
+        {liveAudio && (
+          <button onClick={micOn?stopMic:startMic}
+            style={{fontSize:11,padding:'3px 10px',background:micOn?'rgba(255,77,79,.15)':'var(--panel2)',
+              color:micOn?'var(--crit)':'var(--dim)',borderColor:micOn?'var(--crit)':'var(--line)'}}>
+            {micOn ? '⏹ mic live' : '🎤 use mic'}
+          </button>
+        )}
+      </h2>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div className="num" style={{fontSize:28,color:active?'var(--warn)':'var(--dim)'}}>
+          {active?audio.label:'quiet'}</div>
+        {active && <span className="chip">{Math.round(audio.confidence*100)}% conf</span>}
+        {micOn && !active && <span className="chip" style={{color:'var(--ok)'}}>listening…</span>}
+      </div>
+      {!liveAudio && <div style={{fontSize:11,color:'var(--dim)',marginTop:8}}>
+        synthetic mode — start server with TensorFlow for live mic
+      </div>}
+    </div>
+  );
+}
+
+function Mitigations({list,send}){
+  const visible = list.filter(m=>m.status!=='dismissed');
+  return (
+    <div className="card">
+      <h2>Adaptive Mitigations · confirm-first</h2>
+      {visible.length===0 && <div className="empty-mit">No action needed — cabin nominal.</div>}
+      {visible.map(m=>(
+        <div key={m.id} className={'mit '+m.severity}>
+          <div className="top">
+            <span className="title">{m.title}</span>
+            <span className={'st '+m.status}>{m.status}</span>
+          </div>
+          <div className="uc">{m.usecase}</div>
+          <div className="detail">{m.detail}</div>
+          {m.confirm && m.status==='proposed' &&
+            <div className="acts">
+              <button className="primary" onClick={()=>send({cmd:'confirm',id:m.id})}>Apply</button>
+              <button className="ghost" onClick={()=>send({cmd:'dismiss',id:m.id})}>Dismiss</button>
+            </div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const DEMO_STEPS = [
+  {label:"Idle — cabin nominal"},
+  {label:"Child crying in rear seat"},
+  {label:"Driver under stress"},
+  {label:"Driver fatigue detected"},
+  {label:"Seatbelt misuse alert"},
+  {label:"Unsecured object + pothole ahead"},
+  {label:"Child left behind"},
+  {label:"Idle — demo complete"},
+];
+
+function Vibration({vib}){
+  const quality = vib?.road_quality || 'smooth';
+  const rms = vib?.rms_z || 0;
+  const ahead = vib?.pothole_ahead_m;
+  const qColor = {smooth:'var(--ok)', rough:'var(--warn)', pothole:'var(--crit)'};
+  const pct = Math.min(100, (rms / 0.9) * 100);
+  return (
+    <div className="card">
+      <h2>IMU / Vibration · road quality</h2>
+      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:8}}>
+        <div style={{fontSize:22,fontWeight:700,color:qColor[quality]||'var(--txt)'}}>{quality}</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:11,color:'var(--dim)',marginBottom:3}}>RMS z-axis</div>
+          <div className="bar"><span style={{width:pct+'%',background:qColor[quality]}}/></div>
+        </div>
+        <div style={{fontSize:13,textAlign:'right'}}>
+          <span style={{color:'var(--dim)',fontSize:11,display:'block'}}>ahead</span>
+          <b>{ahead!=null ? Math.round(ahead)+'m' : '—'}</b>
+        </div>
+      </div>
+      {ahead!=null && ahead<80 && <div style={{fontSize:12,color:'var(--warn)'}}>
+        ⚠ Rough road in ~{Math.round(ahead)} m — pre-emptive advisory active
+      </div>}
+    </div>
+  );
+}
+
+function DemoBar({scenario}){
+  const [running,setRunning]=React.useState(false);
+  const [step,setStep]=React.useState(0);
+  const timerRef=React.useRef(null);
+
+  const HOLDS=[3,7,7,7,6,8,7,2]; // matches DEMO_SCRIPT hold+settle times
+  const total=HOLDS.reduce((a,b)=>a+b,0);
+
+  React.useEffect(()=>{
+    if(!running)return;
+    // map scenario name to step index for progress tracking
+    const names=["idle","child_crying_rear","driver_stress","driver_tired",
+                 "seatbelt_misuse","pothole_object","child_left_behind","idle"];
+    const idx=names.indexOf(scenario);
+    if(idx>=0) setStep(idx);
+    if(scenario==="idle" && step===7){setRunning(false);setStep(0);}
+  },[scenario]);
+
+  const play=()=>{
+    if(running)return;
+    setRunning(true);
+    setStep(0);
+    fetch('/api/demo/play',{method:'POST'});
+  };
+
+  const elapsed=HOLDS.slice(0,step).reduce((a,b)=>a+b,0);
+  const pct=running?Math.round((elapsed/total)*100):0;
+
+  return (
+    <div className="demo-bar">
+      <div className="demo-info">
+        <div className="demo-title">
+          {running ? `Step ${step+1}/${DEMO_STEPS.length}: ${DEMO_STEPS[step]?.label}`
+                   : 'Auto-Play Demo — walk judges through every use case'}
+        </div>
+        {running && <>
+          <div className="demo-progress"><span style={{width:pct+'%'}}/></div>
+          <div className="demo-sub">{DEMO_STEPS.map((s,i)=>
+            <span key={i} style={{marginRight:8,opacity:i===step?1:.4,
+              color:i<step?'var(--ok)':i===step?'var(--accent)':'var(--dim)'}}>
+              {i<step?'✓ ':i===step?'▶ ':''}{s.label}
+            </span>
+          )}</div>
+        </>}
+        {!running && <div className="demo-sub">
+          Plays 8 scenarios hands-free · auto-confirms mitigations · ~45 seconds
+        </div>}
+      </div>
+      <button className="demo-btn" onClick={play} disabled={running}>
+        {running ? 'Running…' : '▶ Run Demo'}
+      </button>
+    </div>
+  );
+}
+
+function Scenarios({list,current,send}){
+  return (
+    <div className="card">
+      <h2>Demo Scenarios</h2>
+      <div className="scenarios">
+        {list.map(s=>(
+          <button key={s} className={s===current?'sel':''}
+            onClick={()=>send({cmd:'scenario',name:s})}>{fmt(s)}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [state,setState]=useState({cognitive_load:0,factors:[],radar:{},audio:{},vehicle:{},mitigations:[],scenario:'idle',latency_ms:0});
+  const [conn,setConn]=useState(false);
+  const [scenarios,setScenarios]=useState([]);
+  const [liveAudio,setLiveAudio]=useState(false);
+  const [liveVision,setLiveVision]=useState(false);
+  const ws=useRef(null);
+
+  useEffect(()=>{
+    fetch('/api/scenarios').then(r=>r.json()).then(d=>setScenarios(d.scenarios)).catch(()=>{});
+    fetch('/api/caps').then(r=>r.json()).then(d=>{setLiveAudio(d.live_audio);setLiveVision(d.live_vision);}).catch(()=>{});
+    const sock=new WebSocket(`ws://${location.host}/ws`);
+    ws.current=sock;
+    sock.onopen=()=>setConn(true);
+    sock.onclose=()=>setConn(false);
+    sock.onmessage=e=>setState(JSON.parse(e.data));
+    return ()=>sock.close();
+  },[]);
+
+  const send=msg=>ws.current&&ws.current.readyState===1&&ws.current.send(JSON.stringify(msg));
+
+  return (
+    <div className="app">
+      <header>
+        <h1><span className="tag">Cabin</span>Sense</h1>
+        <span className="sub">In-Cabin Disturbance Intelligence · cognitive-load reduction</span>
+        <span className="status">
+          <span className={'dot'+(conn?' on':'')}/>{conn?'live':'offline'} · {state.latency_ms} ms
+        </span>
+      </header>
+      <DemoBar scenario={state.scenario}/>
+      <div className="grid">
+        <div className="col">
+          <Gauge value={state.cognitive_load} factors={state.factors}/>
+          <Audio audio={state.audio} ws={ws} liveAudio={liveAudio}/>
+          <Vibration vib={state.vibration}/>
+          <Scenarios list={scenarios} current={state.scenario} send={send}/>
+        </div>
+        <div className="col">
+          <Cabin radar={state.radar} vehicle={state.vehicle}/>
+          <Vision visionDriver={state.vision_driver} visionObjects={state.vision_objects}
+            ws={ws} liveVision={liveVision}/>
+        </div>
+        <div className="col">
+          <Mitigations list={state.mitigations} send={send}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
