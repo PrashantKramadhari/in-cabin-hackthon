@@ -34,6 +34,10 @@ app = FastAPI(title="CabinSense")
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
+# serve bundled JS libs before any routes so /static/* is always available
+if FRONTEND.exists():
+    app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
+
 _demo_running = False
 
 # Each step: (scenario_name, hold_seconds, mitigation_ids_to_auto_confirm)
@@ -139,7 +143,3 @@ async def index() -> FileResponse:
 @app.get("/deck")
 async def deck() -> FileResponse:
     return FileResponse(FRONTEND / "deck.html")
-
-
-if FRONTEND.exists():
-    app.mount("/static", StaticFiles(directory=FRONTEND), name="static")

@@ -17,6 +17,9 @@ backend/yolov8n.pt
 *.log
 /tmp/
 
+# Bundled JS libs (downloaded by setup script)
+frontend/lib/
+
 # OS
 .DS_Store
 Thumbs.db

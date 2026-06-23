@@ -37,6 +37,12 @@ conda env create -f environment.yml
 conda activate cabinsense
 ```
 
+Download the local JS libs (React, Babel — avoids CDN blank-screen issues):
+
+```bash
+bash setup_frontend.sh
+```
+
 Then download the MediaPipe face landmarker model (one-time, ~3.6 MB):
 
 ```bash
@@ -273,6 +279,7 @@ technothon/
 | AST model download slow on first start | Wait ~30 s; it caches in `~/.cache/huggingface/` |
 | Mic button missing / greyed out | Server returned `live_audio: false` — check install |
 | Camera shows `no face` | Ensure good lighting; camera must face you directly |
+| HMI blank / black screen | Run `bash setup_frontend.sh` (CDN blocked). Then hard-refresh Ctrl+Shift+R |
 | `torchvision` import error | Run `conda env create -f environment.yml` from scratch — it pins the correct versions |
 | MediaPipe `no attribute solutions` | You have mp 0.10+; the node uses the Tasks API — should work |
 | Port 8000 in use | `uvicorn main:app --port 8001` and open `http://localhost:8001` |

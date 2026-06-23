@@ -8,10 +8,12 @@ dependencies:
     - fastapi
     - "uvicorn[standard]"
     - numpy
-    - --extra-index-url https://download.pytorch.org/whl/cpu
-    - torch==2.5.1
-    - torchaudio==2.5.1
-    - torchvision==0.20.1
+    # PyTorch with CUDA 12.4 (RTX 3080 / RTX 3090 / RTX 40xx)
+    # For CPU-only machines swap the index URL to https://download.pytorch.org/whl/cpu
+    - --extra-index-url https://download.pytorch.org/whl/cu124
+    - torch
+    - torchaudio
+    - torchvision
     - transformers
     - mediapipe
     - ultralytics
