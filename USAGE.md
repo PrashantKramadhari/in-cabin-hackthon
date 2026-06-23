@@ -20,34 +20,38 @@ Vehicle/GPS      ─┘
 
 | Tool | Version |
 |---|---|
-| Python | 3.11+ |
-| Node / npm | not required (HMI is CDN React, zero-build) |
+| Conda | Miniconda or Anaconda (any recent version) |
+| Python | managed by conda (3.11 pinned in `environment.yml`) |
+| Node / npm | not required — HMI is CDN React, zero-build |
 | Browser | Chrome / Edge recommended (mic + camera WebRTC) |
 
 ---
 
-## 2. First-time setup
+## 2. First-time setup (conda)
 
 ```bash
-cd backend
+# from the repo root — one command creates and populates the environment
+conda env create -f environment.yml
 
-# create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+# activate it (do this every time you open a new terminal)
+conda activate cabinsense
+```
 
-# install Python dependencies
-pip install fastapi "uvicorn[standard]" numpy
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip install torchvision==0.20.1  --index-url https://download.pytorch.org/whl/cpu
-pip install transformers mediapipe ultralytics opencv-python-headless
+Then download the MediaPipe face landmarker model (one-time, ~3.6 MB):
 
-# download the MediaPipe face landmarker model (one-time, ~3.6 MB)
-curl -L -o models/face_landmarker.task \
+```bash
+mkdir -p backend/models
+curl -L -o backend/models/face_landmarker.task \
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
 ```
 
 YOLOv8n (`yolov8n.pt`, ~6 MB) and the AST audio model (~85 MB) download
-automatically on first server start.
+automatically on first server start and are cached locally.
+
+> **To update the environment later** (e.g. after a `git pull`):
+> ```bash
+> conda env update -f environment.yml --prune
+> ```
 
 ---
 
@@ -269,6 +273,6 @@ technothon/
 | AST model download slow on first start | Wait ~30 s; it caches in `~/.cache/huggingface/` |
 | Mic button missing / greyed out | Server returned `live_audio: false` — check install |
 | Camera shows `no face` | Ensure good lighting; camera must face you directly |
-| `torchvision` import error | `pip install torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu` |
+| `torchvision` import error | Run `conda env create -f environment.yml` from scratch — it pins the correct versions |
 | MediaPipe `no attribute solutions` | You have mp 0.10+; the node uses the Tasks API — should work |
 | Port 8000 in use | `uvicorn main:app --port 8001` and open `http://localhost:8001` |
