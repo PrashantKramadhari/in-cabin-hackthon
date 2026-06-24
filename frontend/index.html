@@ -26,9 +26,9 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 .view{position:absolute;inset:0;overflow:hidden}
 .hmi-tabs{height:42px;display:flex;background:#040810;border-top:1px solid rgba(255,255,255,.05);flex-shrink:0}
 .tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;font-size:11px;
-  font-weight:500;color:rgba(255,255,255,.3);cursor:pointer;border:none;background:none;
+  font-weight:500;color:rgba(255,255,255,.65);cursor:pointer;border:none;background:none;
   border-top:2px solid transparent;transition:all .25s;letter-spacing:.3px}
-.tab.on{color:#00d4b0;border-top-color:#00d4b0;background:rgba(0,212,176,.04)}
+.tab.on{color:#00d4b0;border-top-color:#00d4b0;background:rgba(0,212,176,.06);font-weight:600}
 
 /* ─── Brand Bar ─── */
 .brand-bar{display:flex;align-items:center;justify-content:space-between;
@@ -170,9 +170,9 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .iv-col{flex:1;display:flex;flex-direction:column;justify-content:center;
   padding:18px 16px;overflow:hidden;border-right:1px solid #1c2740}
 .iv-col:last-child{border-right:none}
-.iv-cabin{background:#090d12;align-items:center;justify-content:flex-start;padding-top:16px}
+.iv-cabin{background:#090d12;align-items:center;justify-content:center}
 .iv-issue{background:#0c1520}
-.iv-gauge{background:#090d12;align-items:center}
+.iv-gauge{background:#090d12;align-items:center;justify-content:flex-start;padding-top:22px}
 .iv-rec{background:#0c1520}
 
 /* infotainment text — white */
@@ -1149,56 +1149,66 @@ function RecommendationPanel({mitigations,send}){
   );
 }
 
+/* ── OccupantList — reusable ── */
+function OccupantList({seatConfigs}){
+  var occupied=SEAT_IDS.filter(function(sid){
+    var c=(seatConfigs&&seatConfigs[sid])||{};return c.occupied;
+  });
+  if(occupied.length===0)
+    return <div style={{fontSize:10,color:'rgba(255,255,255,.35)',textAlign:'center',marginTop:8}}>No occupants</div>;
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:5,width:'100%',marginTop:10}}>
+      {occupied.map(function(sid){
+        var c=(seatConfigs&&seatConfigs[sid])||{};
+        var d=c.distress||0;
+        var col=d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
+        return (
+          <div key={sid} style={{display:'flex',alignItems:'center',gap:7,
+            background:'rgba(255,255,255,.04)',borderRadius:5,padding:'5px 8px',
+            border:'1px solid rgba(255,255,255,.08)'}}>
+            <span style={{color:col,fontSize:13}}>{ICONS[c.kind]||'👤'}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:8,color:'rgba(255,255,255,.6)',textTransform:'uppercase',letterSpacing:'.5px'}}>{SEAT_LABELS[sid]}</div>
+              <div style={{fontSize:10,color:col,fontWeight:600,marginTop:1}}>
+                {c.audio_event&&c.audio_event!=='none'
+                  ?(AICONS[c.audio_event]+' '+c.audio_event)
+                  :(c.emotion||'calm')}
+              </div>
+            </div>
+            <span style={{fontSize:11,color:c.buckled?'#00d4b0':'#fc8181',fontWeight:700,flexShrink:0}}>
+              {c.buckled?'✓':'✗'}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── InfotainmentView (Tab 2) — 4 equal columns, single row ── */
 function InfotainmentView({state,send}){
   var load=state.cognitive_load||0;
   var factors=state.factors||[];
-  var topFactor=factors[0]||null;
   return (
     <div className="iv">
-      {/* Col 1: Vehicle Seat View */}
+      {/* Col 1: Vehicle Cabin — centered */}
       <div className="iv-col iv-cabin">
         <div style={{fontSize:7,textTransform:'uppercase',letterSpacing:'1.5px',
-          color:'#ffffff',fontWeight:600,marginBottom:8,textAlign:'center'}}>Vehicle Cabin</div>
+          color:'#ffffff',fontWeight:600,marginBottom:10,textAlign:'center'}}>Vehicle Cabin</div>
         <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
-        {/* Occupant status list below SVG */}
-        <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:4,width:'100%'}}>
-          {SEAT_IDS.map(function(sid){
-            var c=(state.seat_configs&&state.seat_configs[sid])||{};
-            if(!c.occupied)return null;
-            var d=c.distress||0;
-            var col=d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
-            return (
-              <div key={sid} style={{display:'flex',alignItems:'center',gap:6,
-                background:'rgba(255,255,255,.04)',borderRadius:5,padding:'4px 8px',
-                border:'1px solid rgba(255,255,255,.07)'}}>
-                <span style={{color:col,fontSize:12}}>{ICONS[c.kind]||'👤'}</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:8,color:'rgba(255,255,255,.7)',textTransform:'uppercase'}}>{SEAT_LABELS[sid]}</div>
-                  <div style={{fontSize:9,color:col,fontWeight:600}}>
-                    {c.audio_event&&c.audio_event!=='none'
-                      ?(AICONS[c.audio_event]+' '+c.audio_event)
-                      :(c.emotion||'calm')}
-                  </div>
-                </div>
-                <span style={{fontSize:10,color:c.buckled?'#00d4b0':'#fc8181',fontWeight:700}}>
-                  {c.buckled?'✓':'✗'}
-                </span>
-              </div>
-            );
-          }).filter(Boolean)}
-          {SEAT_IDS.every(function(sid){
-            var c=(state.seat_configs&&state.seat_configs[sid])||{};return !c.occupied;
-          })&&<div style={{fontSize:10,color:'rgba(255,255,255,.5)',textAlign:'center'}}>No occupants</div>}
-        </div>
       </div>
       {/* Col 2: Issue / Distract */}
       <div className="iv-col iv-issue">
         <IssuePanel state={state}/>
       </div>
-      {/* Col 3: Load Score */}
+      {/* Col 3: Load Score + Occupant Status */}
       <div className="iv-col iv-gauge">
         <CircularGauge value={load}/>
+        <div style={{width:'100%',marginTop:14}}>
+          <div style={{fontSize:8,textTransform:'uppercase',letterSpacing:'1.2px',
+            color:'#ffffff',fontWeight:600,marginBottom:6,textAlign:'center'}}>Cabin Status</div>
+          <OccupantList seatConfigs={state.seat_configs}/>
+        </div>
       </div>
       {/* Col 4: Recommendation */}
       <div className="iv-col iv-rec">
@@ -1215,7 +1225,7 @@ function BrandBar(){
       {/* JLR logo */}
       <div className="jag-side">
         <img src="/static/jlr.png" alt="Jaguar Land Rover"
-          style={{height:36,objectFit:'contain',filter:'brightness(0) invert(1)',opacity:.9}}/>
+          style={{height:36,objectFit:'contain',filter:'invert(1)',mixBlendMode:'screen',opacity:.95}}/>
       </div>
       {/* Separator */}
       <div className="brand-sep"/>
