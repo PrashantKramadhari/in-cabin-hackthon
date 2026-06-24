@@ -1103,7 +1103,7 @@ function RoadQualityWidget({vib,send}){
 }
 
 /* ── TimelineBar ── */
-function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,
+function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,onScenarioSelect,
                       showVideo,showAudio,showSeats,
                       onToggleVideo,onToggleAudio,onToggleSeats}){
   var chipStyle=function(on){return {
@@ -1112,6 +1112,10 @@ function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,
     color:on?'#00d4b0':'rgba(255,255,255,.38)',
     outline:on?'1px solid rgba(0,212,176,.5)':'1px solid rgba(255,255,255,.1)'
   };};
+  var pickScenario=function(name){
+    send({cmd:'scenario',name:name});
+    if(onScenarioSelect)onScenarioSelect();
+  };
   return (
     <div className="panel sv-timeline" style={{flexDirection:'column',padding:'8px 12px',gap:7}}>
       {/* Panel toggles row */}
@@ -1123,18 +1127,23 @@ function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,
         <button style={chipStyle(showSeats)} onClick={onToggleSeats}>Seats</button>
         <span style={{flex:1}}/>
         <span style={{fontSize:9,color:'rgba(255,255,255,.25)'}}>
-          Select audio/video above, then Run Demo →
+          Select audio/video above, then Run →
         </span>
       </div>
-      {/* Scenarios + Run Demo row */}
+      {/* Events + Run row */}
       <div style={{display:'flex',alignItems:'center',gap:8}}>
         <span style={{fontSize:9,color:'rgba(255,255,255,.8)',textTransform:'uppercase',
           letterSpacing:'1px',flexShrink:0}}>Events</span>
         <div className="sc-scroll">
-          {(scenarios||[]).map(function(s){
+          {/* "none" resets to idle and clears manual config */}
+          <button className={'sc-btn'+(current==='idle'&&!demoRunning?' on':'')}
+            onClick={function(){pickScenario('idle');}}>
+            none
+          </button>
+          {(scenarios||[]).filter(function(s){return s!=='idle';}).map(function(s){
             var nm=s.replace(/_/g,' ');
             return <button key={s} className={'sc-btn'+(current===s&&!demoRunning?' on':'')}
-              onClick={function(){send({cmd:'scenario',name:s});}}>
+              onClick={function(){pickScenario(s);}}>
               {nm}
             </button>;
           })}
@@ -1144,9 +1153,9 @@ function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,
             onClick={function(){
               if(onDemoToggle)onDemoToggle(!demoRunning);
             }}>
-            {demoRunning?'⏹ Stop Demo':'▶ Run Demo'}
+            {demoRunning?'⏹ Stop':'▶ Run'}
           </button>
-          {demoRunning&&<span className="demo-ind">● running</span>}
+          {demoRunning&&<span className="demo-ind">● live</span>}
         </div>
       </div>
     </div>
@@ -1279,6 +1288,7 @@ function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat,
       {/* Row 3: Timeline + panel toggles */}
       <TimelineBar scenarios={scenarios} current={state.scenario}
         demoRunning={localDemoRunning} send={send} onDemoToggle={onDemoToggle}
+        onScenarioSelect={function(){if(onDemoToggle)onDemoToggle(false);}}
         showVideo={showVideo} showAudio={showAudio} showSeats={showSeats}
         onToggleVideo={function(){setShowVideo(function(v){return !v;});}}
         onToggleAudio={function(){setShowAudio(function(v){return !v;});}}
