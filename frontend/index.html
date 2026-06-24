@@ -1142,13 +1142,7 @@ function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,
         <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center',marginLeft:4}}>
           <button className={demoRunning?'demo-btn demo-stop':'demo-btn demo-run'}
             onClick={function(){
-              if(demoRunning){
-                fetch('/api/demo/stop',{method:'POST'});
-                if(onDemoToggle)onDemoToggle(false);
-              } else {
-                fetch('/api/demo/play',{method:'POST'});
-                if(onDemoToggle)onDemoToggle(true);
-              }
+              if(onDemoToggle)onDemoToggle(!demoRunning);
             }}>
             {demoRunning?'⏹ Stop Demo':'▶ Run Demo'}
           </button>
@@ -1260,7 +1254,7 @@ function SeatConfigOverlay({seatId,config,send,onClose}){
 
 /* ── SensorView (Tab 1) ── */
 function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat,
-                     playTrigger,stopTrigger,onDemoToggle}){
+                     playTrigger,stopTrigger,onDemoToggle,localDemoRunning}){
   const [showVideo,setShowVideo]=useState(true);
   const [showAudio,setShowAudio]=useState(true);
   const [showSeats,setShowSeats]=useState(true);
@@ -1284,7 +1278,7 @@ function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat,
       <RoadQualityWidget vib={state.vibration} send={send}/>
       {/* Row 3: Timeline + panel toggles */}
       <TimelineBar scenarios={scenarios} current={state.scenario}
-        demoRunning={state.demo_running} send={send} onDemoToggle={onDemoToggle}
+        demoRunning={localDemoRunning} send={send} onDemoToggle={onDemoToggle}
         showVideo={showVideo} showAudio={showAudio} showSeats={showSeats}
         onToggleVideo={function(){setShowVideo(function(v){return !v;});}}
         onToggleAudio={function(){setShowAudio(function(v){return !v;});}}
@@ -1585,9 +1579,11 @@ function App(){
   const [selSeat,setSelSeat]=useState(null);
   const [demoTrigger,setDemoTrigger]=useState(0);
   const [demoStopTrigger,setDemoStopTrigger]=useState(0);
+  const [localDemoRunning,setLocalDemoRunning]=useState(false);
   const ws=useRef(null);
 
   var onDemoToggle=useCallback(function(running){
+    setLocalDemoRunning(running);
     if(running){
       setDemoTrigger(function(t){return t+1;});
       setTab('info');
@@ -1631,7 +1627,7 @@ function App(){
               liveAudio={liveAudio} liveVision={liveVision}
               scenarios={scenarios} onSelectSeat={setSelSeat}
               playTrigger={demoTrigger} stopTrigger={demoStopTrigger}
-              onDemoToggle={onDemoToggle}/>
+              onDemoToggle={onDemoToggle} localDemoRunning={localDemoRunning}/>
           </div>
         )}
         {tab==='info'&&(
