@@ -1630,22 +1630,19 @@ function App(){
         <span className="lat">{state.latency_ms}ms</span>
       </div>
       <div className="hmi-content">
-        {tab==='sensor'&&(
-          <div className="view iv-shell">
-            <BrandBar/>
-            <SensorView state={state} send={send} ws={ws}
-              liveAudio={liveAudio} liveVision={liveVision}
-              scenarios={scenarios} onSelectSeat={setSelSeat}
-              playTrigger={demoTrigger} stopTrigger={demoStopTrigger}
-              onDemoToggle={onDemoToggle} localDemoRunning={localDemoRunning}/>
-          </div>
-        )}
-        {tab==='info'&&(
-          <div className="view iv-shell">
-            <BrandBar/>
-            <InfotainmentView state={state} send={send}/>
-          </div>
-        )}
+        {/* Both views stay mounted — display:none keeps audio/video running across tab switches */}
+        <div className="view iv-shell" style={{display:tab==='sensor'?undefined:'none'}}>
+          <BrandBar/>
+          <SensorView state={state} send={send} ws={ws}
+            liveAudio={liveAudio} liveVision={liveVision}
+            scenarios={scenarios} onSelectSeat={setSelSeat}
+            playTrigger={demoTrigger} stopTrigger={demoStopTrigger}
+            onDemoToggle={onDemoToggle} localDemoRunning={localDemoRunning}/>
+        </div>
+        <div className="view iv-shell" style={{display:tab==='info'?undefined:'none'}}>
+          <BrandBar/>
+          <InfotainmentView state={state} send={send}/>
+        </div>
       </div>
       <div className="hmi-tabs">
         <button className={'tab'+(tab==='sensor'?' on':'')} onClick={function(){setTab('sensor');}}>
