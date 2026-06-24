@@ -373,8 +373,16 @@ function SpectrogramCanvas({analyserRef}){
 }
 
 /* ── AudioWidget ── */
+var AUDIO_FILES=[
+  {id:'off',          label:'Audio Off'},
+  {id:'mic',          label:'Live Mic'},
+  {id:'baby_crying',  label:'baby_crying.mp3'},
+  {id:'baby_talking', label:'baby_talking.mp3'},
+  {id:'baby_happy',   label:'baby_happy.mp3'}
+];
+
 function AudioWidget({ws,liveAudio,audio}){
-  const [micOn,setMicOn]=useState(false);
+  const [audioMode,setAudioMode]=useState('off');
   const [db,setDb]=useState(28);
   const [vad,setVad]=useState(false);
   const procRef=useRef(null);
@@ -383,60 +391,97 @@ function AudioWidget({ws,liveAudio,audio}){
   const dbTimerRef=useRef(null);
   const SR=16000;
 
-  const startMic=async function(){
-    try{
-      var st=await navigator.mediaDevices.getUserMedia({audio:{sampleRate:SR,channelCount:1}});
-      var actx=new AudioContext({sampleRate:SR});
-      ctxRef.current=actx;
-      var src=actx.createMediaStreamSource(st);
-      var an=actx.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=0.6;
-      analyserRef.current=an;src.connect(an);
-      await actx.audioWorklet.addModule(window._CHUNKER_URL);
-      var node=new AudioWorkletNode(actx,'chunker');
-      node.port.onmessage=function(e){
-        if(ws.current&&ws.current.readyState===1)
-          ws.current.send(JSON.stringify({cmd:'audio_chunk',data:Array.from(e.data)}));
-      };
-      src.connect(node);procRef.current={stream:st,node,src};
-      /* dB meter loop */
-      var tdata=new Uint8Array(an.fftSize);
-      dbTimerRef.current=setInterval(function(){
-        an.getByteTimeDomainData(tdata);
-        var rms=0;
-        for(var i=0;i<tdata.length;i++){var s=(tdata[i]-128)/128;rms+=s*s;}
-        rms=Math.sqrt(rms/tdata.length);
-        var dbVal=rms>0?Math.round(20*Math.log10(rms)+90):28;
-        dbVal=Math.max(28,Math.min(110,dbVal));
-        setDb(dbVal);setVad(dbVal>45);
-      },80);
-      setMicOn(true);
-    }catch(e){alert('Mic denied: '+e.message);}
-  };
-  const stopMic=function(){
+  var stopAudio=function(){
     clearInterval(dbTimerRef.current);
     analyserRef.current=null;
-    if(procRef.current&&procRef.current.stream)
-      procRef.current.stream.getTracks().forEach(function(t){t.stop();});
-    if(ctxRef.current)ctxRef.current.close();
-    procRef.current=null;setMicOn(false);setDb(28);setVad(false);
+    if(procRef.current){
+      if(procRef.current.stream)
+        procRef.current.stream.getTracks().forEach(function(t){t.stop();});
+      if(procRef.current.bufSrc)
+        try{procRef.current.bufSrc.stop();}catch(e){}
+    }
+    if(ctxRef.current){ctxRef.current.close();ctxRef.current=null;}
+    procRef.current=null;setDb(28);setVad(false);
   };
-  useEffect(function(){return stopMic;},[]);
+
+  /* shared setup: creates AudioContext, Analyser, Chunker; returns {actx, an, chunker} */
+  var _setupContext=async function(){
+    var actx=new AudioContext({sampleRate:SR});
+    ctxRef.current=actx;
+    var an=actx.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=0.6;
+    analyserRef.current=an;
+    await actx.audioWorklet.addModule(window._CHUNKER_URL);
+    var chunker=new AudioWorkletNode(actx,'chunker');
+    chunker.port.onmessage=function(e){
+      if(ws.current&&ws.current.readyState===1)
+        ws.current.send(JSON.stringify({cmd:'audio_chunk',data:Array.from(e.data)}));
+    };
+    /* dB meter */
+    var tdata=new Uint8Array(an.fftSize);
+    dbTimerRef.current=setInterval(function(){
+      if(!analyserRef.current)return;
+      analyserRef.current.getByteTimeDomainData(tdata);
+      var rms=0;
+      for(var i=0;i<tdata.length;i++){var s=(tdata[i]-128)/128;rms+=s*s;}
+      rms=Math.sqrt(rms/tdata.length);
+      var dbVal=rms>0?Math.round(20*Math.log10(rms)+90):28;
+      setDb(Math.max(28,Math.min(110,dbVal)));
+      setVad(dbVal>45);
+    },80);
+    return {actx,an,chunker};
+  };
+
+  var startMic=async function(){
+    try{
+      var st=await navigator.mediaDevices.getUserMedia({audio:{sampleRate:SR,channelCount:1}});
+      var {actx,an,chunker}=await _setupContext();
+      var src=actx.createMediaStreamSource(st);
+      src.connect(an);src.connect(chunker);
+      procRef.current={stream:st,src};
+    }catch(e){alert('Mic denied: '+e.message);setAudioMode('off');}
+  };
+
+  var startFile=async function(filename){
+    try{
+      var resp=await fetch('/static/audio/'+filename+'.mp3');
+      var arrayBuf=await resp.arrayBuffer();
+      var {actx,an,chunker}=await _setupContext();
+      var audioBuf=await actx.decodeAudioData(arrayBuf);
+      var bufSrc=actx.createBufferSource();
+      bufSrc.buffer=audioBuf;bufSrc.loop=true;
+      bufSrc.connect(an);bufSrc.connect(chunker);
+      bufSrc.start();
+      procRef.current={bufSrc};
+    }catch(e){console.error('Audio file error:',e);setAudioMode('off');}
+  };
+
+  var handleMode=function(newMode){
+    stopAudio();
+    setAudioMode(newMode);
+    if(newMode==='mic')startMic();
+    else if(newMode!=='off')startFile(newMode);
+  };
+
+  useEffect(function(){return stopAudio;},[]);
 
   var aud=audio||{};
   var audActive=aud.label&&aud.label!=='none';
   var dbPct=Math.min(100,((db-28)/82)*100);
   var dbCol=db>75?'#fc8181':db>55?'#f6ad55':'#00d4b0';
+  var isFile=audioMode!=='off'&&audioMode!=='mic';
 
   return (
     <div className="panel" style={{gap:0}}>
       <div className="ph">
         <span className="pt">Audio Input</span>
-        {liveAudio&&(
-          <button className={'mic-btn '+(micOn?'mic-stop':'mic-start')}
-            onClick={micOn?stopMic:startMic}>
-            {micOn?'⏹ Stop Mic':'🎤 Start Mic'}
-          </button>
-        )}
+        <select value={audioMode} onChange={function(e){handleMode(e.target.value);}}
+          style={{background:'rgba(0,0,0,.5)',border:'1px solid rgba(255,255,255,.15)',
+            color:'rgba(255,255,255,.85)',borderRadius:4,padding:'2px 6px',
+            fontSize:10,cursor:'pointer',maxWidth:160}}>
+          {AUDIO_FILES.filter(function(f){return f.id!=='mic'||liveAudio;}).map(function(f){
+            return <option key={f.id} value={f.id}>{f.label}</option>;
+          })}
+        </select>
       </div>
       {/* dB meter row */}
       <div className="row" style={{marginBottom:6,flexShrink:0}}>
@@ -460,12 +505,16 @@ function AudioWidget({ws,liveAudio,audio}){
       <div className="canvas-wrap" style={{flex:3,minHeight:0}}>
         <SpectrogramCanvas analyserRef={analyserRef}/>
       </div>
+      {isFile&&(
+        <div style={{fontSize:9,color:'#f6ad55',marginTop:4,flexShrink:0}}>
+          FILE: {audioMode}.mp3 — looping
+        </div>
+      )}
       {audActive&&(
         <div className="det-badge" style={{marginTop:5}}>
           {AICONS[aud.label]||''} {aud.label} · {Math.round((aud.confidence||0)*100)}% conf
         </div>
       )}
-      {!liveAudio&&<div style={{fontSize:9,color:'#1c2740',marginTop:5}}>synthetic · seat config active</div>}
     </div>
   );
 }
