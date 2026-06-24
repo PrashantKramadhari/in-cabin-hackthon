@@ -254,16 +254,6 @@ async def ws(sock: WebSocket) -> None:
                 b64 = msg.get("data", "")
                 if b64 and not _vision.frame_queue.full():
                     await _vision.frame_queue.put(b64)
-            elif cmd == "synthetic_audio" and _USE_LIVE_AUDIO:
-                # Synthetic feed: browser signals which clip is playing
-                clip = msg.get("clip", "")
-                scenario_map = {
-                    "baby_crying": "child_crying_rear",
-                    "baby_talking": "child_crying_rear",
-                    "baby_happy": "idle",
-                }
-                if clip in scenario_map:
-                    scenarios.apply(scenario_map[clip])
     except WebSocketDisconnect:
         pass
     finally:
