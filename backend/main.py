@@ -53,6 +53,19 @@ DEMO_SCRIPT = [
 ]
 
 
+async def _interruptible_sleep(seconds: float) -> bool:
+    """Sleep in short ticks so _demo_stop is checked every 0.3 s.
+    Returns True if the sleep was interrupted."""
+    tick = 0.3
+    elapsed = 0.0
+    while elapsed < seconds:
+        if _demo_stop:
+            return True
+        await asyncio.sleep(min(tick, seconds - elapsed))
+        elapsed += tick
+    return _demo_stop
+
+
 async def _run_demo() -> None:
     global _demo_stop
     _demo_stop = False
@@ -62,12 +75,12 @@ async def _run_demo() -> None:
             if _demo_stop:
                 break
             scenarios.apply(scene)
-            await asyncio.sleep(2)           # let sensors settle
-            if _demo_stop:
+            if await _interruptible_sleep(2.0):   # settle; exits within 0.3 s of stop
                 break
             for mid in auto_confirm:
                 fusion.confirm(mid)
-            await asyncio.sleep(hold)
+            if await _interruptible_sleep(hold):   # hold; exits within 0.3 s of stop
+                break
     finally:
         scenarios.world.demo_running = False
         _demo_stop = False

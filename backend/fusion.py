@@ -37,11 +37,32 @@ def _driver_seat() -> dict | None:
     return None
 
 
+def _effective_audio() -> tuple[str, float]:
+    """Return (label, confidence) — sensor audio first, seat-config world fallback second.
+
+    The live YAMNet node reads the microphone and publishes to the bus regardless of
+    world.audio_label, so scenario/seat-config audio state would otherwise be invisible
+    to the fusion engine when live audio is active.  This fallback ensures that manually
+    configured seat events (crying, barking, shouting…) always reach the cognitive-load
+    formula, while real microphone detections take priority.
+    """
+    sensor = _latest["audio"]
+    s_label = sensor.get("label", "none")
+    s_conf = sensor.get("confidence", 0.0)
+    if s_label not in ("none", "", None) and s_conf > 0.4:
+        return s_label, s_conf
+    # Fallback: audio state derived from per-seat config (set by _sync_audio_from_seats)
+    if world.audio_label not in ("none", "", None):
+        return world.audio_label, world.audio_conf
+    return "none", 0.0
+
+
 def _cognitive_load() -> tuple[int, list[str]]:
     """Return (score 0..100, contributing factors)."""
     score = 0.0
     factors: list[str] = []
 
+    # ── Driver vitals (radar micro-doppler) ──────────────────────────────
     d = _driver_seat()
     if d and d.get("occupied"):
         hr = d.get("heart_rate_bpm") or 72
@@ -53,24 +74,38 @@ def _cognitive_load() -> tuple[int, list[str]]:
         if hr < 60:
             score += 12; factors.append("low arousal / fatigue")
 
-    audio = _latest["audio"]
-    if audio.get("label") in ("crying", "animal") and audio.get("confidence", 0) > 0.5:
-        score += 25; factors.append(f"{audio['label']} in cabin")
-    elif audio.get("label") == "rattle" and audio.get("confidence", 0) > 0.5:
-        score += 10; factors.append("rattling object")
+    # ── Driver emotion (world state / seat config) ────────────────────────
+    if world.driver_emotion == "stressed":
+        score += 10; factors.append("driver stressed")
+    elif world.driver_emotion == "tired":
+        score += 8; factors.append("driver fatigued")
 
+    # ── Audio anomaly (sensor or seat-config fallback) ───────────────────
+    audio_label, audio_conf = _effective_audio()
+    if audio_label in ("crying", "barking", "animal") and audio_conf > 0.4:
+        score += 25; factors.append(audio_label + " in cabin")
+    elif audio_label == "shouting" and audio_conf > 0.4:
+        score += 20; factors.append("shouting in cabin")
+    elif audio_label == "rattle" and audio_conf > 0.4:
+        score += 10; factors.append("rattling object")
+    elif audio_label == "talking" and audio_conf > 0.4:
+        score += 5; factors.append("speech activity")
+
+    # ── Vehicle context ──────────────────────────────────────────────────
     veh = _latest["vehicle"]
-    if veh.get("visibility") == "low":
-        score += 12; factors.append("low visibility")
+    if veh.get("visibility") in ("low", "rain", "fog"):
+        score += 12; factors.append("reduced visibility")
     if veh.get("speed_kmh", 0) > 100:
         score += 8; factors.append("high speed")
 
-    # any agitated rear occupant
+    # ── Agitated rear occupants (count all, not just first) ──────────────
     for s in _latest["radar"].get("seats", []):
-        if s.get("occupant") in ("child", "pet") and (s.get("motion") or 0) > 0.5:
-            score += 8; factors.append(f"agitated {s['occupant']}"); break
+        if s.get("seat") == "driver":
+            continue
+        if s.get("occupant") in ("child", "pet") and s.get("occupied") and (s.get("motion") or 0) > 0.4:
+            score += 10; factors.append("agitated " + s["occupant"])
 
-    # real IMU: road quality adds cognitive load
+    # ── Road quality (IMU) ───────────────────────────────────────────────
     vib = _latest["vibration"]
     if vib.get("road_quality") == "pothole":
         score += 18; factors.append("pothole / road shock (IMU)")
@@ -79,7 +114,7 @@ def _cognitive_load() -> tuple[int, list[str]]:
     if vib.get("pothole_ahead_m") is not None and vib["pothole_ahead_m"] < 80:
         score += 5; factors.append("rough road ahead (IMU)")
 
-    # vision: face-based drowsiness / stress corroboration
+    # ── Vision: drowsiness / stress ──────────────────────────────────────
     vd = _latest["vision_driver"]
     if vd.get("face_detected"):
         if vd.get("drowsy"):
@@ -87,7 +122,7 @@ def _cognitive_load() -> tuple[int, list[str]]:
         elif vd.get("emotion") == "stressed":
             score += 10; factors.append("stress expression (camera)")
 
-    # vision: loose object on seat detected by YOLO
+    # ── Vision: loose object ──────────────────────────────────────────────
     for det in _latest["vision_objects"].get("detections", []):
         if det["label"] in ("backpack", "suitcase", "bottle", "cup", "book", "laptop"):
             score += 6; factors.append(f"loose {det['label']} (camera)"); break
@@ -98,7 +133,7 @@ def _cognitive_load() -> tuple[int, list[str]]:
 def _proposed() -> list[dict]:
     """Compute which mitigations should currently be offered."""
     out: list[dict] = []
-    audio = _latest["audio"]
+    audio_label, audio_conf = _effective_audio()
     veh = _latest["vehicle"]
     d = _driver_seat()
 
@@ -106,15 +141,24 @@ def _proposed() -> list[dict]:
     rear_child_or_pet = any(
         s.get("occupant") in ("child", "pet") and s.get("occupied")
         for s in _latest["radar"].get("seats", []))
-    if audio.get("label") in ("crying", "animal") and audio.get("confidence", 0) > 0.5 \
+    if audio_label in ("crying", "animal", "barking") and audio_conf > 0.4 \
             and rear_child_or_pet:
-        who = "child" if audio["label"] == "crying" else "pet"
+        who = "child" if audio_label == "crying" else "pet"
         out.append(dict(
             id="comfort_audio", title="Soothe cabin",
             usecase="Audio comfort",
             detail=f"{who.title()} distress detected (radar-confirmed). "
                    "Lower media volume 30%, warm AC +1°C, soft cabin lighting.",
             severity="advisory", confirm=True))
+
+    # --- Shouting / passenger distress ---
+    if audio_label == "shouting" and audio_conf > 0.4:
+        out.append(dict(
+            id="shouting_alert", title="Passenger distress",
+            usecase="Audio comfort",
+            detail="Shouting detected in cabin. Check passenger status and consider "
+                   "pulling over if safe.",
+            severity="warning", confirm=True))
 
     # --- USE CASE 2: driver persona tuning from vitals + emotion ---
     if d and d.get("occupied"):
