@@ -472,8 +472,9 @@ function AudioWidget({ws,liveAudio,audio}){
 
 /* ── VideoWidget ── */
 var SYNTH_CLIPS=[
-  {id:'off',       label:'Camera Off'},
-  {id:'live',      label:'Live Camera'},
+  {id:'off',         label:'Camera Off'},
+  {id:'default_video',label:'Default Video (video_1.mp4)'},
+  {id:'live',        label:'Live Camera'},
   {id:'baby_crying', label:'Synthetic: Baby Crying'},
   {id:'baby_talking',label:'Synthetic: Baby Talking'},
   {id:'baby_happy',  label:'Synthetic: Baby Happy'}
@@ -506,7 +507,7 @@ function VideoWidget({ws,liveVision,visionDriver,send}){
       }
       synthRef.current=null;
     }
-    if(vRef.current){vRef.current.srcObject=null;}
+    if(vRef.current){vRef.current.srcObject=null;vRef.current.src='';}
   };
 
   var startLive=async function(){
@@ -569,10 +570,34 @@ function VideoWidget({ws,liveVision,visionDriver,send}){
     }
   };
 
+  var startDefaultVideo=function(){
+    /* Play video_1.mp4 in the <video> element, capture frames for Qwen */
+    var vid=vRef.current;
+    if(!vid)return;
+    vid.src='/static/video_1.mp4';
+    vid.loop=true;
+    vid.muted=true;
+    vid.playsInline=true;
+    vid.play().catch(function(e){console.warn('video play:',e);});
+    var cv2=document.createElement('canvas');cv2.width=320;cv2.height=240;
+    var c2=cv2.getContext('2d');
+    var interval=setInterval(function(){
+      if(vid.readyState>=2){
+        c2.drawImage(vid,0,0,320,240);
+        var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
+        wsSend({cmd:'vision_frame',data:b64});
+      }
+    },1000); /* 1 fps — enough for Qwen scene analysis */
+    camRef.current={interval,canvas:cv2,ctx:c2,stream:null};
+  };
+
   var handleMode=function(newMode){
     stopAll();
+    /* clear src when leaving default_video so browser releases file */
+    if(vRef.current)vRef.current.src='';
     setMode(newMode);
     if(newMode==='live')startLive();
+    else if(newMode==='default_video')startDefaultVideo();
     else if(newMode.startsWith('baby_'))startSynth(newMode);
   };
 
@@ -580,6 +605,7 @@ function VideoWidget({ws,liveVision,visionDriver,send}){
 
   var vd=visionDriver||{};
   var isSynth=mode.startsWith('baby_');
+  var isDefault=mode==='default_video';
   return (
     <div className="panel">
       <div className="ph">
@@ -601,6 +627,12 @@ function VideoWidget({ws,liveVision,visionDriver,send}){
           <div style={{position:'absolute',bottom:6,left:6,fontSize:9,
             color:'#00d4b0',background:'rgba(0,0,0,.6)',padding:'2px 6px',borderRadius:3}}>
             SYNTHETIC
+          </div>
+        )}
+        {isDefault&&(
+          <div style={{position:'absolute',bottom:6,left:6,fontSize:9,
+            color:'#f6ad55',background:'rgba(0,0,0,.6)',padding:'2px 6px',borderRadius:3}}>
+            DEFAULT VIDEO
           </div>
         )}
       </div>
