@@ -1,120 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CabinSense — In-Cabin Disturbance Intelligence</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CabinSense — In-Cabin Intelligence</title>
 <script src="/static/lib/react.min.js"></script>
 <script src="/static/lib/react-dom.min.js"></script>
 <script src="/static/lib/babel.min.js"></script>
 <style>
-  :root{
-    --bg:#0a0e14; --panel:#121821; --panel2:#19212e; --line:#222c3a;
-    --txt:#e6edf3; --dim:#8b98a9; --accent:#36e0c0; --warn:#f5a623;
-    --crit:#ff4d4f; --ok:#3ddc84; --advisory:#5aa9ff;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);
-    font-family:"Inter",system-ui,Segoe UI,Roboto,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  .app{max-width:1280px;margin:0 auto;padding:20px}
-  header{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
-  header h1{font-size:20px;margin:0;letter-spacing:.5px}
-  header .tag{color:var(--accent);font-weight:600}
-  header .sub{color:var(--dim);font-size:13px}
-  .status{margin-left:auto;font-size:12px;color:var(--dim)}
-  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
-    background:var(--crit);margin-right:6px;vertical-align:middle}
-  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
-  .grid{display:grid;grid-template-columns:1.1fr 1.5fr 1.2fr;gap:16px;margin-top:16px}
-  .col{display:flex;flex-direction:column;gap:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
-  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;
-    color:var(--dim);margin:0 0 12px}
-  /* gauge */
-  .gauge{display:flex;flex-direction:column;align-items:center;gap:6px}
-  .gauge .num{font-size:46px;font-weight:700;line-height:1}
-  .gauge .lbl{color:var(--dim);font-size:12px}
-  .bar{height:8px;border-radius:6px;background:var(--panel2);overflow:hidden;width:100%}
-  .bar > span{display:block;height:100%;transition:width .3s,background .3s}
-  .factors{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
-  .chip{font-size:11px;background:var(--panel2);border:1px solid var(--line);
-    padding:3px 8px;border-radius:20px;color:var(--dim)}
-  /* cabin map */
-  .cabin{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .seat{background:var(--panel2);border:1px solid var(--line);border-radius:12px;
-    padding:12px;min-height:92px;transition:.2s}
-  .seat.empty{opacity:.45}
-  .seat .row{display:flex;justify-content:space-between;align-items:center}
-  .seat .name{font-size:12px;color:var(--dim);text-transform:capitalize}
-  .seat .who{font-weight:600;font-size:14px;text-transform:capitalize}
-  .seat .vit{font-size:12px;color:var(--dim);margin-top:8px;display:flex;gap:12px}
-  .seat .vit b{color:var(--txt);font-weight:600}
-  .pill{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600}
-  .pill.belt{background:rgba(61,220,132,.15);color:var(--ok)}
-  .pill.nobelt{background:rgba(255,77,79,.15);color:var(--crit)}
-  .telem{display:flex;gap:18px;flex-wrap:wrap;font-size:13px}
-  .telem div span{color:var(--dim);display:block;font-size:11px}
-  .telem div b{font-size:16px}
-  /* mitigations */
-  .mit{border-left:3px solid var(--advisory);background:var(--panel2);
-    border-radius:10px;padding:12px;margin-bottom:10px}
-  .mit.warning{border-color:var(--warn)}
-  .mit.critical{border-color:var(--crit);animation:pulse 1.2s infinite}
-  @keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(255,77,79,0)}
-    50%{box-shadow:0 0 16px rgba(255,77,79,.4)}}
-  .mit .top{display:flex;justify-content:space-between;align-items:center}
-  .mit .title{font-weight:600;font-size:14px}
-  .mit .uc{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
-  .mit .detail{font-size:12px;color:var(--dim);margin:8px 0}
-  .mit .acts{display:flex;gap:8px}
-  button{font-family:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
-    padding:7px 12px;font-size:12px;background:var(--panel2);color:var(--txt)}
-  button.primary{background:var(--accent);color:#04201b;border-color:var(--accent);font-weight:600}
-  button.ghost{background:transparent;color:var(--dim)}
-  .st{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px}
-  .st.active{background:rgba(61,220,132,.15);color:var(--ok)}
-  .st.proposed{background:rgba(90,169,255,.15);color:var(--advisory)}
-  .st.dismissed{background:var(--panel);color:var(--dim)}
-  .empty-mit{color:var(--dim);font-size:13px;text-align:center;padding:20px}
-  /* scenarios */
-  .scenarios{display:flex;flex-wrap:wrap;gap:8px}
-  .scenarios button.sel{background:var(--accent);color:#04201b;border-color:var(--accent)}
-  /* demo autoplay */
-  .demo-bar{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-    padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px}
-  .demo-bar .demo-info{flex:1}
-  .demo-bar .demo-title{font-size:13px;font-weight:600;margin-bottom:6px}
-  .demo-bar .demo-sub{font-size:11px;color:var(--dim)}
-  .demo-progress{height:5px;border-radius:3px;background:var(--panel2);overflow:hidden;margin-top:8px}
-  .demo-progress > span{display:block;height:100%;background:var(--accent);transition:width .5s}
-  button.demo-btn{padding:9px 18px;font-size:13px;font-weight:600;
-    background:var(--accent);color:#04201b;border-color:var(--accent);white-space:nowrap}
-  button.demo-btn:disabled{opacity:.5;cursor:not-allowed}
+:root{
+  --bg:#07090f;--panel:#0d1520;--panel2:#131d2a;--line:#1a2838;
+  --txt:#dde5ef;--dim:#5e7080;--accent:#36e0c0;--warn:#f5a623;
+  --crit:#ff4d4f;--ok:#3ddc84;--info:#5aa9ff;
+  --car-bg:#0a1218;--car-border:#1e3040;
+  --seat-bg:#0f1825;--seat-border:#1d2e40;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);
+  font-family:"Inter",system-ui,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;min-height:100vh}
+.app{max-width:1440px;margin:0 auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+
+/* ── Header ── */
+header{display:flex;align-items:center;gap:12px;padding:10px 0 6px}
+header h1{font-size:18px;letter-spacing:.4px}
+header .tag{color:var(--accent);font-weight:700}
+header .sub{color:var(--dim);font-size:12px;margin-left:4px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--crit);margin-left:auto;flex-shrink:0}
+.conn-dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.conn-label{font-size:11px;color:var(--dim)}
+.latency{font-size:11px;color:var(--dim);margin-left:8px}
+
+/* ── Demo bar ── */
+.demo-bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:12px 16px;display:flex;align-items:center;gap:12px}
+.demo-info{flex:1;min-width:0}
+.demo-title{font-size:13px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.demo-sub{font-size:11px;color:var(--dim)}
+.demo-progress{height:4px;border-radius:2px;background:var(--panel2);overflow:hidden;margin-top:6px}
+.demo-progress>span{display:block;height:100%;background:var(--accent);transition:width .5s}
+.demo-steps{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.demo-step{font-size:10px;color:var(--dim)}
+.demo-step.done{color:var(--ok)}
+.demo-step.active{color:var(--accent);font-weight:600}
+button{font-family:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+  padding:6px 12px;font-size:12px;background:var(--panel2);color:var(--txt);transition:all .15s}
+button:hover{border-color:var(--dim)}
+button.primary{background:var(--accent);color:#041a15;border-color:var(--accent);font-weight:600}
+button.sel{background:var(--accent);color:#041a15;border-color:var(--accent);font-weight:600}
+button.sel.warn{background:var(--warn);color:#1a1000;border-color:var(--warn)}
+button.sel.crit{background:var(--crit);color:#fff;border-color:var(--crit)}
+button.ghost{background:transparent;color:var(--dim);border-color:transparent}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.demo-btn{padding:8px 16px;font-size:12px;font-weight:600;
+  background:var(--accent);color:#041a15;border-color:var(--accent)}
+button.stop-btn{padding:8px 14px;font-size:12px;font-weight:600;
+  background:var(--crit);color:#fff;border-color:var(--crit)}
+
+/* ── Main layout ── */
+.main{display:flex;gap:14px;align-items:flex-start}
+.left-col{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.right-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+
+/* ── Cards ── */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin-bottom:10px}
+.bar{height:6px;border-radius:4px;background:var(--panel2);overflow:hidden}
+.bar>span{display:block;height:100%;transition:width .3s,background .3s;border-radius:4px}
+.chip{font-size:10px;background:var(--panel2);border:1px solid var(--line);
+  padding:2px 7px;border-radius:20px;color:var(--dim)}
+.pill{font-size:9px;padding:2px 6px;border-radius:12px;font-weight:700}
+.pill.ok{background:rgba(61,220,132,.15);color:var(--ok)}
+.pill.warn{background:rgba(245,166,35,.15);color:var(--warn)}
+.pill.crit{background:rgba(255,77,79,.15);color:var(--crit)}
+.pill.info{background:rgba(90,169,255,.15);color:var(--info)}
+
+/* ── Gauge ── */
+.gauge-num{font-size:52px;font-weight:800;line-height:1;text-align:center}
+.gauge-lbl{font-size:11px;color:var(--dim);text-align:center;margin:4px 0 10px}
+.factors{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+
+/* ── Mitigation ── */
+.mit{border-left:3px solid var(--info);background:var(--panel2);
+  border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.mit.warning{border-color:var(--warn)}
+.mit.critical{border-color:var(--crit);animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(255,77,79,0)}50%{box-shadow:0 0 14px rgba(255,77,79,.35)}}
+.mit-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.mit-title{font-weight:600;font-size:13px}
+.mit-uc{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.mit-detail{font-size:11px;color:var(--dim);margin:6px 0}
+.mit-acts{display:flex;gap:6px}
+.st{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px}
+.st.active{background:rgba(61,220,132,.15);color:var(--ok)}
+.st.proposed{background:rgba(90,169,255,.15);color:var(--info)}
+.st.dismissed{background:var(--panel);color:var(--dim)}
+.empty-mit{color:var(--dim);font-size:12px;text-align:center;padding:16px 0}
+
+/* ── Car Interior ── */
+.cabin-shell{
+  background:radial-gradient(ellipse at 50% 15%, #0e1c2e 0%, var(--car-bg) 65%);
+  border:1px solid var(--car-border);border-radius:40px 40px 32px 32px;
+  padding:14px;position:relative;overflow:hidden}
+.cabin-shell::before{content:'';position:absolute;top:0;left:25%;right:25%;
+  height:2px;background:linear-gradient(90deg,transparent,rgba(54,224,192,.25),transparent)}
+.cabin-dash{display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(180deg,#0d1a28 0%,#0a1318 100%);
+  border:1px solid var(--car-border);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.dash-wheel{font-size:22px;opacity:.7;letter-spacing:0}
+.dash-center{text-align:center}
+.dash-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--dim)}
+.dash-scenario{font-size:12px;font-weight:600;color:var(--accent);margin-top:2px}
+.dash-right{text-align:right}
+.dash-stat{font-size:11px;color:var(--dim);line-height:1.7}
+.dash-stat b{color:var(--txt)}
+
+.seat-layout{display:grid;grid-template-columns:1fr 32px 1fr;gap:10px;align-items:stretch}
+.seat-col{display:flex;flex-direction:column;gap:10px}
+.console{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:4px 0}
+.console-line{flex:1;width:1px;background:var(--car-border);min-height:20px}
+.console-gear{font-size:16px;color:var(--dim);opacity:.6}
+
+.seat-card{
+  background:var(--seat-bg);border:1.5px solid var(--seat-border);
+  border-radius:14px;padding:12px;cursor:pointer;transition:all .2s;
+  min-height:130px;display:flex;flex-direction:column;gap:6px;position:relative}
+.seat-card:hover{border-color:#2a4060;background:#101f2e}
+.seat-card.selected{border-color:var(--accent)!important;box-shadow:0 0 18px rgba(54,224,192,.18)}
+.seat-card.alert-warn{border-color:var(--warn)!important;box-shadow:0 0 12px rgba(245,166,35,.15)}
+.seat-card.alert-crit{border-color:var(--crit)!important;box-shadow:0 0 12px rgba(255,77,79,.2)}
+.seat-card.empty-seat{opacity:.55}
+.seat-top{display:flex;justify-content:space-between;align-items:flex-start}
+.seat-name{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
+.seat-badges{display:flex;gap:4px;align-items:center}
+.seat-icon{font-size:28px;text-align:center;line-height:1;margin:2px 0}
+.seat-kind{font-size:10px;color:var(--dim);text-align:center;text-transform:capitalize}
+.seat-vitals{font-size:10px;color:var(--dim);display:flex;gap:8px;margin-top:2px}
+.seat-vitals b{color:var(--txt)}
+.seat-audio{font-size:11px;margin-top:2px}
+.seat-distress-bar{height:3px;border-radius:2px;background:var(--panel2);overflow:hidden;margin-top:4px}
+.seat-distress-bar>span{display:block;height:100%;border-radius:2px;transition:width .3s,background .3s}
+.seat-empty-hint{font-size:9px;color:var(--dim);text-align:center;margin-top:auto;opacity:.6}
+
+/* ── Seat Config Panel ── */
+.seat-cfg{background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px;
+  animation:slideIn .2s ease-out}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.seat-cfg h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.cfg-section{margin-bottom:14px}
+.cfg-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:6px}
+.btn-group{display:flex;flex-wrap:wrap;gap:6px}
+.cfg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.cfg-row .cfg-label{margin:0;width:90px;flex-shrink:0}
+.cfg-row .right{flex:1;display:flex;align-items:center;gap:8px}
+input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+  background:var(--panel2);outline:none;flex:1;cursor:pointer;border:none;min-width:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg)}
+.range-val{font-size:12px;color:var(--txt);font-weight:600;min-width:52px;text-align:right}
+.cfg-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── Controls row ── */
+.controls-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── Vehicle / Vibration ── */
+.vis-btn{padding:5px 10px;font-size:11px}
+
+/* ── Scenarios ── */
+.scenario-grid{display:flex;flex-wrap:wrap;gap:6px}
+.scenario-grid button{font-size:11px;padding:5px 10px}
+
+/* ── Audio card ── */
+.audio-label{font-size:26px;font-weight:700}
+.audio-event-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+
+/* ── Vision card ── */
+.vision-row{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:4px}
+.vision-row .lbl{font-size:10px;color:var(--dim);display:block}
+
+/* scroll for left col mitigations */
+.mit-scroll{max-height:340px;overflow-y:auto;padding-right:2px}
+.mit-scroll::-webkit-scrollbar{width:3px}
+.mit-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<div id="err" style="display:none;position:fixed;inset:0;background:#0a0e14;color:#ff4d4f;
-  font-family:monospace;font-size:13px;padding:40px;white-space:pre-wrap;z-index:9999"></div>
+<div id="err" style="display:none;position:fixed;inset:0;background:#07090f;color:#ff4d4f;
+  font-family:monospace;font-size:12px;padding:32px;white-space:pre-wrap;z-index:9999"></div>
 <script>
-window.onerror = function(msg, src, line, col, err) {
-  var d = document.getElementById('err');
-  d.style.display = 'block';
-  d.textContent = 'JS ERROR\n' + msg + '\n\nFile: ' + src + ':' + line + ':' + col +
-    (err ? '\n\nStack:\n' + err.stack : '');
-};
-window.addEventListener('unhandledrejection', function(e) {
-  var d = document.getElementById('err');
-  d.style.display = 'block';
-  d.textContent = 'UNHANDLED PROMISE\n' + (e.reason?.stack || e.reason);
-});
+window.onerror=function(m,s,l,c,e){
+  var d=document.getElementById('err');d.style.display='block';
+  d.textContent='JS ERROR\n'+m+'\nFile: '+s+':'+l+':'+(e?'\nStack:\n'+e.stack:'');};
+window.addEventListener('unhandledrejection',function(e){
+  var d=document.getElementById('err');d.style.display='block';
+  d.textContent='PROMISE ERROR\n'+(e.reason&&e.reason.stack||e.reason);});
 </script>
-
-<!-- AudioWorklet module defined outside Babel so nested backticks don't confuse the JSX parser -->
 <script>
-window._CHUNKER_TARGET = Math.round(16000 * 0.96); // 15360 samples
-window._CHUNKER_SRC = [
+/* AudioWorklet must live outside Babel to avoid backtick parse errors */
+window._CHUNKER_TARGET=Math.round(16000*0.96);
+window._CHUNKER_SRC=[
   'class Chunker extends AudioWorkletProcessor {',
   '  constructor(){super();this._buf=[];this._target='+window._CHUNKER_TARGET+';}',
   '  process(inputs){',
@@ -128,382 +213,738 @@ window._CHUNKER_SRC = [
   '}',
   'registerProcessor("chunker",Chunker);'
 ].join('\n');
-window._CHUNKER_URL = URL.createObjectURL(
-  new Blob([window._CHUNKER_SRC], {type:'application/javascript'})
-);
+window._CHUNKER_URL=URL.createObjectURL(new Blob([window._CHUNKER_SRC],{type:'application/javascript'}));
 </script>
 
 <script type="text/babel" data-presets="react">
-const {useState,useEffect,useRef} = React;
-const loadColor = v => v<33?'var(--ok)':v<66?'var(--warn)':'var(--crit)';
+const {useState,useEffect,useRef,useCallback} = React;
+
+/* ─── helpers ─── */
 const fmt = s => s.replace(/_/g,' ');
+const loadColor = v => v<33?'var(--ok)':v<66?'var(--warn)':'var(--crit)';
 
-function Gauge({value,factors}){
-  return (
-    <div className="card">
-      <h2>Cognitive Load / Attention Risk</h2>
-      <div className="gauge">
-        <div className="num" style={{color:loadColor(value)}}>{value}</div>
-        <div className="lbl">0 = relaxed · 100 = overloaded</div>
-        <div className="bar"><span style={{width:value+'%',background:loadColor(value)}}/></div>
-      </div>
-      <div className="factors">
-        {factors.length===0 && <span className="chip">nominal</span>}
-        {factors.map((f,i)=><span key={i} className="chip">{f}</span>)}
-      </div>
-    </div>
-  );
-}
+const SEAT_LABELS = {
+  driver:'Driver', front_passenger:'Front Pass.',
+  rear_left:'Rear Left', rear_right:'Rear Right'
+};
+const SEAT_IDS = ['driver','front_passenger','rear_left','rear_right'];
 
-function Vision({visionDriver, visionObjects, ws, liveVision}){
-  const [camOn, setCamOn] = React.useState(false);
-  const videoRef = React.useRef(null);
-  const timerRef = React.useRef(null);
+const OCCUPANT_ICONS = {adult:'👤', child:'🧒', pet:'🐾', unknown:'👤'};
+const AUDIO_ICONS = {none:'🔇',talking:'💬',shouting:'📢',crying:'😢',happy:'😊',barking:'🐕'};
+const AUDIO_COLORS = {
+  none:'var(--dim)', talking:'var(--info)', shouting:'var(--warn)',
+  crying:'var(--warn)', happy:'var(--ok)', barking:'var(--warn)'
+};
+const AUDIO_OPTIONS = {
+  adult:[{v:'none',l:'Quiet'},{v:'talking',l:'Talking'},{v:'shouting',l:'Shouting'}],
+  child:[{v:'none',l:'Quiet'},{v:'crying',l:'Crying'},{v:'happy',l:'Happy'}],
+  pet:  [{v:'none',l:'Quiet'},{v:'barking',l:'Barking'},{v:'happy',l:'Happy'}],
+  unknown:[{v:'none',l:'Quiet'},{v:'talking',l:'Talking'},{v:'shouting',l:'Shouting'}],
+};
+const EMOTIONS = ['calm','stressed','tired','happy'];
+const EMOTION_COLORS = {calm:'var(--ok)',stressed:'var(--warn)',tired:'var(--info)',happy:'var(--accent)'};
 
-  const startCam = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-      const canvas = document.createElement('canvas');
-      canvas.width = 320; canvas.height = 240;
-      const ctx2d = canvas.getContext('2d');
-      timerRef.current = setInterval(()=>{
-        ctx2d.drawImage(videoRef.current,0,0,320,240);
-        const b64 = canvas.toDataURL('image/jpeg',0.7).split(',')[1];
-        if(ws.current && ws.current.readyState===1)
-          ws.current.send(JSON.stringify({cmd:'vision_frame',data:b64}));
-      }, 200); // 5 fps
-      setCamOn(true);
-    } catch(e){ alert('Camera access denied: '+e.message); }
-  };
-
-  const stopCam = () => {
-    clearInterval(timerRef.current);
-    videoRef.current?.srcObject?.getTracks().forEach(t=>t.stop());
-    setCamOn(false);
-  };
-
-  const vd = visionDriver || {};
-  const dets = (visionObjects?.detections || []).slice(0,3);
-  const emoColor = {calm:'var(--ok)',happy:'var(--ok)',stressed:'var(--warn)',tired:'var(--crit)'};
-
-  return (
-    <div className="card">
-      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span>Vision · Face + Objects</span>
-        {liveVision && (
-          <button onClick={camOn?stopCam:startCam}
-            style={{fontSize:11,padding:'3px 10px',background:camOn?'rgba(255,77,79,.15)':'var(--panel2)',
-              color:camOn?'var(--crit)':'var(--dim)',borderColor:camOn?'var(--crit)':'var(--line)'}}>
-            {camOn ? '⏹ cam live' : '📷 use cam'}
-          </button>
-        )}
-      </h2>
-      <video ref={videoRef} style={{display:'none'}} muted playsInline/>
-      {vd.face_detected ? (
-        <div style={{display:'flex',gap:18,flexWrap:'wrap',fontSize:13}}>
-          <div><span style={{color:'var(--dim)',display:'block',fontSize:11}}>emotion</span>
-            <b style={{color:emoColor[vd.emotion]||'var(--txt)'}}>{vd.emotion}</b></div>
-          <div><span style={{color:'var(--dim)',display:'block',fontSize:11}}>EAR</span>
-            <b style={{color:vd.drowsy?'var(--crit)':'var(--txt)'}}>{vd.ear}</b></div>
-          <div><span style={{color:'var(--dim)',display:'block',fontSize:11}}>drowsy</span>
-            <b style={{color:vd.drowsy?'var(--crit)':'var(--ok)'}}>{vd.drowsy?'yes':'no'}</b></div>
-        </div>
-      ) : (
-        <div style={{color:'var(--dim)',fontSize:13}}>{camOn?'scanning…':'no face'}</div>
-      )}
-      {dets.length>0 && (
-        <div style={{marginTop:10}}>
-          <div style={{fontSize:11,color:'var(--dim)',marginBottom:4}}>YOLO detections</div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-            {dets.map((d,i)=><span key={i} className="chip">{d.label} {Math.round(d.confidence*100)}%</span>)}
-          </div>
-        </div>
-      )}
-      {!liveVision && <div style={{fontSize:11,color:'var(--dim)',marginTop:8}}>
-        synthetic mode — mediapipe + ultralytics required for live cam
-      </div>}
-    </div>
-  );
-}
-
-function Seat({s}){
-  if(!s.occupied) return (
-    <div className="seat empty"><div className="row"><span className="name">{fmt(s.seat)}</span></div>
-      <div className="who">empty</div></div>);
-  return (
-    <div className="seat">
-      <div className="row">
-        <span className="name">{fmt(s.seat)}</span>
-        <span className={'pill '+(s.buckled?'belt':'nobelt')}>{s.buckled?'belted':'no belt'}</span>
-      </div>
-      <div className="who">{s.occupant}</div>
-      <div className="vit">
-        {s.heart_rate_bpm!=null && <span>♥ <b>{Math.round(s.heart_rate_bpm)}</b> bpm</span>}
-        {s.respiration_rpm!=null && <span>≈ <b>{Math.round(s.respiration_rpm)}</b> rpm</span>}
-      </div>
-    </div>
-  );
-}
-
-function Cabin({radar,vehicle}){
-  const seats = (radar.seats||[]);
-  const order = ["driver","front_passenger","rear_left","rear_right"];
-  const sorted = order.map(o=>seats.find(s=>s.seat===o)).filter(Boolean);
-  return (
-    <div className="card">
-      <h2>In-Cabin Radar · {radar.point_count||0} pts</h2>
-      <div className="cabin">{sorted.map(s=><Seat key={s.seat} s={s}/>)}</div>
-      <div className="telem" style={{marginTop:14}}>
-        <div><span>speed</span><b>{Math.round(vehicle.speed_kmh||0)} km/h</b></div>
-        <div><span>visibility</span><b>{vehicle.visibility||'—'}</b></div>
-        <div><span>rough road in</span><b>{vehicle.pothole_ahead_m!=null?Math.round(vehicle.pothole_ahead_m)+' m':'—'}</b></div>
-      </div>
-    </div>
-  );
-}
-
-function Audio({audio, ws, liveAudio}){
-  const [micOn, setMicOn] = React.useState(false);
-  const processorRef = React.useRef(null);
-  const ctxRef = React.useRef(null);
-
-  const SAMPLE_RATE = 16000;
-
-  const startMic = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({audio:{sampleRate:SAMPLE_RATE,channelCount:1}});
-      const ctx = new AudioContext({sampleRate: SAMPLE_RATE});
-      ctxRef.current = ctx;
-      const src = ctx.createMediaStreamSource(stream);
-      await ctx.audioWorklet.addModule(window._CHUNKER_URL);
-      const node = new AudioWorkletNode(ctx, 'chunker');
-      node.port.onmessage = e => {
-        if(ws.current && ws.current.readyState===1)
-          ws.current.send(JSON.stringify({cmd:'audio_chunk', data: Array.from(e.data)}));
-      };
-      src.connect(node);
-      processorRef.current = {stream, node, src};
-      setMicOn(true);
-    } catch(e){ alert('Mic access denied: '+e.message); }
-  };
-
-  const stopMic = () => {
-    processorRef.current?.stream?.getTracks().forEach(t=>t.stop());
-    ctxRef.current?.close();
-    processorRef.current = null;
-    setMicOn(false);
-  };
-
-  const active = audio.label && audio.label!=='none';
-  return (
-    <div className="card">
-      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span>Acoustic Anomaly</span>
-        {liveAudio && (
-          <button onClick={micOn?stopMic:startMic}
-            style={{fontSize:11,padding:'3px 10px',background:micOn?'rgba(255,77,79,.15)':'var(--panel2)',
-              color:micOn?'var(--crit)':'var(--dim)',borderColor:micOn?'var(--crit)':'var(--line)'}}>
-            {micOn ? '⏹ mic live' : '🎤 use mic'}
-          </button>
-        )}
-      </h2>
-      <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <div className="num" style={{fontSize:28,color:active?'var(--warn)':'var(--dim)'}}>
-          {active?audio.label:'quiet'}</div>
-        {active && <span className="chip">{Math.round(audio.confidence*100)}% conf</span>}
-        {micOn && !active && <span className="chip" style={{color:'var(--ok)'}}>listening…</span>}
-      </div>
-      {!liveAudio && <div style={{fontSize:11,color:'var(--dim)',marginTop:8}}>
-        synthetic mode — start server with TensorFlow for live mic
-      </div>}
-    </div>
-  );
-}
-
-function Mitigations({list,send}){
-  const visible = list.filter(m=>m.status!=='dismissed');
-  return (
-    <div className="card">
-      <h2>Adaptive Mitigations · confirm-first</h2>
-      {visible.length===0 && <div className="empty-mit">No action needed — cabin nominal.</div>}
-      {visible.map(m=>(
-        <div key={m.id} className={'mit '+m.severity}>
-          <div className="top">
-            <span className="title">{m.title}</span>
-            <span className={'st '+m.status}>{m.status}</span>
-          </div>
-          <div className="uc">{m.usecase}</div>
-          <div className="detail">{m.detail}</div>
-          {m.confirm && m.status==='proposed' &&
-            <div className="acts">
-              <button className="primary" onClick={()=>send({cmd:'confirm',id:m.id})}>Apply</button>
-              <button className="ghost" onClick={()=>send({cmd:'dismiss',id:m.id})}>Dismiss</button>
-            </div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const DEMO_STEPS = [
-  {label:"Idle — cabin nominal"},
-  {label:"Child crying in rear seat"},
-  {label:"Driver under stress"},
-  {label:"Driver fatigue detected"},
-  {label:"Seatbelt misuse alert"},
-  {label:"Unsecured object + pothole ahead"},
-  {label:"Child left behind"},
-  {label:"Idle — demo complete"},
+/* ─── DemoBar ─── */
+const DEMO_NAMES=['idle','child_crying_rear','driver_stress','driver_tired',
+                  'seatbelt_misuse','pothole_object','child_left_behind','idle'];
+const DEMO_STEPS=[
+  {l:'Idle'},
+  {l:'Child crying'},
+  {l:'Driver stress'},
+  {l:'Driver fatigue'},
+  {l:'Seatbelt misuse'},
+  {l:'Pothole + object'},
+  {l:'Child left behind'},
+  {l:'Done'},
 ];
 
-function Vibration({vib}){
-  const quality = vib?.road_quality || 'smooth';
-  const rms = vib?.rms_z || 0;
-  const ahead = vib?.pothole_ahead_m;
-  const qColor = {smooth:'var(--ok)', rough:'var(--warn)', pothole:'var(--crit)'};
-  const pct = Math.min(100, (rms / 0.9) * 100);
-  return (
-    <div className="card">
-      <h2>IMU / Vibration · road quality</h2>
-      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:8}}>
-        <div style={{fontSize:22,fontWeight:700,color:qColor[quality]||'var(--txt)'}}>{quality}</div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:11,color:'var(--dim)',marginBottom:3}}>RMS z-axis</div>
-          <div className="bar"><span style={{width:pct+'%',background:qColor[quality]}}/></div>
-        </div>
-        <div style={{fontSize:13,textAlign:'right'}}>
-          <span style={{color:'var(--dim)',fontSize:11,display:'block'}}>ahead</span>
-          <b>{ahead!=null ? Math.round(ahead)+'m' : '—'}</b>
-        </div>
-      </div>
-      {ahead!=null && ahead<80 && <div style={{fontSize:12,color:'var(--warn)'}}>
-        ⚠ Rough road in ~{Math.round(ahead)} m — pre-emptive advisory active
-      </div>}
-    </div>
-  );
-}
-
-function DemoBar({scenario}){
-  const [running,setRunning]=React.useState(false);
-  const [step,setStep]=React.useState(0);
-  const timerRef=React.useRef(null);
-
-  const HOLDS=[3,7,7,7,6,8,7,2]; // matches DEMO_SCRIPT hold+settle times
+function DemoBar({scenario,demoRunning}){
+  const step = demoRunning ? Math.max(0,DEMO_NAMES.indexOf(scenario)) : 0;
+  const HOLDS=[3,7,7,7,6,8,7,2];
   const total=HOLDS.reduce((a,b)=>a+b,0);
-
-  React.useEffect(()=>{
-    if(!running)return;
-    // map scenario name to step index for progress tracking
-    const names=["idle","child_crying_rear","driver_stress","driver_tired",
-                 "seatbelt_misuse","pothole_object","child_left_behind","idle"];
-    const idx=names.indexOf(scenario);
-    if(idx>=0) setStep(idx);
-    if(scenario==="idle" && step===7){setRunning(false);setStep(0);}
-  },[scenario]);
-
-  const play=()=>{
-    if(running)return;
-    setRunning(true);
-    setStep(0);
-    fetch('/api/demo/play',{method:'POST'});
-  };
-
   const elapsed=HOLDS.slice(0,step).reduce((a,b)=>a+b,0);
-  const pct=running?Math.round((elapsed/total)*100):0;
-
+  const pct=demoRunning?Math.round((elapsed/total)*100):0;
+  const play=()=>fetch('/api/demo/play',{method:'POST'});
+  const stop=()=>fetch('/api/demo/stop',{method:'POST'});
   return (
     <div className="demo-bar">
       <div className="demo-info">
         <div className="demo-title">
-          {running ? ('Step '+(step+1)+'/'+DEMO_STEPS.length+': '+(DEMO_STEPS[step]?.label||''))
-                   : 'Auto-Play Demo — walk judges through every use case'}
+          {demoRunning
+            ? ('Step '+(step+1)+'/'+DEMO_STEPS.length+': '+(DEMO_STEPS[step]&&DEMO_STEPS[step].l||''))
+            : 'Auto-Play Demo — hands-free walkthrough for judges (~45 s)'}
         </div>
-        {running && <>
+        {demoRunning && <>
           <div className="demo-progress"><span style={{width:pct+'%'}}/></div>
-          <div className="demo-sub">{DEMO_STEPS.map((s,i)=>
-            <span key={i} style={{marginRight:8,opacity:i===step?1:.4,
-              color:i<step?'var(--ok)':i===step?'var(--accent)':'var(--dim)'}}>
-              {i<step?'✓ ':i===step?'▶ ':''}{s.label}
-            </span>
-          )}</div>
+          <div className="demo-steps">
+            {DEMO_STEPS.map(function(s,i){
+              return <span key={i} className={'demo-step'+(i<step?' done':i===step?' active':'')}>
+                {i<step?'✓ ':i===step?'▶ ':''}{s.l}
+              </span>;
+            })}
+          </div>
         </>}
-        {!running && <div className="demo-sub">
-          Plays 8 scenarios hands-free · auto-confirms mitigations · ~45 seconds
-        </div>}
+        {!demoRunning && <div className="demo-sub">Plays 8 scenarios · auto-confirms mitigations</div>}
       </div>
-      <button className="demo-btn" onClick={play} disabled={running}>
-        {running ? 'Running…' : '▶ Run Demo'}
-      </button>
+      <div style={{display:'flex',gap:8,flexShrink:0}}>
+        <button className="demo-btn" onClick={play} disabled={demoRunning}>
+          {demoRunning?'Running…':'▶ Run Demo'}
+        </button>
+        {demoRunning && <button className="stop-btn" onClick={stop}>⏹ Stop</button>}
+      </div>
     </div>
   );
 }
 
-function Scenarios({list,current,send}){
+/* ─── SeatCard (in car interior) ─── */
+function SeatCard({seatId,config,radarSeat,selected,onClick}){
+  const occ = config || {};
+  const isOcc = occ.occupied;
+  const kind = occ.kind || 'unknown';
+  const audio = occ.audio_event || 'none';
+  const distress = occ.distress || 0;
+  const audioAlert = audio!=='none' && audio!=='happy';
+  const audioGood = audio==='happy';
+
+  let alertClass = '';
+  if(isOcc && distress>0.6) alertClass=' alert-crit';
+  else if(isOcc && (audioAlert || distress>0.2)) alertClass=' alert-warn';
+
+  const hr = radarSeat && radarSeat.heart_rate_bpm;
+  const resp = radarSeat && radarSeat.respiration_rpm;
+  const buckled = isOcc ? occ.buckled : false;
+
+  return (
+    <div className={'seat-card'+(selected?' selected':'')+(isOcc?'':' empty-seat')+alertClass}
+         onClick={onClick}>
+      <div className="seat-top">
+        <span className="seat-name">{SEAT_LABELS[seatId]||seatId}</span>
+        <div className="seat-badges">
+          {isOcc && (
+            <span className={'pill '+(buckled?'ok':'crit')}>{buckled?'🔒':'⚠'}</span>
+          )}
+        </div>
+      </div>
+      <div className="seat-icon">{isOcc?(OCCUPANT_ICONS[kind]||'👤'):'—'}</div>
+      <div className="seat-kind">{isOcc?kind:'empty'}</div>
+      {isOcc && hr!=null && (
+        <div className="seat-vitals">
+          <span>♥ <b>{Math.round(hr)}</b></span>
+          <span>≈ <b>{Math.round(resp||0)}</b></span>
+        </div>
+      )}
+      {isOcc && (
+        <div className="seat-audio" style={{color:AUDIO_COLORS[audio]||'var(--dim)'}}>
+          {AUDIO_ICONS[audio]||'🔇'} {audio}
+        </div>
+      )}
+      {isOcc && distress>0.05 && (
+        <div className="seat-distress-bar">
+          <span style={{width:(distress*100)+'%',background:distress>0.5?'var(--crit)':'var(--warn)'}}/>
+        </div>
+      )}
+      {!isOcc && <div className="seat-empty-hint">tap to configure</div>}
+    </div>
+  );
+}
+
+/* ─── SeatConfigPanel ─── */
+function SeatConfigPanel({seatId,config,send,onClose}){
+  if(!seatId||!config) return null;
+  const occ = config;
+  const kind = occ.kind||'unknown';
+  const audioOpts = AUDIO_OPTIONS[kind]||AUDIO_OPTIONS.adult;
+  const isDriver = seatId==='driver';
+
+  const upd = (fields) => send(Object.assign({cmd:'configure_seat',seat:seatId},fields));
+
+  const hrDefault = isDriver?72:kind==='child'?100:kind==='pet'?110:75;
+  const respDefault = isDriver?14:kind==='child'?24:kind==='pet'?30:15;
+  const hrVal = occ.heart_rate_bpm!=null?occ.heart_rate_bpm:hrDefault;
+  const respVal = occ.respiration_rpm!=null?occ.respiration_rpm:respDefault;
+
+  return (
+    <div className="seat-cfg">
+      <h2>
+        <span>Configure · {SEAT_LABELS[seatId]||seatId}</span>
+        <button className="ghost" onClick={onClose} style={{fontSize:14,padding:'2px 8px'}}>✕</button>
+      </h2>
+
+      {/* Occupant type */}
+      <div className="cfg-section">
+        <div className="cfg-label">Occupant Type</div>
+        <div className="btn-group">
+          <button className={!occ.occupied?'sel':''} onClick={()=>upd({occupied:false})}>
+            — Empty
+          </button>
+          {!isDriver && <>
+            <button className={occ.occupied&&kind==='adult'?'sel':''} onClick={()=>upd({occupied:true,kind:'adult'})}>
+              👤 Adult
+            </button>
+            <button className={occ.occupied&&kind==='child'?'sel':''} onClick={()=>upd({occupied:true,kind:'child'})}>
+              🧒 Child
+            </button>
+            <button className={occ.occupied&&kind==='pet'?'sel':''} onClick={()=>upd({occupied:true,kind:'pet'})}>
+              🐾 Animal
+            </button>
+          </>}
+          {isDriver && <button className={occ.occupied?'sel':''} onClick={()=>upd({occupied:true,kind:'adult'})}>
+            👤 Driver (adult)
+          </button>}
+        </div>
+      </div>
+
+      {occ.occupied && (
+        <div className="cfg-cols">
+          {/* Left column */}
+          <div>
+            {/* Seatbelt */}
+            <div className="cfg-section">
+              <div className="cfg-label">Seatbelt</div>
+              <div className="btn-group">
+                <button className={occ.buckled?'sel':''} onClick={()=>upd({buckled:true})}>🔒 Belted</button>
+                <button className={!occ.buckled?'sel crit':''} onClick={()=>upd({buckled:false})}>⚠ Unbelted</button>
+              </div>
+            </div>
+
+            {/* Audio event */}
+            <div className="cfg-section">
+              <div className="cfg-label">Audio Event</div>
+              <div className="btn-group">
+                {audioOpts.map(function(o){
+                  return <button key={o.v}
+                    className={occ.audio_event===o.v?'sel':''}
+                    onClick={()=>upd({audio_event:o.v})}>
+                    {AUDIO_ICONS[o.v]} {o.l}
+                  </button>;
+                })}
+              </div>
+            </div>
+
+            {/* Driver emotion */}
+            {isDriver && (
+              <div className="cfg-section">
+                <div className="cfg-label">Driver State</div>
+                <div className="btn-group">
+                  {EMOTIONS.map(function(e){
+                    return <button key={e}
+                      className={occ.emotion===e?'sel':''}
+                      style={occ.emotion===e?{background:EMOTION_COLORS[e],color:'#060c10',borderColor:EMOTION_COLORS[e]}:{}}
+                      onClick={()=>upd({emotion:e})}>
+                      {e}
+                    </button>;
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right column — sliders */}
+          <div>
+            <div className="cfg-section">
+              <div className="cfg-label">Distress Level</div>
+              <div className="cfg-row" style={{margin:0}}>
+                <input type="range" min="0" max="100"
+                  value={Math.round((occ.distress||0)*100)}
+                  onChange={function(e){upd({distress:parseInt(e.target.value)/100});}}/>
+                <span className="range-val">{Math.round((occ.distress||0)*100)}%</span>
+              </div>
+            </div>
+
+            <div className="cfg-section">
+              <div className="cfg-label">Heart Rate</div>
+              <div className="cfg-row" style={{margin:0}}>
+                <input type="range" min="40" max="180"
+                  value={Math.round(hrVal)}
+                  onChange={function(e){upd({heart_rate_bpm:parseInt(e.target.value)});}}/>
+                <span className="range-val">{Math.round(hrVal)} bpm</span>
+              </div>
+            </div>
+
+            <div className="cfg-section">
+              <div className="cfg-label">Respiration</div>
+              <div className="cfg-row" style={{margin:0}}>
+                <input type="range" min="6" max="50"
+                  value={Math.round(respVal)}
+                  onChange={function(e){upd({respiration_rpm:parseInt(e.target.value)});}}/>
+                <span className="range-val">{Math.round(respVal)} rpm</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── CabinView ─── */
+function CabinView({seatConfigs,radarSeats,selectedSeat,onSelectSeat,scenario,speed,visibility,potholeAhead}){
+  const radar = {};
+  ((radarSeats&&radarSeats.seats)||[]).forEach(function(s){radar[s.seat]=s;});
+
+  const leftCol = ['driver','rear_left'];
+  const rightCol = ['front_passenger','rear_right'];
+
+  return (
+    <div className="cabin-shell">
+      {/* Dashboard strip */}
+      <div className="cabin-dash">
+        <div className="dash-wheel">⊙</div>
+        <div className="dash-center">
+          <div className="dash-title">CabinSense · Interior</div>
+          <div className="dash-scenario">{fmt(scenario||'idle')}</div>
+        </div>
+        <div className="dash-right">
+          <div className="dash-stat"><b>{Math.round(speed||0)}</b> km/h</div>
+          <div className="dash-stat">{visibility||'good'}</div>
+          {potholeAhead!=null && (
+            <div className="dash-stat" style={{color:'var(--warn)'}}>⚠ {Math.round(potholeAhead)}m</div>
+          )}
+        </div>
+      </div>
+
+      {/* Seat grid: left col | console | right col */}
+      <div className="seat-layout">
+        <div className="seat-col">
+          {leftCol.map(function(id){
+            return <SeatCard key={id} seatId={id}
+              config={seatConfigs&&seatConfigs[id]}
+              radarSeat={radar[id]}
+              selected={selectedSeat===id}
+              onClick={function(){onSelectSeat(selectedSeat===id?null:id);}}/>;
+          })}
+        </div>
+        <div className="console">
+          <div className="console-line"/>
+          <div className="console-gear">⊞</div>
+          <div className="console-line"/>
+        </div>
+        <div className="seat-col">
+          {rightCol.map(function(id){
+            return <SeatCard key={id} seatId={id}
+              config={seatConfigs&&seatConfigs[id]}
+              radarSeat={radar[id]}
+              selected={selectedSeat===id}
+              onClick={function(){onSelectSeat(selectedSeat===id?null:id);}}/>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── VehicleControls ─── */
+function VehicleControls({speed,visibility,potholeAhead,send}){
+  const visOpts = ['good','low','rain','fog'];
+  const upd = (fields) => send(Object.assign({cmd:'configure_vehicle'},fields));
+  return (
+    <div className="card">
+      <h2>Vehicle · Road</h2>
+      <div className="cfg-section">
+        <div className="cfg-label">Speed</div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <input type="range" min="0" max="130"
+            value={Math.round(speed||0)}
+            onChange={function(e){upd({speed_kmh:parseInt(e.target.value)});}}/>
+          <span className="range-val">{Math.round(speed||0)} km/h</span>
+        </div>
+      </div>
+      <div className="cfg-section">
+        <div className="cfg-label">Visibility</div>
+        <div className="btn-group">
+          {visOpts.map(function(v){
+            return <button key={v} className={'vis-btn '+(visibility===v?'sel':'')}
+              onClick={function(){upd({visibility:v});}}>{v}</button>;
+          })}
+        </div>
+      </div>
+      <div className="cfg-section" style={{marginBottom:0}}>
+        <div className="cfg-label">Pothole / Rough Patch</div>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <button
+            className={potholeAhead!=null?'sel warn':''}
+            onClick={function(){upd({pothole_ahead_m:potholeAhead!=null?null:80});}}>
+            {potholeAhead!=null?('⚠ '+Math.round(potholeAhead)+'m'):'None'}
+          </button>
+          {potholeAhead!=null && (
+            <input type="range" min="10" max="250"
+              value={Math.round(potholeAhead)}
+              onChange={function(e){upd({pothole_ahead_m:parseInt(e.target.value)});}}/>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── VibrationControls ─── */
+function VibrationControls({override,roadQuality,rms,send}){
+  const qualities = ['smooth','rough','pothole'];
+  const upd = (fields) => send(Object.assign({cmd:'configure_vibration'},fields));
+  return (
+    <div className="card">
+      <h2>IMU · Vibration</h2>
+      <div className="cfg-section">
+        <div className="cfg-label">Mode</div>
+        <div className="btn-group">
+          <button className={!override?'sel':''} onClick={function(){upd({override:false});}}>CSV Replay</button>
+          <button className={override?'sel':''} onClick={function(){upd({override:true});}}>⚡ Manual Override</button>
+        </div>
+      </div>
+      {override && <>
+        <div className="cfg-section">
+          <div className="cfg-label">Road Quality</div>
+          <div className="btn-group">
+            {qualities.map(function(q){
+              var col=q==='smooth'?'var(--ok)':q==='rough'?'var(--warn)':'var(--crit)';
+              return <button key={q}
+                className={roadQuality===q?'sel':''}
+                style={roadQuality===q?{background:col,color:'#060c10',borderColor:col}:{}}
+                onClick={function(){upd({road_quality:q});}}>
+                {q}
+              </button>;
+            })}
+          </div>
+        </div>
+        <div className="cfg-section" style={{marginBottom:0}}>
+          <div className="cfg-label">Intensity (RMS z)</div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <input type="range" min="0" max="100"
+              value={Math.round((rms||0)*111)}
+              onChange={function(e){upd({rms:parseInt(e.target.value)/111});}}/>
+            <span className="range-val">{(rms||0).toFixed(3)}</span>
+          </div>
+        </div>
+      </>}
+    </div>
+  );
+}
+
+/* ─── ScenarioPanel ─── */
+function ScenarioPanel({list,current,send}){
   return (
     <div className="card">
       <h2>Demo Scenarios</h2>
-      <div className="scenarios">
-        {list.map(s=>(
-          <button key={s} className={s===current?'sel':''}
-            onClick={()=>send({cmd:'scenario',name:s})}>{fmt(s)}</button>
-        ))}
+      <div className="scenario-grid">
+        {list.map(function(s){
+          return <button key={s} className={s===current?'sel':''}
+            onClick={function(){send({cmd:'scenario',name:s});}}>
+            {fmt(s)}
+          </button>;
+        })}
       </div>
     </div>
   );
 }
 
+/* ─── CognitiveLoad ─── */
+function CognitiveLoad({value,factors}){
+  const col = loadColor(value);
+  return (
+    <div className="card">
+      <h2>Cognitive Load / Attention Risk</h2>
+      <div className="gauge-num" style={{color:col}}>{value}</div>
+      <div className="gauge-lbl">0 = relaxed · 100 = overloaded</div>
+      <div className="bar"><span style={{width:value+'%',background:col}}/></div>
+      <div className="factors">
+        {factors.length===0 && <span className="chip">nominal</span>}
+        {factors.map(function(f,i){return <span key={i} className="chip">{f}</span>;})}
+      </div>
+    </div>
+  );
+}
+
+/* ─── AcousticPanel ─── */
+function AcousticPanel({audio,liveAudio,ws}){
+  const [micOn,setMicOn]=useState(false);
+  const procRef=useRef(null);
+  const ctxRef=useRef(null);
+  const SR=16000;
+
+  const startMic=async()=>{
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:{sampleRate:SR,channelCount:1}});
+      const ctx=new AudioContext({sampleRate:SR});
+      ctxRef.current=ctx;
+      const src=ctx.createMediaStreamSource(stream);
+      await ctx.audioWorklet.addModule(window._CHUNKER_URL);
+      const node=new AudioWorkletNode(ctx,'chunker');
+      node.port.onmessage=function(e){
+        if(ws.current&&ws.current.readyState===1)
+          ws.current.send(JSON.stringify({cmd:'audio_chunk',data:Array.from(e.data)}));
+      };
+      src.connect(node);
+      procRef.current={stream,node,src};
+      setMicOn(true);
+    }catch(e){alert('Mic denied: '+e.message);}
+  };
+  const stopMic=()=>{
+    procRef.current&&procRef.current.stream&&procRef.current.stream.getTracks().forEach(function(t){t.stop();});
+    ctxRef.current&&ctxRef.current.close();
+    procRef.current=null;
+    setMicOn(false);
+  };
+
+  const active=audio&&audio.label&&audio.label!=='none';
+  const col=AUDIO_COLORS[audio&&audio.label]||'var(--dim)';
+  return (
+    <div className="card">
+      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span>Acoustic Anomaly</span>
+        {liveAudio&&<button onClick={micOn?stopMic:startMic}
+          style={{fontSize:10,padding:'2px 8px',
+            background:micOn?'rgba(255,77,79,.15)':'var(--panel2)',
+            color:micOn?'var(--crit)':'var(--dim)',borderColor:micOn?'var(--crit)':'var(--line)'}}>
+          {micOn?'⏹ live':'🎤 mic'}
+        </button>}
+      </h2>
+      <div className="audio-event-row">
+        <span className="audio-label" style={{color:active?col:'var(--dim)'}}>
+          {active?(AUDIO_ICONS[audio.label]||'🔊')+' '+(audio.label):'🔇 quiet'}
+        </span>
+        {active&&<span className="chip">{Math.round((audio.confidence||0)*100)}%</span>}
+        {micOn&&!active&&<span className="chip" style={{color:'var(--ok)'}}>listening…</span>}
+      </div>
+      {!liveAudio&&<div style={{fontSize:10,color:'var(--dim)',marginTop:6}}>synthetic — per-seat audio config active</div>}
+    </div>
+  );
+}
+
+/* ─── VisionPanel ─── */
+function VisionPanel({visionDriver,visionObjects,liveVision,ws}){
+  const [camOn,setCamOn]=useState(false);
+  const [open,setOpen]=useState(false);
+  const videoRef=useRef(null);
+  const timerRef=useRef(null);
+
+  const startCam=async()=>{
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
+      videoRef.current.srcObject=stream;
+      await videoRef.current.play();
+      const canvas=document.createElement('canvas');
+      canvas.width=320;canvas.height=240;
+      const ctx2d=canvas.getContext('2d');
+      timerRef.current=setInterval(function(){
+        ctx2d.drawImage(videoRef.current,0,0,320,240);
+        const b64=canvas.toDataURL('image/jpeg',0.7).split(',')[1];
+        if(ws.current&&ws.current.readyState===1)
+          ws.current.send(JSON.stringify({cmd:'vision_frame',data:b64}));
+      },200);
+      setCamOn(true);
+    }catch(e){alert('Camera denied: '+e.message);}
+  };
+  const stopCam=()=>{
+    clearInterval(timerRef.current);
+    videoRef.current&&videoRef.current.srcObject&&
+      videoRef.current.srcObject.getTracks().forEach(function(t){t.stop();});
+    setCamOn(false);
+  };
+
+  const vd=visionDriver||{};
+  const dets=((visionObjects&&visionObjects.detections)||[]).slice(0,3);
+  const emoCol={calm:'var(--ok)',happy:'var(--ok)',stressed:'var(--warn)',tired:'var(--crit)'};
+
+  return (
+    <div className="card">
+      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}}
+          onClick={function(){setOpen(function(o){return !o;});}}>
+        <span>Vision · Face + Objects</span>
+        <span style={{fontSize:10,color:'var(--dim)'}}>{open?'▲':'▼'}</span>
+      </h2>
+      {open&&<>
+        <video ref={videoRef} style={{display:'none'}} muted playsInline/>
+        {liveVision&&<button onClick={camOn?stopCam:startCam}
+          style={{fontSize:10,padding:'3px 9px',marginBottom:8,
+            background:camOn?'rgba(255,77,79,.15)':'var(--panel2)',
+            color:camOn?'var(--crit)':'var(--dim)',borderColor:camOn?'var(--crit)':'var(--line)'}}>
+          {camOn?'⏹ cam live':'📷 use cam'}
+        </button>}
+        {vd.face_detected?(
+          <div className="vision-row">
+            <div><span className="lbl">emotion</span>
+              <b style={{color:emoCol[vd.emotion]||'var(--txt)'}}>{vd.emotion}</b></div>
+            <div><span className="lbl">EAR</span>
+              <b style={{color:vd.drowsy?'var(--crit)':'var(--txt)'}}>{vd.ear}</b></div>
+            <div><span className="lbl">drowsy</span>
+              <b style={{color:vd.drowsy?'var(--crit)':'var(--ok)'}}>{vd.drowsy?'yes':'no'}</b></div>
+          </div>
+        ):<div style={{color:'var(--dim)',fontSize:12}}>{camOn?'scanning…':'no face detected'}</div>}
+        {dets.length>0&&<div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:5}}>
+          {dets.map(function(d,i){return <span key={i} className="chip">{d.label} {Math.round(d.confidence*100)}%</span>;})}
+        </div>}
+        {!liveVision&&<div style={{fontSize:10,color:'var(--dim)',marginTop:6}}>synthetic — mediapipe off</div>}
+      </>}
+    </div>
+  );
+}
+
+/* ─── MitigationPanel ─── */
+function MitigationPanel({mitigations,send}){
+  const visible=(mitigations||[]).filter(function(m){return m.status!=='dismissed';});
+  return (
+    <div className="card">
+      <h2>Adaptive Mitigations · confirm-first</h2>
+      <div className="mit-scroll">
+        {visible.length===0&&<div className="empty-mit">Cabin nominal — no action needed.</div>}
+        {visible.map(function(m){
+          return <div key={m.id} className={'mit '+m.severity}>
+            <div className="mit-top">
+              <span className="mit-title">{m.title}</span>
+              <span className={'st '+m.status}>{m.status}</span>
+            </div>
+            <div className="mit-uc">{m.usecase}</div>
+            <div className="mit-detail">{m.detail}</div>
+            {m.confirm&&m.status==='proposed'&&(
+              <div className="mit-acts">
+                <button className="primary" onClick={function(){send({cmd:'confirm',id:m.id});}}>Apply</button>
+                <button className="ghost" onClick={function(){send({cmd:'dismiss',id:m.id});}}>Dismiss</button>
+              </div>
+            )}
+          </div>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─── VibrationMini (in left col) ─── */
+function VibrationMini({vib}){
+  const quality=(vib&&vib.road_quality)||'smooth';
+  const rms=(vib&&vib.rms_z)||0;
+  const ahead=vib&&vib.pothole_ahead_m;
+  const qCol={smooth:'var(--ok)',rough:'var(--warn)',pothole:'var(--crit)'};
+  const pct=Math.min(100,(rms/0.9)*100);
+  return (
+    <div className="card">
+      <h2>IMU · Road Quality</h2>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+        <span style={{fontWeight:700,fontSize:16,color:qCol[quality]||'var(--txt)'}}>{quality}</span>
+        <div style={{flex:1}}>
+          <div className="bar"><span style={{width:pct+'%',background:qCol[quality]}}/></div>
+        </div>
+        <span style={{fontSize:12,color:'var(--dim)',minWidth:40,textAlign:'right'}}>
+          {ahead!=null?Math.round(ahead)+'m':'—'}
+        </span>
+      </div>
+      {ahead!=null&&ahead<80&&<div style={{fontSize:11,color:'var(--warn)'}}>
+        ⚠ Rough road ~{Math.round(ahead)} m ahead
+      </div>}
+    </div>
+  );
+}
+
+/* ─── App ─── */
 function App(){
-  const [state,setState]=useState({cognitive_load:0,factors:[],radar:{},audio:{},vehicle:{},mitigations:[],scenario:'idle',latency_ms:0});
+  const INIT = {
+    cognitive_load:0,factors:[],radar:{},audio:{},vehicle:{},mitigations:[],
+    scenario:'idle',demo_running:false,latency_ms:0,
+    seat_configs:{
+      driver:{occupied:true,kind:'adult',buckled:true,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
+      front_passenger:{occupied:false,kind:'unknown',buckled:false,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
+      rear_left:{occupied:false,kind:'unknown',buckled:false,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
+      rear_right:{occupied:false,kind:'unknown',buckled:false,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
+    },
+    driver_emotion:'calm',
+    vib_override:false,vib_road_quality:'smooth',vib_rms:0.05,
+    world_speed_kmh:60,world_visibility:'good',world_pothole_ahead_m:null,
+    vision_driver:null,vision_objects:null,vibration:{},
+  };
+  const [state,setState]=useState(INIT);
   const [conn,setConn]=useState(false);
   const [scenarios,setScenarios]=useState([]);
   const [liveAudio,setLiveAudio]=useState(false);
   const [liveVision,setLiveVision]=useState(false);
+  const [selectedSeat,setSelectedSeat]=useState(null);
   const ws=useRef(null);
 
-  useEffect(()=>{
-    fetch('/api/scenarios').then(r=>r.json()).then(d=>setScenarios(d.scenarios)).catch(()=>{});
-    fetch('/api/caps').then(r=>r.json()).then(d=>{setLiveAudio(d.live_audio);setLiveVision(d.live_vision);}).catch(()=>{});
-    const sock=new WebSocket('ws://'+location.host+'/ws');
+  useEffect(function(){
+    fetch('/api/scenarios').then(function(r){return r.json();})
+      .then(function(d){setScenarios(d.scenarios||[]);}).catch(function(){});
+    fetch('/api/caps').then(function(r){return r.json();})
+      .then(function(d){setLiveAudio(d.live_audio);setLiveVision(d.live_vision);}).catch(function(){});
+
+    var proto = location.protocol==='https:'?'wss:':'ws:';
+    var sock=new WebSocket(proto+'//'+location.host+'/ws');
     ws.current=sock;
-    sock.onopen=()=>setConn(true);
-    sock.onclose=()=>setConn(false);
-    sock.onmessage=e=>setState(JSON.parse(e.data));
-    return ()=>sock.close();
+    sock.onopen=function(){setConn(true);};
+    sock.onclose=function(){setConn(false);};
+    sock.onmessage=function(e){setState(JSON.parse(e.data));};
+    return function(){sock.close();};
   },[]);
 
-  const send=msg=>ws.current&&ws.current.readyState===1&&ws.current.send(JSON.stringify(msg));
+  const send=useCallback(function(msg){
+    if(ws.current&&ws.current.readyState===1)
+      ws.current.send(JSON.stringify(msg));
+  },[]);
 
   return (
     <div className="app">
       <header>
         <h1><span className="tag">Cabin</span>Sense</h1>
-        <span className="sub">In-Cabin Disturbance Intelligence · cognitive-load reduction</span>
-        <span className="status">
-          <span className={'dot'+(conn?' on':'')}/>{conn?'live':'offline'} · {state.latency_ms} ms
-        </span>
+        <span className="sub">In-Cabin Disturbance Intelligence</span>
+        <div className={'conn-dot'+(conn?' on':'')}/>
+        <span className="conn-label">{conn?'live':'offline'}</span>
+        <span className="latency">{state.latency_ms} ms</span>
       </header>
-      <DemoBar scenario={state.scenario}/>
-      <div className="grid">
-        <div className="col">
-          <Gauge value={state.cognitive_load} factors={state.factors}/>
-          <Audio audio={state.audio} ws={ws} liveAudio={liveAudio}/>
-          <Vibration vib={state.vibration}/>
-          <Scenarios list={scenarios} current={state.scenario} send={send}/>
+
+      <DemoBar scenario={state.scenario} demoRunning={state.demo_running}/>
+
+      <div className="main">
+        {/* ── Left monitoring column ── */}
+        <div className="left-col">
+          <CognitiveLoad value={state.cognitive_load} factors={state.factors}/>
+          <AcousticPanel audio={state.audio} liveAudio={liveAudio} ws={ws}/>
+          <VibrationMini vib={state.vibration}/>
+          <VisionPanel visionDriver={state.vision_driver} visionObjects={state.vision_objects}
+            liveVision={liveVision} ws={ws}/>
+          <MitigationPanel mitigations={state.mitigations} send={send}/>
         </div>
-        <div className="col">
-          <Cabin radar={state.radar} vehicle={state.vehicle}/>
-          <Vision visionDriver={state.vision_driver} visionObjects={state.vision_objects}
-            ws={ws} liveVision={liveVision}/>
-        </div>
-        <div className="col">
-          <Mitigations list={state.mitigations} send={send}/>
+
+        {/* ── Right interactive column ── */}
+        <div className="right-col">
+          {/* Car interior */}
+          <CabinView
+            seatConfigs={state.seat_configs}
+            radarSeats={state.radar}
+            selectedSeat={selectedSeat}
+            onSelectSeat={setSelectedSeat}
+            scenario={state.scenario}
+            speed={state.world_speed_kmh}
+            visibility={state.world_visibility}
+            potholeAhead={state.world_pothole_ahead_m}
+          />
+
+          {/* Seat config panel (conditional) */}
+          {selectedSeat && (
+            <SeatConfigPanel
+              seatId={selectedSeat}
+              config={state.seat_configs&&state.seat_configs[selectedSeat]}
+              send={send}
+              onClose={function(){setSelectedSeat(null);}}
+            />
+          )}
+
+          {/* Controls row */}
+          <div className="controls-row">
+            <VehicleControls
+              speed={state.world_speed_kmh}
+              visibility={state.world_visibility}
+              potholeAhead={state.world_pothole_ahead_m}
+              send={send}/>
+            <VibrationControls
+              override={state.vib_override}
+              roadQuality={state.vib_road_quality}
+              rms={state.vib_rms}
+              send={send}/>
+            <ScenarioPanel list={scenarios} current={state.scenario} send={send}/>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>

@@ -30,19 +30,21 @@ def _frame() -> RadarFrame:
             seats.append(SeatState(seat=seat_id, occupied=False))
             continue
         points += random.randint(12, 40)
+        # Per-seat overrides take priority; fall back to kind-derived defaults
         if seat_id == "driver":
-            resp = _jitter(world.driver_resp)
-            hr = _jitter(world.driver_hr)
+            resp_base = world.driver_resp
+            hr_base = world.driver_hr
         elif occ.kind == "child":
-            # children breathe faster; distress raises it further
-            resp = _jitter(24 + occ.distress * 12)
-            hr = _jitter(100 + occ.distress * 25)
+            resp_base = 24 + occ.distress * 12
+            hr_base = 100 + occ.distress * 25
         elif occ.kind == "pet":
-            resp = _jitter(30 + occ.distress * 20)
-            hr = _jitter(110 + occ.distress * 30)
+            resp_base = 30 + occ.distress * 20
+            hr_base = 110 + occ.distress * 30
         else:
-            resp = _jitter(15)
-            hr = _jitter(75)
+            resp_base = 15
+            hr_base = 75
+        resp = _jitter(occ.respiration_rpm if occ.respiration_rpm is not None else resp_base)
+        hr = _jitter(occ.heart_rate_bpm if occ.heart_rate_bpm is not None else hr_base)
         motion = round(min(1.0, occ.distress * 0.6 +
                            (world.object_motion if seat_id == "driver" else 0) +
                            random.uniform(0, 0.08)), 2)

@@ -75,6 +75,23 @@ async def run() -> None:
     while True:
         loop_start = time.perf_counter()
 
+        # User-controlled override: bypass CSV replay
+        if world.vib_override:
+            quality = world.vib_road_quality
+            current_rms = world.vib_rms
+            await bus.publish("vibration", {
+                "ts": time.time(),
+                "ax": 0.0, "ay": 0.0,
+                "az": round(9.81 + current_rms, 4),
+                "rms_z": round(current_rms, 4),
+                "road_quality": quality,
+                "pothole_ahead_m": world.pothole_ahead_m,
+                "source": "imu_override",
+            })
+            elapsed = time.perf_counter() - loop_start
+            await asyncio.sleep(max(0, 1 / HZ - elapsed))
+            continue
+
         if idx >= len(rows):
             idx = 0             # loop the route
 
@@ -99,7 +116,7 @@ async def run() -> None:
             dist_m = round(lookahead_s * speed_ms, 1)
             if world.pothole_ahead_m is None or world.pothole_ahead_m > dist_m:
                 world.pothole_ahead_m = dist_m
-        elif quality == "smooth" and world.pothole_ahead_m is not None and world.pothole_ahead_m < 5:
+        elif quality == "smooth" and world.pothole_ahead_m is not None and world.pothole_ahead_m < 5 and not world.vib_override:
             world.pothole_ahead_m = None  # clear after we've passed
 
         await bus.publish("vibration", {

@@ -38,7 +38,7 @@ FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 if FRONTEND.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
 
-_demo_running = False
+_demo_stop = False
 
 # Each step: (scenario_name, hold_seconds, mitigation_ids_to_auto_confirm)
 DEMO_SCRIPT = [
@@ -54,17 +54,23 @@ DEMO_SCRIPT = [
 
 
 async def _run_demo() -> None:
-    global _demo_running
-    _demo_running = True
+    global _demo_stop
+    _demo_stop = False
+    scenarios.world.demo_running = True
     try:
         for scene, hold, auto_confirm in DEMO_SCRIPT:
+            if _demo_stop:
+                break
             scenarios.apply(scene)
             await asyncio.sleep(2)           # let sensors settle
+            if _demo_stop:
+                break
             for mid in auto_confirm:
                 fusion.confirm(mid)
             await asyncio.sleep(hold)
     finally:
-        _demo_running = False
+        scenarios.world.demo_running = False
+        _demo_stop = False
 
 
 @app.on_event("startup")
@@ -94,11 +100,35 @@ async def list_scenarios() -> dict:
 
 @app.post("/api/demo/play")
 async def demo_play() -> dict:
-    global _demo_running
-    if _demo_running:
+    if scenarios.world.demo_running:
         return {"status": "already_running"}
     asyncio.create_task(_run_demo())
     return {"status": "started", "steps": len(DEMO_SCRIPT)}
+
+
+@app.post("/api/demo/stop")
+async def demo_stop_endpoint() -> dict:
+    global _demo_stop
+    _demo_stop = True
+    return {"status": "stopping"}
+
+
+def _sync_audio_from_seats() -> None:
+    """Derive world audio state from the loudest per-seat audio event."""
+    priority = {"crying": 5, "barking": 4, "shouting": 3, "talking": 2, "happy": 1, "none": 0}
+    best_label = "none"
+    best_conf = 0.0
+    best_pri = 0
+    for occ in scenarios.world.seats.values():
+        if not occ.occupied:
+            continue
+        pri = priority.get(occ.audio_event, 0)
+        if pri > best_pri:
+            best_pri = pri
+            best_label = occ.audio_event
+            best_conf = round(min(1.0, 0.80 + occ.distress * 0.15), 2)
+    scenarios.world.audio_label = best_label
+    scenarios.world.audio_conf = best_conf
 
 
 @app.websocket("/ws")
@@ -116,7 +146,58 @@ async def ws(sock: WebSocket) -> None:
             msg = json.loads(await sock.receive_text())
             cmd = msg.get("cmd")
             if cmd == "scenario":
+                _demo_stop = True          # cancel auto-play if running
                 scenarios.apply(msg["name"])
+            elif cmd == "configure_seat":
+                seat_id = msg.get("seat")
+                if seat_id in scenarios.world.seats:
+                    occ = scenarios.world.seats[seat_id]
+                    if "occupied" in msg:
+                        occ.occupied = bool(msg["occupied"])
+                        if not occ.occupied:
+                            occ.audio_event = "none"
+                    if "kind" in msg:
+                        if occ.kind != msg["kind"]:
+                            occ.audio_event = "none"   # reset on type change
+                        occ.kind = msg["kind"]
+                    if "buckled" in msg:
+                        occ.buckled = bool(msg["buckled"])
+                    if "distress" in msg:
+                        occ.distress = float(msg["distress"])
+                    if "audio_event" in msg:
+                        occ.audio_event = msg["audio_event"]
+                    if "heart_rate_bpm" in msg:
+                        v = msg["heart_rate_bpm"]
+                        occ.heart_rate_bpm = float(v) if v is not None else None
+                    if "respiration_rpm" in msg:
+                        v = msg["respiration_rpm"]
+                        occ.respiration_rpm = float(v) if v is not None else None
+                    if "emotion" in msg:
+                        occ.emotion = msg["emotion"]
+                    if seat_id == "driver":
+                        scenarios.world.driver_emotion = occ.emotion
+                        if occ.heart_rate_bpm is not None:
+                            scenarios.world.driver_hr = occ.heart_rate_bpm
+                        if occ.respiration_rpm is not None:
+                            scenarios.world.driver_resp = occ.respiration_rpm
+                    _sync_audio_from_seats()
+            elif cmd == "configure_vehicle":
+                w = scenarios.world
+                if "speed_kmh" in msg:
+                    w.speed_kmh = float(msg["speed_kmh"])
+                if "visibility" in msg:
+                    w.visibility = msg["visibility"]
+                if "pothole_ahead_m" in msg:
+                    v = msg["pothole_ahead_m"]
+                    w.pothole_ahead_m = float(v) if v is not None else None
+            elif cmd == "configure_vibration":
+                w = scenarios.world
+                if "override" in msg:
+                    w.vib_override = bool(msg["override"])
+                if "road_quality" in msg:
+                    w.vib_road_quality = msg["road_quality"]
+                if "rms" in msg:
+                    w.vib_rms = float(msg["rms"])
             elif cmd == "confirm":
                 fusion.confirm(msg["id"])
             elif cmd == "dismiss":

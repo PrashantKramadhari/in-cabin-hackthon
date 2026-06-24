@@ -12,9 +12,13 @@ from dataclasses import dataclass, field
 @dataclass
 class Occupant:
     occupied: bool = False
-    kind: str = "unknown"      # adult | child | pet | unknown
+    kind: str = "unknown"       # adult | child | pet | unknown
     buckled: bool = False
-    distress: float = 0.0      # 0..1 (crying child, agitated pet, ...)
+    distress: float = 0.0       # 0..1 (crying child, agitated pet, ...)
+    audio_event: str = "none"   # none | talking | shouting | crying | happy | barking
+    heart_rate_bpm: float | None = None   # None = auto-derived from kind
+    respiration_rpm: float | None = None  # None = auto-derived from kind
+    emotion: str = "calm"       # calm | stressed | tired | happy (driver only used in fusion)
 
 
 @dataclass
@@ -31,8 +35,8 @@ class World:
     driver_resp: float = 14.0        # breaths/min baseline
     driver_emotion: str = "calm"     # calm | stressed | tired | happy
 
-    # acoustic environment
-    audio_label: str = "none"        # crying | animal | rattle | speech | none
+    # acoustic environment (synthesised from per-seat audio_events)
+    audio_label: str = "none"
     audio_conf: float = 0.0
 
     # vehicle / road
@@ -42,9 +46,15 @@ class World:
 
     # loose objects
     unsecured_object: bool = False
-    object_motion: float = 0.0       # 0..1
+    object_motion: float = 0.0
+
+    # vibration override (user-controlled via HMI)
+    vib_override: bool = False
+    vib_road_quality: str = "smooth"   # smooth | rough | pothole
+    vib_rms: float = 0.05
 
     scenario: str = "idle"
+    demo_running: bool = False
 
 
 # single shared world

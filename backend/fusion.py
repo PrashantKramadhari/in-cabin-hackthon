@@ -240,6 +240,7 @@ async def run() -> None:
         state = dict(
             ts=time.time(),
             scenario=world.scenario,
+            demo_running=world.demo_running,
             cognitive_load=score,
             factors=factors,
             radar=_latest["radar"],
@@ -250,6 +251,27 @@ async def run() -> None:
             vibration=_latest["vibration"],
             mitigations=mitigations,
             latency_ms=round((time.perf_counter() - t0) * 1000, 2),
+            # World-level config exposed so the HMI can reflect / edit it
+            seat_configs={
+                sid: {
+                    "occupied": occ.occupied,
+                    "kind": occ.kind,
+                    "buckled": occ.buckled,
+                    "distress": round(occ.distress, 2),
+                    "audio_event": occ.audio_event,
+                    "heart_rate_bpm": occ.heart_rate_bpm,
+                    "respiration_rpm": occ.respiration_rpm,
+                    "emotion": occ.emotion,
+                }
+                for sid, occ in world.seats.items()
+            },
+            driver_emotion=world.driver_emotion,
+            vib_override=world.vib_override,
+            vib_road_quality=world.vib_road_quality,
+            vib_rms=round(world.vib_rms, 3),
+            world_speed_kmh=world.speed_kmh,
+            world_visibility=world.visibility,
+            world_pothole_ahead_m=world.pothole_ahead_m,
         )
         await bus.publish("fused", state)
         await asyncio.sleep(1 / HZ)
