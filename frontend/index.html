@@ -516,11 +516,15 @@ function VideoWidget({ws,liveVision,visionDriver,send}){
       vRef.current.srcObject=st;await vRef.current.play();
       var cv2=document.createElement('canvas');cv2.width=320;cv2.height=240;
       var c2=cv2.getContext('2d');
-      /* throttle to 500 ms when mic also active — prevents WS flood */
+      /* throttle to 500 ms; guard against null ref after unmount */
       var interval=setInterval(function(){
-        c2.drawImage(vRef.current,0,0,320,240);
-        var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
-        wsSend({cmd:'vision_frame',data:b64});
+        var v=vRef.current;
+        if(!v||!v.videoWidth)return;
+        try{
+          c2.drawImage(v,0,0,320,240);
+          var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
+          wsSend({cmd:'vision_frame',data:b64});
+        }catch(e){/* frame skipped */}
       },500);
       camRef.current={interval,canvas:cv2,ctx:c2,stream:st};
     }catch(e){alert('Camera denied: '+e.message);setMode('off');}
@@ -582,11 +586,13 @@ function VideoWidget({ws,liveVision,visionDriver,send}){
     var cv2=document.createElement('canvas');cv2.width=320;cv2.height=240;
     var c2=cv2.getContext('2d');
     var interval=setInterval(function(){
-      if(vid.readyState>=2){
-        c2.drawImage(vid,0,0,320,240);
+      var v=vRef.current;
+      if(!v||!v.videoWidth||v.readyState<2)return;
+      try{
+        c2.drawImage(v,0,0,320,240);
         var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
         wsSend({cmd:'vision_frame',data:b64});
-      }
+      }catch(e){/* frame skipped */}
     },1000); /* 1 fps — enough for Qwen scene analysis */
     camRef.current={interval,canvas:cv2,ctx:c2,stream:null};
   };
