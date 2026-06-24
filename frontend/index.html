@@ -36,12 +36,15 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 
 /* ─── Sensor View Grid ─── */
 .sv{display:grid;grid-template-columns:repeat(3,1fr);
-  grid-template-rows:1fr 1fr 52px;gap:8px;padding:8px;height:100%;overflow:hidden}
+  grid-template-rows:1fr 1fr 44px;gap:6px;padding:6px;
+  width:54vw;height:54vh;min-width:600px;min-height:320px;
+  border-radius:14px;overflow:hidden;border:1.5px solid #1c2740;
+  box-shadow:0 0 60px rgba(0,0,0,.7),0 0 0 1px rgba(0,212,176,.06)}
 .sv-timeline{grid-column:1/-1}
 
 /* ─── Panels ─── */
-.panel{background:#0d1520;border:1px solid #1c2740;border-radius:8px;
-  padding:9px 11px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.panel{background:#0d1520;border:1px solid #1c2740;border-radius:7px;
+  padding:7px 9px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0}
 .pt{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
 .ps{font-size:9px;color:#2a3a50}
@@ -1248,7 +1251,7 @@ function App(){
       </div>
       <div className="hmi-content">
         {tab==='sensor'&&(
-          <div className="view">
+          <div className="view iv-shell">
             <SensorView state={state} send={send} ws={ws}
               liveAudio={liveAudio} liveVision={liveVision}
               scenarios={scenarios} onSelectSeat={setSelSeat}/>
