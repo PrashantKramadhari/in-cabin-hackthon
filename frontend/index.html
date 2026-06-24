@@ -58,12 +58,12 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
   padding:7px 9px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0}
 .pt{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
-.ps{font-size:9px;color:rgba(255,255,255,.38)}
+.ps{font-size:9px;color:rgba(255,255,255,.7)}
 .pb{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:6px}
 
 /* ─── Shared controls ─── */
 .row{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.lbl{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.45);flex-shrink:0}
+.lbl{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.75);flex-shrink:0}
 .val{font-size:11px;font-weight:600;color:#ffffff;min-width:42px;text-align:right;flex-shrink:0}
 .btn-row{display:flex;flex-wrap:wrap;gap:4px}
 .btn{padding:3px 9px;border-radius:4px;font-size:9px;border:1px solid rgba(255,255,255,.1);
@@ -128,7 +128,7 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .sc-scroll::-webkit-scrollbar{height:2px}
 .sc-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
 .sc-btn{padding:4px 10px;border-radius:4px;font-size:9px;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);cursor:pointer;white-space:nowrap;flex-shrink:0;
+  background:rgba(255,255,255,.04);color:rgba(255,255,255,.75);cursor:pointer;white-space:nowrap;flex-shrink:0;
   transition:all .15s;font-family:inherit}
 .sc-btn:hover{border-color:#00d4b0;color:#00d4b0}
 .sc-btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
@@ -153,7 +153,7 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .cfg-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .rval{font-size:11px;color:#ffffff;font-weight:600;min-width:52px;text-align:right}
 .xbtn{padding:4px 10px;border-radius:4px;font-size:10px;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);color:rgba(255,255,255,.45);transition:all .15s;cursor:pointer;font-family:inherit}
+  background:rgba(255,255,255,.04);color:rgba(255,255,255,.75);transition:all .15s;cursor:pointer;font-family:inherit}
 .xbtn.sel{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
 .close-btn{background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);border-radius:5px;
   padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit}
@@ -172,11 +172,11 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .iv-col:last-child{border-right:none}
 .iv-cabin{background:#090d12;align-items:center;justify-content:center}
 .iv-issue{background:#0c1520}
-.iv-gauge{background:#090d12;align-items:center;justify-content:flex-start;padding-top:22px}
+.iv-gauge{background:#090d12;align-items:center;justify-content:center;gap:0}
 .iv-rec{background:#0c1520}
 
 /* infotainment text — white */
-.iss-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:5px}
+.iss-lbl{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:8px}
 .iss-name{font-size:16px;font-weight:700;color:#ffffff;line-height:1.25;margin-bottom:10px}
 .iss-conf{font-size:36px;font-weight:700;line-height:1;margin-bottom:2px}
 .iss-clbl{font-size:8px;color:rgba(255,255,255,.55);margin-bottom:12px}
@@ -188,19 +188,19 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 
 /* gauge */
 .gauge-sec{text-align:center;width:100%}
-.gauge-ttl{font-size:8px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:10px}
-.gauge-lbl{font-size:13px;font-weight:700;margin-top:8px;color:#ffffff}
+.gauge-ttl{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:12px}
+.gauge-lbl{font-size:16px;font-weight:700;margin-top:10px;color:#ffffff}
 
 /* rec panel */
-.rec-ttl{font-size:8px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:12px}
-.rec-list{display:flex;flex-direction:column;gap:9px;margin-bottom:14px}
-.rec-item{display:flex;gap:8px;align-items:flex-start}
-.rec-num{width:18px;height:18px;border-radius:50%;background:rgba(0,212,176,.1);
+.rec-ttl{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:14px}
+.rec-list{display:flex;flex-direction:column;gap:11px;margin-bottom:16px}
+.rec-item{display:flex;gap:10px;align-items:flex-start}
+.rec-num{width:20px;height:20px;border-radius:50%;background:rgba(0,212,176,.1);
   border:1px solid rgba(0,212,176,.3);display:flex;align-items:center;justify-content:center;
-  font-size:9px;font-weight:700;color:#00d4b0;flex-shrink:0;margin-top:1px}
-.rec-text{font-size:11px;color:#ffffff;line-height:1.35}
-.rec-detail{font-size:8px;color:rgba(255,255,255,.5);margin-top:1px}
-.rec-empty{font-size:11px;color:rgba(255,255,255,.45);padding:4px 0}
+  font-size:10px;font-weight:700;color:#00d4b0;flex-shrink:0;margin-top:1px}
+.rec-text{font-size:14px;color:#ffffff;line-height:1.35}
+.rec-detail{font-size:10px;color:rgba(255,255,255,.5);margin-top:2px}
+.rec-empty{font-size:14px;color:rgba(255,255,255,.45);padding:4px 0}
 .apply-btn{display:block;width:100%;padding:9px;border-radius:7px;font-size:12px;font-weight:700;
   background:rgba(0,212,176,.14);border:1px solid #00d4b0;color:#00d4b0;
   cursor:pointer;transition:all .2s;font-family:inherit;text-align:center}
@@ -440,7 +440,7 @@ function AudioWidget({ws,liveAudio,audio}){
         </span>
         <span style={{fontSize:22,fontWeight:700,color:dbCol,marginLeft:8,minWidth:56,
           fontVariantNumeric:'tabular-nums',lineHeight:1}}>{db}</span>
-        <span style={{fontSize:10,color:'rgba(255,255,255,.42)',alignSelf:'flex-end',marginBottom:2}}>dB</span>
+        <span style={{fontSize:10,color:'rgba(255,255,255,.8)',alignSelf:'flex-end',marginBottom:2}}>dB</span>
       </div>
       {/* Waveform */}
       <div className="canvas-wrap" style={{marginBottom:4}}>
@@ -495,7 +495,7 @@ function VideoWidget({ws,liveVision,visionDriver}){
       </div>
       <div className="vid-box" style={{position:'relative'}}>
         {!on&&!liveVision&&<span>No camera · synthetic</span>}
-        {!on&&liveVision&&<span style={{color:'rgba(255,255,255,.42)'}}>Camera off</span>}
+        {!on&&liveVision&&<span style={{color:'rgba(255,255,255,.8)'}}>Camera off</span>}
         <video ref={vRef} muted playsInline
           style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:5,
             display:on?'block':'none'}}/>
@@ -505,11 +505,11 @@ function VideoWidget({ws,liveVision,visionDriver}){
       </div>
       {vd.face_detected&&(
         <div style={{display:'flex',gap:10,marginTop:5,fontSize:10,flexShrink:0}}>
-          <span style={{color:'rgba(255,255,255,.42)'}}>Emotion:</span>
+          <span style={{color:'rgba(255,255,255,.8)'}}>Emotion:</span>
           <span style={{color:vd.drowsy?'#fc8181':'#00d4b0',fontWeight:600}}>
             {vd.emotion}{vd.drowsy?' ⚠ Drowsy':''}
           </span>
-          <span style={{color:'rgba(255,255,255,.42)',marginLeft:'auto'}}>EAR {vd.ear}</span>
+          <span style={{color:'rgba(255,255,255,.8)',marginLeft:'auto'}}>EAR {vd.ear}</span>
         </div>
       )}
     </div>
@@ -540,7 +540,7 @@ function SeatWidget({seatConfigs,onSelect}){
               <span className="seat-icon">{c.occupied?(ICONS[c.kind]||'👤'):'·'}</span>
               <span className="seat-name">{SEAT_LABELS[sid]}</span>
               {au&&<span className="seat-tag">{AICONS[c.audio_event]} {c.audio_event}</span>}
-              {c.occupied&&!au&&<span style={{fontSize:8,color:'rgba(255,255,255,.42)'}}>{c.emotion||'calm'}</span>}
+              {c.occupied&&!au&&<span style={{fontSize:8,color:'rgba(255,255,255,.8)'}}>{c.emotion||'calm'}</span>}
             </div>
           );
         })}
@@ -666,7 +666,7 @@ function IMUWidget({vibState,send}){
             ['Z (Vertical)',az,setAz,8,12]].map(function(r){
             return (
               <div key={r[0]} className="row" style={{marginBottom:4}}>
-                <span style={{fontSize:9,color:'rgba(255,255,255,.42)',width:72,flexShrink:0}}>{r[0]}</span>
+                <span style={{fontSize:9,color:'rgba(255,255,255,.8)',width:72,flexShrink:0}}>{r[0]}</span>
                 <input type="range" min={r[3]} max={r[4]} step="0.1"
                   value={r[1]}
                   onChange={function(e){
@@ -690,7 +690,7 @@ function IMUWidget({vibState,send}){
           {[['Roll',roll,setRoll,-45,45],['Pitch',pitch,setPitch,-30,30],['Yaw',yaw,setYaw,-180,180]].map(function(r){
             return (
               <div key={r[0]} className="row" style={{marginBottom:4}}>
-                <span style={{fontSize:9,color:'rgba(255,255,255,.42)',width:32,flexShrink:0}}>{r[0]}</span>
+                <span style={{fontSize:9,color:'rgba(255,255,255,.8)',width:32,flexShrink:0}}>{r[0]}</span>
                 <input type="range" min={r[3]} max={r[4]} step="1" value={r[1]}
                   onChange={function(e){r[2](parseInt(e.target.value));}}/>
                 <span className="val" style={{minWidth:36}}>{r[1]}°</span>
@@ -780,7 +780,7 @@ function RoadQualityWidget({vib,send}){
       </div>
       {/* Wheel vibration heatmap */}
       <div style={{flexShrink:0,marginBottom:6}}>
-        <div style={{fontSize:9,color:'rgba(255,255,255,.42)',marginBottom:4,textTransform:'uppercase',letterSpacing:'.7px'}}>Wheel Vibration</div>
+        <div style={{fontSize:9,color:'rgba(255,255,255,.8)',marginBottom:4,textTransform:'uppercase',letterSpacing:'.7px'}}>Wheel Vibration</div>
         <div className="wheel-map">
           {[['FL',wheels.fl],['FR',wheels.fr],['RL',wheels.rl],['RR',wheels.rr]].map(function(w){
             return <div key={w[0]} className="wheel"
@@ -832,7 +832,7 @@ function RoadQualityWidget({vib,send}){
 function TimelineBar({scenarios,current,demoRunning,send}){
   return (
     <div className="panel sv-timeline" style={{flexDirection:'row',padding:'8px 12px'}}>
-      <span style={{fontSize:9,color:'rgba(255,255,255,.42)',textTransform:'uppercase',letterSpacing:'1px',
+      <span style={{fontSize:9,color:'rgba(255,255,255,.8)',textTransform:'uppercase',letterSpacing:'1px',
         flexShrink:0,alignSelf:'center',marginRight:10}}>Events</span>
       <div className="sc-scroll">
         {(scenarios||[]).map(function(s){
@@ -946,7 +946,7 @@ function SeatConfigOverlay({seatId,config,send,onClose}){
                 width:Math.round(((c.weight_kg||70)/120)*100)+'%',
                 background:loadCol(Math.round(((c.weight_kg||70)/120)*100))}}/>
             </div>
-            <div style={{fontSize:9,color:'rgba(255,255,255,.42)',marginTop:3}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,.8)',marginTop:3}}>
               {Math.round(((c.weight_kg||70)/120)*100)}% — {c.weight_kg||70} kg
             </div>
           </div>
@@ -984,7 +984,7 @@ function CabinSVG({seatConfigs,factors}){
     {id:'rear_right',       x:118, y:116, label:'Rear R'}
   ];
   return (
-    <svg viewBox="0 0 160 220" style={{width:'82%',height:'auto',display:'block',margin:'0 auto',flexShrink:0}}>
+    <svg viewBox="0 0 160 220" style={{width:'96%',height:'auto',display:'block',margin:'0 auto',flexShrink:0}}>
       {/* Car body */}
       <rect x="10" y="12" width="140" height="196" rx="22" fill="#0d1520" stroke="#1c2740" strokeWidth="1.5"/>
       {/* Windshield */}
@@ -1201,13 +1201,15 @@ function InfotainmentView({state,send}){
       <div className="iv-col iv-issue">
         <IssuePanel state={state}/>
       </div>
-      {/* Col 3: Load Score + Occupant Status */}
+      {/* Col 3: Load Score + Occupant Status — centered as a unit */}
       <div className="iv-col iv-gauge">
-        <CircularGauge value={load}/>
-        <div style={{width:'100%',marginTop:14}}>
-          <div style={{fontSize:8,textTransform:'uppercase',letterSpacing:'1.2px',
-            color:'#ffffff',fontWeight:600,marginBottom:6,textAlign:'center'}}>Cabin Status</div>
-          <OccupantList seatConfigs={state.seat_configs}/>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:'100%'}}>
+          <CircularGauge value={load}/>
+          <div style={{width:'100%',marginTop:12}}>
+            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'1.2px',
+              color:'#ffffff',fontWeight:600,marginBottom:8,textAlign:'center'}}>Cabin Status</div>
+            <OccupantList seatConfigs={state.seat_configs}/>
+          </div>
         </div>
       </div>
       {/* Col 4: Recommendation */}
