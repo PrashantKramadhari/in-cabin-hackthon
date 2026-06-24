@@ -321,6 +321,7 @@ function WaveformCanvas({analyserRef}){
     var ctx=cv.getContext('2d');var id;
     var draw=function(){
       var W=cv.clientWidth||340;var H=cv.clientHeight||44;
+      if(W<2||H<2){id=requestAnimationFrame(draw);return;}
       if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
       ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
       var buf=new Uint8Array(analyserRef.current?analyserRef.current.fftSize:256);
@@ -347,6 +348,7 @@ function SpectrogramCanvas({analyserRef}){
     var ctx=cv.getContext('2d');var id;
     var draw=function(){
       var W=cv.clientWidth||340;var H=cv.clientHeight||80;
+      if(W<2||H<2){id=requestAnimationFrame(draw);return;}
       if(cv.width!==W||cv.height!==H){
         cv.width=W;cv.height=H;
         ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
@@ -1045,7 +1047,8 @@ function IssuePanel({state}){
     if(above){
       if(!detRef.current)detRef.current=new Date();
       var id=setInterval(function(){
-        setDur(Math.round((Date.now()-detRef.current.getTime())/1000));
+        if(detRef.current)
+          setDur(Math.round((Date.now()-detRef.current.getTime())/1000));
       },1000);
       return function(){clearInterval(id);};
     }
