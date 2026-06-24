@@ -44,9 +44,9 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 
 /* ─── Sensor View Grid ─── */
 .sv{display:grid;grid-template-columns:repeat(3,1fr);
-  grid-template-rows:1fr 1fr 44px;gap:6px;padding:6px;
+  grid-template-rows:1fr 1fr 52px;gap:8px;padding:8px;
   width:81vw;height:81vh;min-width:900px;min-height:480px;
-  border-radius:14px;overflow:hidden;
+  border-radius:14px;overflow:auto;resize:both;
   border:1px solid rgba(0,212,176,.2);
   background:linear-gradient(150deg,#0c1420 0%,#080d18 100%);
   box-shadow:0 0 0 1px rgba(0,212,176,.06),0 30px 80px rgba(0,0,0,.95),
@@ -55,29 +55,30 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 
 /* ─── Panels ─── */
 .panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;
-  padding:7px 9px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
-.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0}
-.pt{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
-.ps{font-size:9px;color:rgba(255,255,255,.7)}
-.pb{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:6px}
+  padding:11px 13px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0}
+.pt{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
+.ps{font-size:11px;color:rgba(255,255,255,.7)}
+.pb{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column;
+  gap:0;justify-content:space-evenly}
 
 /* ─── Shared controls ─── */
-.row{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.lbl{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.75);flex-shrink:0}
-.val{font-size:11px;font-weight:600;color:#ffffff;min-width:42px;text-align:right;flex-shrink:0}
-.btn-row{display:flex;flex-wrap:wrap;gap:4px}
-.btn{padding:3px 9px;border-radius:4px;font-size:9px;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s;font-family:inherit}
+.row{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.75);flex-shrink:0}
+.val{font-size:13px;font-weight:600;color:#ffffff;min-width:48px;text-align:right;flex-shrink:0}
+.btn-row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.btn{padding:6px 14px;border-radius:5px;font-size:11px;border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);color:rgba(255,255,255,.75);cursor:pointer;transition:all .15s;font-family:inherit}
 .btn:hover{border-color:#00d4b0;color:#00d4b0}
 .btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
 .btn.warn{background:rgba(246,173,85,.08);border-color:#f6ad55;color:#f6ad55}
 .btn.crit{background:rgba(252,129,129,.08);border-color:#fc8181;color:#fc8181}
-input[type=range]{-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
+input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
   background:rgba(255,255,255,.12);outline:none;flex:1;cursor:pointer;border:none;min-width:0}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
   border-radius:50%;background:#00d4b0;cursor:pointer;border:2px solid #090d12}
-input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
-.divider{height:1px;background:rgba(255,255,255,.07);flex-shrink:0;margin:2px 0}
+input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:15px;height:15px}
+.divider{height:1px;background:rgba(255,255,255,.07);flex-shrink:0;margin:0}
 
 /* ─── Video ─── */
 .vid-box{background:rgba(0,0,0,.4);border-radius:5px;flex:1;display:flex;align-items:center;
@@ -93,13 +94,13 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .vad-dot.on{background:#00d4b0;box-shadow:0 0 6px rgba(0,212,176,.6)}
 .noise-bar{height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;flex:1}
 .noise-fill{height:100%;border-radius:3px;transition:width .15s,background .3s}
-.mic-btn{padding:4px 12px;border-radius:5px;font-size:10px;font-weight:600;
+.mic-btn{padding:6px 14px;border-radius:5px;font-size:12px;font-weight:600;
   font-family:inherit;cursor:pointer;transition:all .2s}
 .mic-start{background:rgba(0,212,176,.1);border:1px solid #00d4b0;color:#00d4b0}
 .mic-stop{background:rgba(252,129,129,.1);border:1px solid #fc8181;color:#fc8181}
 .canvas-wrap{border-radius:4px;overflow:hidden;background:rgba(0,0,0,.5);flex-shrink:0;
   border:1px solid rgba(255,255,255,.05)}
-.det-badge{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(246,173,85,.12);
+.det-badge{font-size:12px;padding:4px 10px;border-radius:10px;background:rgba(246,173,85,.12);
   border:1px solid rgba(246,173,85,.3);color:#f6ad55;flex-shrink:0;align-self:flex-start}
 
 /* ─── Seats widget ─── */
@@ -110,29 +111,29 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .seat-cell.occ{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.04)}
 .seat-cell.warn{border-color:rgba(246,173,85,.5);background:rgba(246,173,85,.06)}
 .seat-cell.crit{border-color:rgba(252,129,129,.5);background:rgba(252,129,129,.06)}
-.seat-icon{font-size:16px}
-.seat-name{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4)}
-.seat-tag{font-size:8px;color:#f6ad55;margin-top:1px}
-.seat-belt{position:absolute;top:4px;right:5px;font-size:9px}
+.seat-icon{font-size:22px}
+.seat-name{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.6)}
+.seat-tag{font-size:10px;color:#f6ad55;margin-top:2px}
+.seat-belt{position:absolute;top:5px;right:7px;font-size:11px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .seat-cell.warn .seat-icon,.seat-cell.crit .seat-icon{animation:pulse 1.4s infinite}
 
 /* ─── Road Quality ─── */
 .wheel-map{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0}
-.wheel{border-radius:4px;height:16px;display:flex;align-items:center;justify-content:center;
-  font-size:8px;font-weight:600;transition:background .3s,color .3s}
+.wheel{border-radius:4px;height:24px;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;transition:background .3s,color .3s}
 
 /* ─── Timeline ─── */
 .timeline{display:flex;align-items:center;gap:8px;height:100%;overflow:hidden}
 .sc-scroll{display:flex;gap:4px;flex:1;overflow-x:auto;align-items:center}
 .sc-scroll::-webkit-scrollbar{height:2px}
 .sc-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
-.sc-btn{padding:4px 10px;border-radius:4px;font-size:9px;border:1px solid rgba(255,255,255,.1);
+.sc-btn{padding:6px 14px;border-radius:5px;font-size:11px;border:1px solid rgba(255,255,255,.1);
   background:rgba(255,255,255,.04);color:rgba(255,255,255,.75);cursor:pointer;white-space:nowrap;flex-shrink:0;
   transition:all .15s;font-family:inherit}
 .sc-btn:hover{border-color:#00d4b0;color:#00d4b0}
 .sc-btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
-.demo-btn{padding:5px 14px;border-radius:5px;font-size:10px;font-weight:600;
+.demo-btn{padding:7px 18px;border-radius:5px;font-size:12px;font-weight:600;
   white-space:nowrap;flex-shrink:0;font-family:inherit;cursor:pointer}
 .demo-run{background:rgba(0,212,176,.08);border:1px solid #00d4b0;color:#00d4b0}
 .demo-stop{background:rgba(252,129,129,.08);border:1px solid #fc8181;color:#fc8181}
@@ -162,7 +163,7 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .iv-shell{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(ellipse at 50% 42%,#0c1828 0%,#040810 65%)}
 .iv{display:flex;flex-direction:row;width:81vw;height:81vh;min-width:900px;min-height:480px;
-  border-radius:14px;overflow:hidden;
+  border-radius:14px;overflow:auto;resize:both;
   border:1px solid rgba(0,212,176,.2);
   background:linear-gradient(150deg,#0c1420 0%,#080d18 100%);
   box-shadow:0 0 0 1px rgba(0,212,176,.06),0 30px 80px rgba(0,0,0,.95),
