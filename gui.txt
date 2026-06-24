@@ -1,0 +1,202 @@
+That changes the architecture significantly, and actually makes the demo much stronger.
+Instead of a passive “sensor replay dashboard”, the Data Replay View becomes a Signal Injection & Simulation Console, while the Infotainment View becomes the User-Facing AI Response Screen.
+I would update the Claude prompt like this:
+Revised Product Concept
+Tab 1: Sensor Simulation & Replay View
+Target User:
+
+Engineers
+Testers
+Judges during demo
+Purpose:
+Inject sensor signals, replay recordings, and observe how the AI system reacts.
+This tab acts as the INPUT side of the system.
+Tab 2: Infotainment View
+Target User:
+
+Driver
+Passenger
+Purpose:
+Display AI-generated cabin insights and recommendations.
+This tab acts as the OUTPUT side of the system.
+Sensor Simulation View Layout
+---------------------------------------------------------
+| Cabin Video Feed | Audio Input | Seat Status          |
+---------------------------------------------------------
+| Vehicle Signals  | IMU Signals | Road Quality         |
+---------------------------------------------------------
+| Replay Timeline / Event Controller                    |
+---------------------------------------------------------
+Audio Input Widget
+Instead of a passive spectrogram.
+Features
+Live microphone capture.
+[ Start Microphone ]
+[ Stop Microphone ]
+Current Noise Level
+58 dB
+Visualizations
+
+Real-time waveform
+Spectrogram
+Voice activity indicator
+Demo Mode
+Judges can:
+
+Speak loudly
+Simulate distraction
+Create noise
+The signal should immediately flow into the inference engine.
+Vehicle Signal Control Widget
+Purpose:
+Manually control vehicle conditions.
+Controls
+Visibility
+Excellent
+Good
+Moderate
+Poor
+Fog
+Slider:
+0% ------------------ 100%
+Additional Controls
+Speed
+0-120 km/h
+Traffic Density
+Low
+Medium
+High
+Weather
+Sunny
+Rain
+Fog
+Night
+IMU Control Widget
+Purpose:
+Inject motion conditions.
+Controls
+Acceleration
+X
+Y
+Z
+Sliders.
+Orientation
+Roll
+Pitch
+Yaw
+Driving Condition
+Buttons:
+Smooth Road
+Speed Breaker
+Pothole
+Aggressive Turn
+Hard Braking
+When selected:
+
+IMU graph changes
+Road Quality updates
+Load score can increase
+Road Quality Widget
+Instead of only displaying values.
+Allow simulation.
+Controls
+Road Roughness
+0 ---------- 100
+Presets
+Highway
+City Road
+Broken Road
+Construction Zone
+Offroad
+Visualization
+Vehicle top view.
+Wheel vibration heatmap.
+Seat Configuration Widget
+Allow manual occupancy simulation.
+For every seat:
+Occupied
+Vacant
+Weight slider:
+0-120 kg
+Seatbelt toggle.
+Pressure visualization.
+Inference Engine Simulation
+Create a centralized state store.
+All widgets publish signals to the store.
+Example:
+audio.noiseLevel = 85
+vehicle.visibility = 20
+imu.vibration = 75
+driverSeat.occupied = true
+These values should automatically trigger inference rules.
+Infotainment View
+This page should ONLY show outputs.
+No controls.
+No engineering metrics.
+No sensor values.
+No IMU.
+No raw vehicle data.
+Layout
+---------------------------------------------------------
+| Vehicle Cabin Visualization                            |
+---------------------------------------------------------
+| Issue | Load Score | Recommendation                    |
+---------------------------------------------------------
+Vehicle Visualization
+Top-down vehicle image.
+Highlight affected occupants.
+Examples:
+
+Driver distracted
+Rear passenger sleeping
+Passenger seatbelt not fastened
+Issue Panel
+Examples:
+Driver Distracted
+Confidence: 84%
+Duration: 10 sec
+or
+High Cabin Noise
+Confidence: 92%
+or
+Road Discomfort Detected
+Load Score Panel
+Single large circular gauge.
+0-100
+Derived from:
+
+Audio intensity
+IMU vibration
+Visibility
+Occupancy
+Recommendation Panel
+Examples:
+Reduce Audio Volume
+Enable Focus Mode
+Increase Cabin Lighting
+Take Driver Break
+Large button:
+Apply Recommendation
+Demo Flow
+Judge speaks loudly into microphone
+↓
+Audio signal increases
+↓
+Load Score rises
+↓
+Issue becomes “High Cabin Noise”
+↓
+Recommendation becomes “Reduce Audio Volume”
+Judge changes Visibility to Fog
+↓
+Issue becomes “Reduced Visibility”
+↓
+Recommendation becomes “Enable Focus Mode”
+Judge selects Pothole Road
+↓
+IMU vibration spikes
+↓
+Issue becomes “Road Discomfort”
+↓
+Recommendation updates automatically
+This makes the story very clear: left tab = sensor inputs and simulation, right tab = AI intelligence and passenger-facing output, which judges usually understand within seconds.

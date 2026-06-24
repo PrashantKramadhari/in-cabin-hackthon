@@ -251,7 +251,7 @@ const {useState,useEffect,useRef,useCallback}=React;
 /* ── constants ── */
 const SEAT_IDS=['driver','front_passenger','rear_left','rear_right'];
 const SEAT_LABELS={driver:'Driver',front_passenger:'Front Pass.',rear_left:'Rear Left',rear_right:'Rear Right'};
-const ICONS={adult:'👤',child:'🧒',pet:'🐾',unknown:'👤'};
+const ICONS={adult:'👤',child:'🧒',infant:'🧒',pet:'🐾',unknown:'👤'};
 const AICONS={none:'—',talking:'💬',shouting:'📢',crying:'😢',happy:'😊',barking:'🐕'};
 const loadCol=function(v){return v<33?'#00d4b0':v<66?'#f6ad55':'#fc8181';};
 const loadLbl=function(v){return v<20?'Nominal':v<40?'Low':v<66?'Medium':v<85?'High':'Critical';};
@@ -409,10 +409,11 @@ function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger}){
   const kindTargetRef=useRef('child');
   const SR=16000;
 
-  /* reset the previously configured seat */
+  /* fully vacate the previously configured seat */
   var _clearSeat=function(){
     if(prevCfgRef.current&&send){
-      send({cmd:'configure_seat',seat:prevCfgRef.current,audio_event:'none',distress:0});
+      send({cmd:'configure_seat',seat:prevCfgRef.current,
+            occupied:false,kind:'unknown',audio_event:'none',distress:0});
     }
     prevCfgRef.current=null;
   };
@@ -652,20 +653,25 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
 
   var startLive=async function(){
     try{
-      var st=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
+      var st=await navigator.mediaDevices.getUserMedia({video:true});
       vRef.current.srcObject=st;await vRef.current.play();
-      var cv2=document.createElement('canvas');cv2.width=320;cv2.height=240;
-      var c2=cv2.getContext('2d');
-      /* throttle to 500 ms; guard against null ref after unmount */
+      var cv2=null,c2=null;
       var interval=setInterval(function(){
         var v=vRef.current;
         if(!v||!v.videoWidth)return;
+        if(!cv2){
+          var scale=Math.min(1,480/Math.max(v.videoWidth,v.videoHeight));
+          cv2=document.createElement('canvas');
+          cv2.width=Math.round(v.videoWidth*scale);
+          cv2.height=Math.round(v.videoHeight*scale);
+          c2=cv2.getContext('2d');
+        }
         try{
-          c2.drawImage(v,0,0,320,240);
-          var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
+          c2.drawImage(v,0,0,cv2.width,cv2.height);
+          var b64=cv2.toDataURL('image/jpeg',.85).split(',')[1];
           wsSend({cmd:'vision_frame',data:b64});
         }catch(e){/* frame skipped */}
-      },500);
+      },2000);
       camRef.current={interval,canvas:cv2,ctx:c2,stream:st};
     }catch(e){alert('Camera denied: '+e.message);setMode('off');}
   };
@@ -712,25 +718,30 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
   };
 
   var startDefaultVideo=function(){
-    /* Play video_1.mp4 in the <video> element, capture frames for Qwen */
     var vid=vRef.current;
     if(!vid)return;
     vid.src='/static/video_1.mp4';
-    vid.loop=true;
-    vid.muted=true;
-    vid.playsInline=true;
+    vid.loop=true;vid.muted=true;vid.playsInline=true;
     vid.play().catch(function(e){console.warn('video play:',e);});
-    var cv2=document.createElement('canvas');cv2.width=320;cv2.height=240;
-    var c2=cv2.getContext('2d');
+    /* Canvas created lazily on first frame so we know the real resolution */
+    var cv2=null,c2=null;
     var interval=setInterval(function(){
       var v=vRef.current;
       if(!v||!v.videoWidth||v.readyState<2)return;
+      if(!cv2){
+        /* preserve aspect ratio, max dimension 480px so Qwen gets a clear image */
+        var scale=Math.min(1,480/Math.max(v.videoWidth,v.videoHeight));
+        cv2=document.createElement('canvas');
+        cv2.width=Math.round(v.videoWidth*scale);
+        cv2.height=Math.round(v.videoHeight*scale);
+        c2=cv2.getContext('2d');
+      }
       try{
-        c2.drawImage(v,0,0,320,240);
-        var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
+        c2.drawImage(v,0,0,cv2.width,cv2.height);
+        var b64=cv2.toDataURL('image/jpeg',.85).split(',')[1];
         wsSend({cmd:'vision_frame',data:b64});
       }catch(e){/* frame skipped */}
-    },1000); /* 1 fps — enough for Qwen scene analysis */
+    },2000); /* 0.5 fps — Qwen inference ~150ms, queue maxsize 4 */
     camRef.current={interval,canvas:cv2,ctx:c2,stream:null};
   };
 
@@ -1519,8 +1530,27 @@ function InfotainmentView({state,send}){
       {/* Col 1: Vehicle Cabin — centered */}
       <div className="iv-col iv-cabin">
         <div style={{fontSize:7,textTransform:'uppercase',letterSpacing:'1.5px',
-          color:'#ffffff',fontWeight:600,marginBottom:10,textAlign:'center'}}>Vehicle Cabin</div>
+          color:'#ffffff',fontWeight:600,marginBottom:6,textAlign:'center'}}>Vehicle Cabin</div>
         <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
+        {/* Qwen vision debug strip */}
+        {(function(){
+          var vas=state.vision_all_seats||{};
+          var found=Object.entries(vas).filter(function(e){
+            return e[0]!=='ts'&&e[1]&&e[1].occupied;
+          });
+          if(!found.length)return(
+            <div style={{fontSize:8,color:'rgba(255,255,255,.25)',textAlign:'center',marginTop:4}}>
+              Vision: no occupants detected
+            </div>
+          );
+          return(
+            <div style={{fontSize:8,color:'#00d4b0',textAlign:'center',marginTop:4}}>
+              Vision: {found.map(function(e){
+                return e[0].replace(/_/g,' ')+' '+ICONS[e[1].kind]||e[1].kind;
+              }).join(' · ')}
+            </div>
+          );
+        })()}
       </div>
       {/* Col 2: Issue / Distract */}
       <div className="iv-col iv-issue">
@@ -1592,9 +1622,14 @@ function App(){
   const [localDemoRunning,setLocalDemoRunning]=useState(false);
   const ws=useRef(null);
 
+  var _wsSend=function(msg){
+    if(ws.current&&ws.current.readyState===1)ws.current.send(JSON.stringify(msg));
+  };
   var onDemoToggle=useCallback(function(running){
     setLocalDemoRunning(running);
     if(running){
+      /* reset backend world before the new config arrives */
+      _wsSend({cmd:'scenario',name:'idle'});
       setDemoTrigger(function(t){return t+1;});
       setTab('info');
     } else {

@@ -38,12 +38,14 @@ _SEAT_IDS = ["driver", "front_passenger", "rear_left", "rear_right"]
 
 _PROMPT = (
     "You are analyzing an in-vehicle cabin camera image. "
-    "Identify occupants in all 4 seat positions: driver (front-left), "
-    "front_passenger (front-right), rear_left, rear_right. "
+    "The camera angle may be front-facing, rear-facing, or side-facing. "
+    "Identify ALL visible occupants and which seat they are in: "
+    "driver (front-left), front_passenger (front-right), rear_left, rear_right. "
+    "A dog or cat in any position counts as kind='pet'. "
     "For each seat return a JSON object with exactly these keys: "
-    "occupied (bool), kind (adult|child|infant|unknown), "
+    "occupied (bool), kind (adult|child|infant|pet|unknown), "
     "emotion (calm|happy|stressed|tired|distressed), buckled (bool). "
-    "If a seat is not clearly visible or empty set occupied=false. "
+    "Set occupied=false only if the seat is clearly empty or not visible. "
     "Reply with ONLY a valid JSON object — no markdown, no explanation:\n"
     '{"driver":{...},"front_passenger":{...},"rear_left":{...},"rear_right":{...}}'
 )
@@ -75,9 +77,13 @@ def _load_model() -> None:
 def _safe_seat(raw: Any) -> dict:
     if not isinstance(raw, dict):
         return dict(_EMPTY_SEAT)
+    kind = str(raw.get("kind", "unknown"))
+    # If Qwen identified a child/infant/pet it must be present even if it
+    # incorrectly set occupied=false — trust kind over the occupied flag.
+    occupied = bool(raw.get("occupied", False)) or kind in ("child", "infant", "pet")
     return {
-        "occupied": bool(raw.get("occupied", False)),
-        "kind":     str(raw.get("kind", "unknown")),
+        "occupied": occupied,
+        "kind":     kind,
         "emotion":  str(raw.get("emotion", "calm")),
         "buckled":  bool(raw.get("buckled", False)),
     }
@@ -124,17 +130,24 @@ def _infer(b64: str) -> dict[str, dict]:
     new_tokens = out_ids[:, inputs["input_ids"].shape[1]:]
     response   = _processor.decode(new_tokens[0], skip_special_tokens=True).strip()
 
+    print(f"[QwenVision] raw response: {response[:120]}")
+
     # Extract first JSON object from response
     m = re.search(r"\{.*\}", response, re.DOTALL)
     if not m:
+        print("[QwenVision] no JSON found in response")
         return {sid: dict(_EMPTY_SEAT) for sid in _SEAT_IDS}
 
     try:
         data = json.loads(m.group())
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        print(f"[QwenVision] JSON parse error: {e}  raw={m.group()[:200]}")
         return {sid: dict(_EMPTY_SEAT) for sid in _SEAT_IDS}
 
-    return {sid: _safe_seat(data.get(sid)) for sid in _SEAT_IDS}
+    seats = {sid: _safe_seat(data.get(sid)) for sid in _SEAT_IDS}
+    occupied = {sid: s for sid, s in seats.items() if s["occupied"]}
+    print(f"[QwenVision] detected: {occupied if occupied else 'nobody'}")
+    return seats
 
 
 async def run() -> None:

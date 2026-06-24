@@ -84,6 +84,7 @@ def _cognitive_load() -> tuple[int, list[str]]:
     audio_label, audio_conf = _effective_audio()
     _child_pet_seats = [s for s in _latest["radar"].get("seats", [])
                         if s.get("occupant") in ("child", "pet") and s.get("occupied")]
+    _child_pet_seats = _child_pet_seats + _vision_child_pet_seats()
     if audio_label in ("crying", "barking", "animal") and audio_conf > 0.25:
         score += 25; factors.append(audio_label + " in cabin")
     elif audio_label == "shouting" and audio_conf > 0.25:
@@ -148,7 +149,7 @@ def _proposed() -> list[dict]:
     child_pet_seats = [
         s for s in _latest["radar"].get("seats", [])
         if s.get("occupant") in ("child", "pet") and s.get("occupied")
-    ]
+    ] + _vision_child_pet_seats()
     seat_names = ", ".join(
         s["seat"].replace("_", " ").title() for s in child_pet_seats
     ) if child_pet_seats else ""
@@ -317,6 +318,25 @@ def dismiss(mitigation_id: str) -> None:
         _mitigations[mitigation_id]["status"] = "dismissed"
 
 
+def _norm_kind(k: str) -> str:
+    """Normalise Qwen kind strings to world model kinds."""
+    return "child" if k in ("child", "infant") else k  # infant → child
+
+
+def _vision_child_pet_seats() -> list[dict]:
+    """Seats where Qwen detected a child/infant/pet not already in world radar."""
+    seen = {s["seat"] for s in _latest["radar"].get("seats", [])
+            if s.get("occupant") in ("child", "pet") and s.get("occupied")}
+    out = []
+    for sid, sv in _latest.get("vision_all_seats", {}).items():
+        if not isinstance(sv, dict) or not sv.get("occupied"):
+            continue
+        kind = _norm_kind(sv.get("kind", "unknown"))
+        if kind in ("child", "pet") and sid not in seen:
+            out.append({"seat": sid, "occupant": kind, "occupied": True})
+    return out
+
+
 def _build_seat_configs() -> dict:
     """Merge world seat state with Qwen per-seat vision data."""
     vs = _latest.get("vision_all_seats", {})
@@ -334,10 +354,11 @@ def _build_seat_configs() -> dict:
         }
         seat_v = vs.get(sid)
         if isinstance(seat_v, dict) and seat_v.get("occupied"):
-            # Qwen sees someone here — enrich emotion + kind if unknown
+            cfg["occupied"] = True
+            raw_kind = seat_v.get("kind", "")
+            if raw_kind:
+                cfg["kind"] = _norm_kind(raw_kind)
             cfg["emotion"] = seat_v.get("emotion", cfg["emotion"])
-            if cfg["kind"] == "unknown" and seat_v.get("kind"):
-                cfg["kind"] = seat_v["kind"]
         configs[sid] = cfg
     return configs
 
@@ -372,6 +393,7 @@ async def run() -> None:
             # World-level config exposed so the HMI can reflect / edit it.
             # Qwen vision_all_seats overlays per-seat emotion when available.
             seat_configs=_build_seat_configs(),
+            vision_all_seats=_latest.get("vision_all_seats", {}),
             driver_emotion=world.driver_emotion,
             vib_override=world.vib_override,
             vib_road_quality=world.vib_road_quality,

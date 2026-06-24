@@ -1,0 +1,8 @@
+Next features:
+
+1 )Audio model also needs to be improved
+2 )Improve Visual Emotion Prediction Model
+3 )In Cabin feed give two options, one for live camera, and one for prerecorded synthetic feed and detect all occupant and use the information in processing and also in displaying in second panel
+
+Bug: 
+1 ) When camera feed is ON, and Mic is ON, infotainment view breaks.
