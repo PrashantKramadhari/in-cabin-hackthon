@@ -2,202 +2,217 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CabinSense — In-Cabin Intelligence</title>
-<script src="/static/lib/react.min.js"></script>
-<script src="/static/lib/react-dom.min.js"></script>
-<script src="/static/lib/babel.min.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CabinSense</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.12.17/babel.min.js"></script>
 <style>
-:root{
-  --bg:#07090f;--panel:#0d1520;--panel2:#131d2a;--line:#1a2838;
-  --txt:#dde5ef;--dim:#5e7080;--accent:#36e0c0;--warn:#f5a623;
-  --crit:#ff4d4f;--ok:#3ddc84;--info:#5aa9ff;
-  --car-bg:#0a1218;--car-border:#1e3040;
-  --seat-bg:#0f1825;--seat-border:#1d2e40;
-}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--txt);
-  font-family:"Inter",system-ui,"Segoe UI",Roboto,sans-serif;
-  -webkit-font-smoothing:antialiased;min-height:100vh}
-.app{max-width:1440px;margin:0 auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+html,body{height:100%;overflow:hidden}
+body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:12px;-webkit-font-smoothing:antialiased}
 
-/* ── Header ── */
-header{display:flex;align-items:center;gap:12px;padding:10px 0 6px}
-header h1{font-size:18px;letter-spacing:.4px}
-header .tag{color:var(--accent);font-weight:700}
-header .sub{color:var(--dim);font-size:12px;margin-left:4px}
-.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--crit);margin-left:auto;flex-shrink:0}
-.conn-dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
-.conn-label{font-size:11px;color:var(--dim)}
-.latency{font-size:11px;color:var(--dim);margin-left:8px}
+/* ── Layout ── */
+.hmi{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.hmi-hdr{height:44px;display:flex;align-items:center;padding:0 16px;gap:10px;
+  background:#0c1018;border-bottom:1px solid #1c2740;flex-shrink:0}
+.logo{font-size:18px;font-weight:700;letter-spacing:-.5px;line-height:1}
+.logo span{color:#00d4b0}
+.tagline{font-size:9px;color:#2a3a50;letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
+.sp{flex:1}
+.view-lbl{font-size:10px;color:#3d5070;font-weight:500;letter-spacing:.5px}
+.hmi-clock{font-size:11px;color:#4a6580;font-variant-numeric:tabular-nums}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:#1c2740;transition:background .4s}
+.conn-dot.on{background:#00d4b0;box-shadow:0 0 7px rgba(0,212,176,.5)}
+.lat{font-size:9px;color:#2a3a50;font-variant-numeric:tabular-nums}
 
-/* ── Demo bar ── */
-.demo-bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;
-  padding:12px 16px;display:flex;align-items:center;gap:12px}
-.demo-info{flex:1;min-width:0}
-.demo-title{font-size:13px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.demo-sub{font-size:11px;color:var(--dim)}
-.demo-progress{height:4px;border-radius:2px;background:var(--panel2);overflow:hidden;margin-top:6px}
-.demo-progress>span{display:block;height:100%;background:var(--accent);transition:width .5s}
-.demo-steps{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.demo-step{font-size:10px;color:var(--dim)}
-.demo-step.done{color:var(--ok)}
-.demo-step.active{color:var(--accent);font-weight:600}
-button{font-family:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
-  padding:6px 12px;font-size:12px;background:var(--panel2);color:var(--txt);transition:all .15s}
-button:hover{border-color:var(--dim)}
-button.primary{background:var(--accent);color:#041a15;border-color:var(--accent);font-weight:600}
-button.sel{background:var(--accent);color:#041a15;border-color:var(--accent);font-weight:600}
-button.sel.warn{background:var(--warn);color:#1a1000;border-color:var(--warn)}
-button.sel.crit{background:var(--crit);color:#fff;border-color:var(--crit)}
-button.ghost{background:transparent;color:var(--dim);border-color:transparent}
-button:disabled{opacity:.4;cursor:not-allowed}
-button.demo-btn{padding:8px 16px;font-size:12px;font-weight:600;
-  background:var(--accent);color:#041a15;border-color:var(--accent)}
-button.stop-btn{padding:8px 14px;font-size:12px;font-weight:600;
-  background:var(--crit);color:#fff;border-color:var(--crit)}
+.hmi-content{flex:1;overflow:hidden;position:relative}
+.hmi-view{position:absolute;inset:0;overflow:hidden}
 
-/* ── Main layout ── */
-.main{display:flex;gap:14px;align-items:flex-start}
-.left-col{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
-.right-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.hmi-tabs{height:48px;display:flex;background:#0c1018;border-top:1px solid #1c2740;flex-shrink:0}
+.hmi-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+  font-size:11px;font-weight:500;color:#2a3a50;cursor:pointer;border:none;background:none;
+  border-top:2px solid transparent;transition:all .25s;letter-spacing:.3px}
+.hmi-tab.on{color:#00d4b0;border-top-color:#00d4b0;background:rgba(0,212,176,.04)}
 
-/* ── Cards ── */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
-.card h2{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin-bottom:10px}
-.bar{height:6px;border-radius:4px;background:var(--panel2);overflow:hidden}
-.bar>span{display:block;height:100%;transition:width .3s,background .3s;border-radius:4px}
-.chip{font-size:10px;background:var(--panel2);border:1px solid var(--line);
-  padding:2px 7px;border-radius:20px;color:var(--dim)}
-.pill{font-size:9px;padding:2px 6px;border-radius:12px;font-weight:700}
-.pill.ok{background:rgba(61,220,132,.15);color:var(--ok)}
-.pill.warn{background:rgba(245,166,35,.15);color:var(--warn)}
-.pill.crit{background:rgba(255,77,79,.15);color:var(--crit)}
-.pill.info{background:rgba(90,169,255,.15);color:var(--info)}
+/* ── Data Replay View ── */
+.drv{display:grid;grid-template-columns:27% 1fr 29%;gap:8px;padding:8px;height:100%;overflow:hidden}
+.drv-col{display:flex;flex-direction:column;gap:8px;overflow:hidden;min-height:0}
+.dp{background:#111720;border:1px solid #1c2740;border-radius:8px;padding:9px 11px;
+  display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.dp-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;flex-shrink:0}
+.dp-ttl{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
+.dp-sub{font-size:9px;color:#2a3a50}
+.dp-body{flex:1;overflow:hidden;min-height:0}
 
-/* ── Gauge ── */
-.gauge-num{font-size:52px;font-weight:800;line-height:1;text-align:center}
-.gauge-lbl{font-size:11px;color:var(--dim);text-align:center;margin:4px 0 10px}
-.factors{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+/* video box */
+.vid-box{background:#060c14;border-radius:5px;display:flex;align-items:center;
+  justify-content:center;color:#1c2740;font-size:11px;width:100%;height:100%;overflow:hidden}
+.vid-box video{width:100%;height:100%;object-fit:cover;border-radius:5px}
 
-/* ── Mitigation ── */
-.mit{border-left:3px solid var(--info);background:var(--panel2);
-  border-radius:8px;padding:10px 12px;margin-bottom:8px}
-.mit.warning{border-color:var(--warn)}
-.mit.critical{border-color:var(--crit);animation:pulse 1.2s infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(255,77,79,0)}50%{box-shadow:0 0 14px rgba(255,77,79,.35)}}
-.mit-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.mit-title{font-weight:600;font-size:13px}
-.mit-uc{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
-.mit-detail{font-size:11px;color:var(--dim);margin:6px 0}
-.mit-acts{display:flex;gap:6px}
-.st{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px}
-.st.active{background:rgba(61,220,132,.15);color:var(--ok)}
-.st.proposed{background:rgba(90,169,255,.15);color:var(--info)}
-.st.dismissed{background:var(--panel);color:var(--dim)}
-.empty-mit{color:var(--dim);font-size:12px;text-align:center;padding:16px 0}
+/* vehicle feed */
+.vf-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #111820}
+.vf-row:last-child{border-bottom:none}
+.vf-key{color:#2a3a50;font-size:10px;width:70px;flex-shrink:0}
+.vf-val{font-size:11px;font-weight:600}
+.vis-btns{display:flex;gap:4px;flex-wrap:wrap}
+.vbtn{padding:2px 7px;border-radius:3px;font-size:9px;border:1px solid #1c2740;
+  background:#0d1520;color:#3d5070;cursor:pointer;transition:all .15s}
+.vbtn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
 
-/* ── Car Interior ── */
-.cabin-shell{
-  background:radial-gradient(ellipse at 50% 15%, #0e1c2e 0%, var(--car-bg) 65%);
-  border:1px solid var(--car-border);border-radius:40px 40px 32px 32px;
-  padding:14px;position:relative;overflow:hidden}
-.cabin-shell::before{content:'';position:absolute;top:0;left:25%;right:25%;
-  height:2px;background:linear-gradient(90deg,transparent,rgba(54,224,192,.25),transparent)}
-.cabin-dash{display:flex;align-items:center;justify-content:space-between;
-  background:linear-gradient(180deg,#0d1a28 0%,#0a1318 100%);
-  border:1px solid var(--car-border);border-radius:12px;padding:10px 14px;margin-bottom:12px}
-.dash-wheel{font-size:22px;opacity:.7;letter-spacing:0}
-.dash-center{text-align:center}
-.dash-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--dim)}
-.dash-scenario{font-size:12px;font-weight:600;color:var(--accent);margin-top:2px}
-.dash-right{text-align:right}
-.dash-stat{font-size:11px;color:var(--dim);line-height:1.7}
-.dash-stat b{color:var(--txt)}
+/* audio canvas */
+.audio-wrap{flex:1;min-height:0;border-radius:4px;overflow:hidden;background:#060d16}
 
-.seat-layout{display:grid;grid-template-columns:1fr 32px 1fr;gap:10px;align-items:stretch}
-.seat-col{display:flex;flex-direction:column;gap:10px}
-.console{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:4px 0}
-.console-line{flex:1;width:1px;background:var(--car-border);min-height:20px}
-.console-gear{font-size:16px;color:var(--dim);opacity:.6}
+/* road chart */
+.rq-wrap{flex:1;min-height:0;border-radius:4px;overflow:hidden;background:#060d16}
+.rq-qual{font-size:18px;font-weight:700;margin-bottom:4px;flex-shrink:0}
 
-.seat-card{
-  background:var(--seat-bg);border:1.5px solid var(--seat-border);
-  border-radius:14px;padding:12px;cursor:pointer;transition:all .2s;
-  min-height:130px;display:flex;flex-direction:column;gap:6px;position:relative}
-.seat-card:hover{border-color:#2a4060;background:#101f2e}
-.seat-card.selected{border-color:var(--accent)!important;box-shadow:0 0 18px rgba(54,224,192,.18)}
-.seat-card.alert-warn{border-color:var(--warn)!important;box-shadow:0 0 12px rgba(245,166,35,.15)}
-.seat-card.alert-crit{border-color:var(--crit)!important;box-shadow:0 0 12px rgba(255,77,79,.2)}
-.seat-card.empty-seat{opacity:.55}
-.seat-top{display:flex;justify-content:space-between;align-items:flex-start}
-.seat-name{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
-.seat-badges{display:flex;gap:4px;align-items:center}
-.seat-icon{font-size:28px;text-align:center;line-height:1;margin:2px 0}
-.seat-kind{font-size:10px;color:var(--dim);text-align:center;text-transform:capitalize}
-.seat-vitals{font-size:10px;color:var(--dim);display:flex;gap:8px;margin-top:2px}
-.seat-vitals b{color:var(--txt)}
-.seat-audio{font-size:11px;margin-top:2px}
-.seat-distress-bar{height:3px;border-radius:2px;background:var(--panel2);overflow:hidden;margin-top:4px}
-.seat-distress-bar>span{display:block;height:100%;border-radius:2px;transition:width .3s,background .3s}
-.seat-empty-hint{font-size:9px;color:var(--dim);text-align:center;margin-top:auto;opacity:.6}
+/* seat table */
+.stbl{width:100%;border-collapse:collapse;font-size:10px}
+.stbl th{color:#2a3a50;font-weight:500;font-size:9px;text-transform:uppercase;
+  letter-spacing:.7px;padding:3px 5px;text-align:left;border-bottom:1px solid #1c2740}
+.stbl td{padding:5px 5px;border-bottom:1px solid #0d1420;vertical-align:middle}
+.stbl tr:hover td{background:rgba(0,212,176,.03);cursor:pointer}
+.stbl tr:last-child td{border-bottom:none}
+.kind-chip{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;
+  background:#151f30;color:#4a6580}
+.belt-y{color:#00d4b0}
+.belt-n{color:#fc8181}
+.dmini{height:3px;background:#151f30;border-radius:2px;width:38px;display:inline-block;overflow:hidden}
+.dmini span{display:block;height:100%;border-radius:2px}
 
-/* ── Seat Config Panel ── */
-.seat-cfg{background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:16px;
-  animation:slideIn .2s ease-out}
-@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-.seat-cfg h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
-.cfg-section{margin-bottom:14px}
-.cfg-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:6px}
-.btn-group{display:flex;flex-wrap:wrap;gap:6px}
-.cfg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.cfg-row .cfg-label{margin:0;width:90px;flex-shrink:0}
+/* cabin mini map */
+.cmap{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;height:100%}
+.cseat{border-radius:6px;border:1px solid #1c2740;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;font-size:9px;color:#2a3a50;
+  padding:6px;background:#0d1520;cursor:pointer;transition:all .3s;position:relative}
+.cseat.occ{border-color:#2a3f5a;background:#111f30;color:#4a6580}
+.cseat.warn{border-color:rgba(246,173,85,.5);background:rgba(246,173,85,.05)}
+.cseat.crit{border-color:rgba(252,129,129,.5);background:rgba(252,129,129,.05)}
+.cseat .ci{font-size:18px}
+.cseat .cn{font-size:8px;text-transform:uppercase;letter-spacing:.5px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.cseat.warn .ci,.cseat.crit .ci{animation:pulse 1.4s infinite}
+
+/* scenario row */
+.sc-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.sc-btn{padding:3px 8px;border-radius:4px;font-size:9px;border:1px solid #1c2740;
+  background:#0d1520;color:#3d5070;cursor:pointer;transition:all .15s;font-family:inherit}
+.sc-btn:hover{border-color:#00d4b0;color:#00d4b0}
+.sc-btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
+.demo-row{display:flex;align-items:center;gap:8px}
+.demo-go{padding:3px 10px;border-radius:4px;font-size:9px;border:1px solid #00d4b0;
+  background:rgba(0,212,176,.08);color:#00d4b0;cursor:pointer;font-family:inherit}
+.demo-stop{padding:3px 10px;border-radius:4px;font-size:9px;border:1px solid #fc8181;
+  background:rgba(252,129,129,.08);color:#fc8181;cursor:pointer;font-family:inherit}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.demo-indicator{font-size:9px;color:#f6ad55;animation:blink 1s infinite}
+
+/* range */
+input[type=range]{-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
+  background:#1a2535;outline:none;flex:1;cursor:pointer;border:none;min-width:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;
+  border-radius:50%;background:#00d4b0;cursor:pointer;border:2px solid #090d12}
+input[type=checkbox]{accent-color:#00d4b0;cursor:pointer}
+
+/* ── IMU drive condition buttons ── */
+.imu-btns{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.imu-btn{padding:3px 9px;border-radius:4px;font-size:9px;border:1px solid #1c2740;
+  background:#0d1520;color:#3d5070;cursor:pointer;transition:all .15s;font-family:inherit}
+.imu-btn:hover{border-color:#f6ad55;color:#f6ad55}
+.imu-btn.on{background:rgba(246,173,85,.1);border-color:#f6ad55;color:#f6ad55}
+
+/* ── noise level dB ── */
+.noise-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-shrink:0}
+.noise-db{font-size:22px;font-weight:700;color:#00d4b0;font-variant-numeric:tabular-nums;min-width:52px}
+.noise-bar-wrap{flex:1;height:6px;background:#0d1520;border-radius:3px;overflow:hidden}
+.noise-bar{height:100%;border-radius:3px;transition:width .15s,background .3s}
+.vad{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:600}
+.vad.on{background:rgba(0,212,176,.15);color:#00d4b0;border:1px solid rgba(0,212,176,.3)}
+.vad.off{background:transparent;color:#1c2740;border:1px solid #1c2740}
+
+/* ── Infotainment View ── */
+.iv{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.iv-top{flex:0 0 44%;background:#090d12;border-bottom:1px solid #1c2740;
+  display:flex;align-items:center;justify-content:center;gap:40px;padding:12px 24px}
+.iv-bottom{flex:1;display:flex;overflow:hidden}
+.iv-col{display:flex;flex-direction:column;justify-content:center;padding:20px 22px;overflow:hidden}
+.iv-l{flex:0 0 33%;background:#0d1420;border-right:1px solid #1c2740}
+.iv-c{flex:0 0 34%;background:#090d12;border-right:1px solid #1c2740;align-items:center}
+.iv-r{flex:1;background:#0d1420}
+
+.iss-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#2a3a50;margin-bottom:4px}
+.iss-title{font-size:14px;font-weight:600;color:#d4dce8;margin-bottom:12px;line-height:1.4}
+.iss-conf{font-size:42px;font-weight:700;line-height:1;margin-bottom:3px}
+.iss-clbl{font-size:9px;color:#2a3a50;margin-bottom:14px}
+.iss-meta-row{display:flex;justify-content:space-between;padding:5px 0;
+  border-bottom:1px solid #111820;font-size:11px}
+.iss-meta-row:last-child{border-bottom:none}
+.iss-mk{color:#2a3a50}
+.iss-mv{color:#d4dce8;font-weight:600;font-variant-numeric:tabular-nums}
+
+.gauge-ttl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#2a3a50;
+  margin-bottom:16px;text-align:center}
+.gauge-sub{font-size:14px;font-weight:600;margin-top:8px;text-align:center}
+.factors-mini{margin-top:14px;display:flex;flex-direction:column;gap:4px;text-align:center}
+.fchip{font-size:9px;color:#2a3a50}
+
+.rec-ttl{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#2a3a50;margin-bottom:16px}
+.rec-list{display:flex;flex-direction:column;gap:12px;margin-bottom:22px}
+.rec-item{display:flex;gap:11px;align-items:flex-start}
+.rec-num{width:22px;height:22px;border-radius:50%;background:rgba(0,212,176,.1);
+  border:1px solid rgba(0,212,176,.3);display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:#00d4b0;flex-shrink:0;margin-top:1px}
+.rec-txt{font-size:12px;color:#d4dce8;line-height:1.45}
+.rec-uc{font-size:9px;color:#2a3a50;margin-top:2px}
+.rec-empty{font-size:12px;color:#2a3a50;padding:4px 0}
+.rec-acts{display:flex;gap:9px;flex-wrap:wrap}
+.btn-apply{padding:8px 22px;border-radius:6px;font-size:11px;font-weight:600;
+  background:rgba(0,212,176,.1);border:1px solid #00d4b0;color:#00d4b0;
+  cursor:pointer;transition:all .2s;font-family:inherit}
+.btn-apply:hover{background:rgba(0,212,176,.2)}
+.btn-dis{padding:8px 14px;border-radius:6px;font-size:11px;background:transparent;
+  border:1px solid #1c2740;color:#3d5070;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-dis:hover{border-color:#3d5070;color:#6b8199}
+
+/* ── Seat config overlay ── */
+.overlay{position:fixed;inset:0;background:rgba(0,4,10,.78);display:flex;
+  align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+.ov-panel{background:#111720;border:1px solid #00d4b0;border-radius:12px;
+  padding:20px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.ov-ttl{font-size:13px;font-weight:600;color:#00d4b0;margin-bottom:16px;
+  display:flex;justify-content:space-between;align-items:center}
+.cfg-sec{margin-bottom:13px}
+.cfg-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#2a3a50;margin-bottom:6px}
+.btn-grp{display:flex;flex-wrap:wrap;gap:5px}
+.cfg-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.cfg-row .cfg-lbl{margin:0;width:88px;flex-shrink:0}
 .cfg-row .right{flex:1;display:flex;align-items:center;gap:8px}
-input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
-  background:var(--panel2);outline:none;flex:1;cursor:pointer;border:none;min-width:0}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
-  border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg)}
-.range-val{font-size:12px;color:var(--txt);font-weight:600;min-width:52px;text-align:right}
-.cfg-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-
-/* ── Controls row ── */
-.controls-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-
-/* ── Vehicle / Vibration ── */
-.vis-btn{padding:5px 10px;font-size:11px}
-
-/* ── Scenarios ── */
-.scenario-grid{display:flex;flex-wrap:wrap;gap:6px}
-.scenario-grid button{font-size:11px;padding:5px 10px}
-
-/* ── Audio card ── */
-.audio-label{font-size:26px;font-weight:700}
-.audio-event-row{display:flex;align-items:center;gap:8px;margin-top:6px}
-
-/* ── Vision card ── */
-.vision-row{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:4px}
-.vision-row .lbl{font-size:10px;color:var(--dim);display:block}
-
-/* scroll for left col mitigations */
-.mit-scroll{max-height:340px;overflow-y:auto;padding-right:2px}
-.mit-scroll::-webkit-scrollbar{width:3px}
-.mit-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+.rval{font-size:11px;color:#d4dce8;font-weight:600;min-width:52px;text-align:right}
+.cfg-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.xbtn{padding:4px 10px;border-radius:4px;font-size:10px;border:1px solid #1c2740;
+  background:#0d1520;color:#3d5070;transition:all .15s;cursor:pointer;font-family:inherit}
+.xbtn.sel{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
+.close-btn{background:none;border:1px solid #1c2740;color:#3d5070;border-radius:5px;
+  padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit}
+button{font-family:inherit;cursor:pointer}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<div id="err" style="display:none;position:fixed;inset:0;background:#07090f;color:#ff4d4f;
+<div id="err" style="display:none;position:fixed;inset:0;background:#030508;color:#ff4d4f;
   font-family:monospace;font-size:12px;padding:32px;white-space:pre-wrap;z-index:9999"></div>
 <script>
 window.onerror=function(m,s,l,c,e){
   var d=document.getElementById('err');d.style.display='block';
-  d.textContent='JS ERROR\n'+m+'\nFile: '+s+':'+l+':'+(e?'\nStack:\n'+e.stack:'');};
+  d.textContent='JS ERROR\n'+m+'\n'+s+':'+l+(e?'\nStack:\n'+e.stack:'');};
 window.addEventListener('unhandledrejection',function(e){
   var d=document.getElementById('err');d.style.display='block';
   d.textContent='PROMISE ERROR\n'+(e.reason&&e.reason.stack||e.reason);});
 </script>
 <script>
-/* AudioWorklet must live outside Babel to avoid backtick parse errors */
+/* AudioWorklet outside Babel — no backtick template literals allowed inside Babel */
 window._CHUNKER_TARGET=Math.round(16000*0.96);
 window._CHUNKER_SRC=[
   'class Chunker extends AudioWorkletProcessor {',
@@ -217,721 +232,784 @@ window._CHUNKER_URL=URL.createObjectURL(new Blob([window._CHUNKER_SRC],{type:'ap
 </script>
 
 <script type="text/babel" data-presets="react">
-const {useState,useEffect,useRef,useCallback} = React;
+const {useState,useEffect,useRef,useCallback}=React;
 
-/* ─── helpers ─── */
-const fmt = s => s.replace(/_/g,' ');
-const loadColor = v => v<33?'var(--ok)':v<66?'var(--warn)':'var(--crit)';
+/* ── constants ── */
+const SEAT_LABELS={driver:'Driver',front_passenger:'Front Pass.',rear_left:'Rear Left',rear_right:'Rear Right'};
+const SEAT_IDS=['driver','front_passenger','rear_left','rear_right'];
+const ICONS={adult:'👤',child:'🧒',pet:'🐾',unknown:'👤'};
+const AICONS={none:'—',talking:'💬',shouting:'📢',crying:'😢',happy:'😊',barking:'🐕'};
+const loadCol=function(v){return v<33?'#00d4b0':v<66?'#f6ad55':'#fc8181';};
+const loadLbl=function(v){return v<20?'Nominal':v<40?'Low':v<66?'Medium':v<85?'High':'Critical';};
+const fmt2=function(n){return n<10?'0'+n:''+n;};
 
-const SEAT_LABELS = {
-  driver:'Driver', front_passenger:'Front Pass.',
-  rear_left:'Rear Left', rear_right:'Rear Right'
-};
-const SEAT_IDS = ['driver','front_passenger','rear_left','rear_right'];
-
-const OCCUPANT_ICONS = {adult:'👤', child:'🧒', pet:'🐾', unknown:'👤'};
-const AUDIO_ICONS = {none:'🔇',talking:'💬',shouting:'📢',crying:'😢',happy:'😊',barking:'🐕'};
-const AUDIO_COLORS = {
-  none:'var(--dim)', talking:'var(--info)', shouting:'var(--warn)',
-  crying:'var(--warn)', happy:'var(--ok)', barking:'var(--warn)'
-};
-const AUDIO_OPTIONS = {
-  adult:[{v:'none',l:'Quiet'},{v:'talking',l:'Talking'},{v:'shouting',l:'Shouting'}],
-  child:[{v:'none',l:'Quiet'},{v:'crying',l:'Crying'},{v:'happy',l:'Happy'}],
-  pet:  [{v:'none',l:'Quiet'},{v:'barking',l:'Barking'},{v:'happy',l:'Happy'}],
-  unknown:[{v:'none',l:'Quiet'},{v:'talking',l:'Talking'},{v:'shouting',l:'Shouting'}],
-};
-const EMOTIONS = ['calm','stressed','tired','happy'];
-const EMOTION_COLORS = {calm:'var(--ok)',stressed:'var(--warn)',tired:'var(--info)',happy:'var(--accent)'};
-
-/* ─── DemoBar ─── */
-const DEMO_NAMES=['idle','child_crying_rear','driver_stress','driver_tired',
-                  'seatbelt_misuse','pothole_object','child_left_behind','idle'];
-const DEMO_STEPS=[
-  {l:'Idle'},
-  {l:'Child crying'},
-  {l:'Driver stress'},
-  {l:'Driver fatigue'},
-  {l:'Seatbelt misuse'},
-  {l:'Pothole + object'},
-  {l:'Child left behind'},
-  {l:'Done'},
-];
-
-function DemoBar({scenario,demoRunning}){
-  const step = demoRunning ? Math.max(0,DEMO_NAMES.indexOf(scenario)) : 0;
-  const HOLDS=[3,7,7,7,6,8,7,2];
-  const total=HOLDS.reduce((a,b)=>a+b,0);
-  const elapsed=HOLDS.slice(0,step).reduce((a,b)=>a+b,0);
-  const pct=demoRunning?Math.round((elapsed/total)*100):0;
-  const play=()=>fetch('/api/demo/play',{method:'POST'});
-  const stop=()=>fetch('/api/demo/stop',{method:'POST'});
-  return (
-    <div className="demo-bar">
-      <div className="demo-info">
-        <div className="demo-title">
-          {demoRunning
-            ? ('Step '+(step+1)+'/'+DEMO_STEPS.length+': '+(DEMO_STEPS[step]&&DEMO_STEPS[step].l||''))
-            : 'Auto-Play Demo — hands-free walkthrough for judges (~45 s)'}
-        </div>
-        {demoRunning && <>
-          <div className="demo-progress"><span style={{width:pct+'%'}}/></div>
-          <div className="demo-steps">
-            {DEMO_STEPS.map(function(s,i){
-              return <span key={i} className={'demo-step'+(i<step?' done':i===step?' active':'')}>
-                {i<step?'✓ ':i===step?'▶ ':''}{s.l}
-              </span>;
-            })}
-          </div>
-        </>}
-        {!demoRunning && <div className="demo-sub">Plays 8 scenarios · auto-confirms mitigations</div>}
-      </div>
-      <div style={{display:'flex',gap:8,flexShrink:0}}>
-        <button className="demo-btn" onClick={play} disabled={demoRunning}>
-          {demoRunning?'Running…':'▶ Run Demo'}
-        </button>
-        {demoRunning && <button className="stop-btn" onClick={stop}>⏹ Stop</button>}
-      </div>
-    </div>
-  );
-}
-
-/* ─── SeatCard (in car interior) ─── */
-function SeatCard({seatId,config,radarSeat,selected,onClick}){
-  const occ = config || {};
-  const isOcc = occ.occupied;
-  const kind = occ.kind || 'unknown';
-  const audio = occ.audio_event || 'none';
-  const distress = occ.distress || 0;
-  const audioAlert = audio!=='none' && audio!=='happy';
-  const audioGood = audio==='happy';
-
-  let alertClass = '';
-  if(isOcc && distress>0.6) alertClass=' alert-crit';
-  else if(isOcc && (audioAlert || distress>0.2)) alertClass=' alert-warn';
-
-  const hr = radarSeat && radarSeat.heart_rate_bpm;
-  const resp = radarSeat && radarSeat.respiration_rpm;
-  const buckled = isOcc ? occ.buckled : false;
-
-  return (
-    <div className={'seat-card'+(selected?' selected':'')+(isOcc?'':' empty-seat')+alertClass}
-         onClick={onClick}>
-      <div className="seat-top">
-        <span className="seat-name">{SEAT_LABELS[seatId]||seatId}</span>
-        <div className="seat-badges">
-          {isOcc && (
-            <span className={'pill '+(buckled?'ok':'crit')}>{buckled?'🔒':'⚠'}</span>
-          )}
-        </div>
-      </div>
-      <div className="seat-icon">{isOcc?(OCCUPANT_ICONS[kind]||'👤'):'—'}</div>
-      <div className="seat-kind">{isOcc?kind:'empty'}</div>
-      {isOcc && hr!=null && (
-        <div className="seat-vitals">
-          <span>♥ <b>{Math.round(hr)}</b></span>
-          <span>≈ <b>{Math.round(resp||0)}</b></span>
-        </div>
-      )}
-      {isOcc && (
-        <div className="seat-audio" style={{color:AUDIO_COLORS[audio]||'var(--dim)'}}>
-          {AUDIO_ICONS[audio]||'🔇'} {audio}
-        </div>
-      )}
-      {isOcc && distress>0.05 && (
-        <div className="seat-distress-bar">
-          <span style={{width:(distress*100)+'%',background:distress>0.5?'var(--crit)':'var(--warn)'}}/>
-        </div>
-      )}
-      {!isOcc && <div className="seat-empty-hint">tap to configure</div>}
-    </div>
-  );
-}
-
-/* ─── SeatConfigPanel ─── */
-function SeatConfigPanel({seatId,config,send,onClose}){
-  if(!seatId||!config) return null;
-  const occ = config;
-  const kind = occ.kind||'unknown';
-  const audioOpts = AUDIO_OPTIONS[kind]||AUDIO_OPTIONS.adult;
-  const isDriver = seatId==='driver';
-
-  const upd = (fields) => send(Object.assign({cmd:'configure_seat',seat:seatId},fields));
-
-  const hrDefault = isDriver?72:kind==='child'?100:kind==='pet'?110:75;
-  const respDefault = isDriver?14:kind==='child'?24:kind==='pet'?30:15;
-  const hrVal = occ.heart_rate_bpm!=null?occ.heart_rate_bpm:hrDefault;
-  const respVal = occ.respiration_rpm!=null?occ.respiration_rpm:respDefault;
-
-  return (
-    <div className="seat-cfg">
-      <h2>
-        <span>Configure · {SEAT_LABELS[seatId]||seatId}</span>
-        <button className="ghost" onClick={onClose} style={{fontSize:14,padding:'2px 8px'}}>✕</button>
-      </h2>
-
-      {/* Occupant type */}
-      <div className="cfg-section">
-        <div className="cfg-label">Occupant Type</div>
-        <div className="btn-group">
-          <button className={!occ.occupied?'sel':''} onClick={()=>upd({occupied:false})}>
-            — Empty
-          </button>
-          {!isDriver && <>
-            <button className={occ.occupied&&kind==='adult'?'sel':''} onClick={()=>upd({occupied:true,kind:'adult'})}>
-              👤 Adult
-            </button>
-            <button className={occ.occupied&&kind==='child'?'sel':''} onClick={()=>upd({occupied:true,kind:'child'})}>
-              🧒 Child
-            </button>
-            <button className={occ.occupied&&kind==='pet'?'sel':''} onClick={()=>upd({occupied:true,kind:'pet'})}>
-              🐾 Animal
-            </button>
-          </>}
-          {isDriver && <button className={occ.occupied?'sel':''} onClick={()=>upd({occupied:true,kind:'adult'})}>
-            👤 Driver (adult)
-          </button>}
-        </div>
-      </div>
-
-      {occ.occupied && (
-        <div className="cfg-cols">
-          {/* Left column */}
-          <div>
-            {/* Seatbelt */}
-            <div className="cfg-section">
-              <div className="cfg-label">Seatbelt</div>
-              <div className="btn-group">
-                <button className={occ.buckled?'sel':''} onClick={()=>upd({buckled:true})}>🔒 Belted</button>
-                <button className={!occ.buckled?'sel crit':''} onClick={()=>upd({buckled:false})}>⚠ Unbelted</button>
-              </div>
-            </div>
-
-            {/* Audio event */}
-            <div className="cfg-section">
-              <div className="cfg-label">Audio Event</div>
-              <div className="btn-group">
-                {audioOpts.map(function(o){
-                  return <button key={o.v}
-                    className={occ.audio_event===o.v?'sel':''}
-                    onClick={()=>upd({audio_event:o.v})}>
-                    {AUDIO_ICONS[o.v]} {o.l}
-                  </button>;
-                })}
-              </div>
-            </div>
-
-            {/* Driver emotion */}
-            {isDriver && (
-              <div className="cfg-section">
-                <div className="cfg-label">Driver State</div>
-                <div className="btn-group">
-                  {EMOTIONS.map(function(e){
-                    return <button key={e}
-                      className={occ.emotion===e?'sel':''}
-                      style={occ.emotion===e?{background:EMOTION_COLORS[e],color:'#060c10',borderColor:EMOTION_COLORS[e]}:{}}
-                      onClick={()=>upd({emotion:e})}>
-                      {e}
-                    </button>;
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right column — sliders */}
-          <div>
-            <div className="cfg-section">
-              <div className="cfg-label">Distress Level</div>
-              <div className="cfg-row" style={{margin:0}}>
-                <input type="range" min="0" max="100"
-                  value={Math.round((occ.distress||0)*100)}
-                  onChange={function(e){upd({distress:parseInt(e.target.value)/100});}}/>
-                <span className="range-val">{Math.round((occ.distress||0)*100)}%</span>
-              </div>
-            </div>
-
-            <div className="cfg-section">
-              <div className="cfg-label">Heart Rate</div>
-              <div className="cfg-row" style={{margin:0}}>
-                <input type="range" min="40" max="180"
-                  value={Math.round(hrVal)}
-                  onChange={function(e){upd({heart_rate_bpm:parseInt(e.target.value)});}}/>
-                <span className="range-val">{Math.round(hrVal)} bpm</span>
-              </div>
-            </div>
-
-            <div className="cfg-section">
-              <div className="cfg-label">Respiration</div>
-              <div className="cfg-row" style={{margin:0}}>
-                <input type="range" min="6" max="50"
-                  value={Math.round(respVal)}
-                  onChange={function(e){upd({respiration_rpm:parseInt(e.target.value)});}}/>
-                <span className="range-val">{Math.round(respVal)} rpm</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── CabinView ─── */
-function CabinView({seatConfigs,radarSeats,selectedSeat,onSelectSeat,scenario,speed,visibility,potholeAhead}){
-  const radar = {};
-  ((radarSeats&&radarSeats.seats)||[]).forEach(function(s){radar[s.seat]=s;});
-
-  const leftCol = ['driver','rear_left'];
-  const rightCol = ['front_passenger','rear_right'];
-
-  return (
-    <div className="cabin-shell">
-      {/* Dashboard strip */}
-      <div className="cabin-dash">
-        <div className="dash-wheel">⊙</div>
-        <div className="dash-center">
-          <div className="dash-title">CabinSense · Interior</div>
-          <div className="dash-scenario">{fmt(scenario||'idle')}</div>
-        </div>
-        <div className="dash-right">
-          <div className="dash-stat"><b>{Math.round(speed||0)}</b> km/h</div>
-          <div className="dash-stat">{visibility||'good'}</div>
-          {potholeAhead!=null && (
-            <div className="dash-stat" style={{color:'var(--warn)'}}>⚠ {Math.round(potholeAhead)}m</div>
-          )}
-        </div>
-      </div>
-
-      {/* Seat grid: left col | console | right col */}
-      <div className="seat-layout">
-        <div className="seat-col">
-          {leftCol.map(function(id){
-            return <SeatCard key={id} seatId={id}
-              config={seatConfigs&&seatConfigs[id]}
-              radarSeat={radar[id]}
-              selected={selectedSeat===id}
-              onClick={function(){onSelectSeat(selectedSeat===id?null:id);}}/>;
-          })}
-        </div>
-        <div className="console">
-          <div className="console-line"/>
-          <div className="console-gear">⊞</div>
-          <div className="console-line"/>
-        </div>
-        <div className="seat-col">
-          {rightCol.map(function(id){
-            return <SeatCard key={id} seatId={id}
-              config={seatConfigs&&seatConfigs[id]}
-              radarSeat={radar[id]}
-              selected={selectedSeat===id}
-              onClick={function(){onSelectSeat(selectedSeat===id?null:id);}}/>;
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── VehicleControls ─── */
-function VehicleControls({speed,visibility,potholeAhead,send}){
-  const visOpts = ['good','low','rain','fog'];
-  const upd = (fields) => send(Object.assign({cmd:'configure_vehicle'},fields));
-  return (
-    <div className="card">
-      <h2>Vehicle · Road</h2>
-      <div className="cfg-section">
-        <div className="cfg-label">Speed</div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <input type="range" min="0" max="130"
-            value={Math.round(speed||0)}
-            onChange={function(e){upd({speed_kmh:parseInt(e.target.value)});}}/>
-          <span className="range-val">{Math.round(speed||0)} km/h</span>
-        </div>
-      </div>
-      <div className="cfg-section">
-        <div className="cfg-label">Visibility</div>
-        <div className="btn-group">
-          {visOpts.map(function(v){
-            return <button key={v} className={'vis-btn '+(visibility===v?'sel':'')}
-              onClick={function(){upd({visibility:v});}}>{v}</button>;
-          })}
-        </div>
-      </div>
-      <div className="cfg-section" style={{marginBottom:0}}>
-        <div className="cfg-label">Pothole / Rough Patch</div>
-        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          <button
-            className={potholeAhead!=null?'sel warn':''}
-            onClick={function(){upd({pothole_ahead_m:potholeAhead!=null?null:80});}}>
-            {potholeAhead!=null?('⚠ '+Math.round(potholeAhead)+'m'):'None'}
-          </button>
-          {potholeAhead!=null && (
-            <input type="range" min="10" max="250"
-              value={Math.round(potholeAhead)}
-              onChange={function(e){upd({pothole_ahead_m:parseInt(e.target.value)});}}/>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── VibrationControls ─── */
-function VibrationControls({override,roadQuality,rms,send}){
-  const qualities = ['smooth','rough','pothole'];
-  const upd = (fields) => send(Object.assign({cmd:'configure_vibration'},fields));
-  return (
-    <div className="card">
-      <h2>IMU · Vibration</h2>
-      <div className="cfg-section">
-        <div className="cfg-label">Mode</div>
-        <div className="btn-group">
-          <button className={!override?'sel':''} onClick={function(){upd({override:false});}}>CSV Replay</button>
-          <button className={override?'sel':''} onClick={function(){upd({override:true});}}>⚡ Manual Override</button>
-        </div>
-      </div>
-      {override && <>
-        <div className="cfg-section">
-          <div className="cfg-label">Road Quality</div>
-          <div className="btn-group">
-            {qualities.map(function(q){
-              var col=q==='smooth'?'var(--ok)':q==='rough'?'var(--warn)':'var(--crit)';
-              return <button key={q}
-                className={roadQuality===q?'sel':''}
-                style={roadQuality===q?{background:col,color:'#060c10',borderColor:col}:{}}
-                onClick={function(){upd({road_quality:q});}}>
-                {q}
-              </button>;
-            })}
-          </div>
-        </div>
-        <div className="cfg-section" style={{marginBottom:0}}>
-          <div className="cfg-label">Intensity (RMS z)</div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <input type="range" min="0" max="100"
-              value={Math.round((rms||0)*111)}
-              onChange={function(e){upd({rms:parseInt(e.target.value)/111});}}/>
-            <span className="range-val">{(rms||0).toFixed(3)}</span>
-          </div>
-        </div>
-      </>}
-    </div>
-  );
-}
-
-/* ─── ScenarioPanel ─── */
-function ScenarioPanel({list,current,send}){
-  return (
-    <div className="card">
-      <h2>Demo Scenarios</h2>
-      <div className="scenario-grid">
-        {list.map(function(s){
-          return <button key={s} className={s===current?'sel':''}
-            onClick={function(){send({cmd:'scenario',name:s});}}>
-            {fmt(s)}
-          </button>;
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ─── CognitiveLoad ─── */
-function CognitiveLoad({value,factors}){
-  const [mode,setMode]=useState('live');
-  const bufRef=useRef([]);
-
+/* ── Clock ── */
+function Clock(){
+  const [t,setT]=useState('');
   useEffect(function(){
-    var now=Date.now();
-    bufRef.current.push({v:value,t:now});
-    var cutoff=now-31000;
-    bufRef.current=bufRef.current.filter(function(x){return x.t>=cutoff;});
-  },[value]);
+    var upd=function(){
+      var d=new Date(),h=d.getHours(),m=d.getMinutes(),s=d.getSeconds();
+      var ap=h>=12?'PM':'AM';h=h%12||12;
+      setT(fmt2(h)+':'+fmt2(m)+':'+fmt2(s)+' '+ap);
+    };
+    upd();var id=setInterval(upd,1000);return function(){clearInterval(id);};
+  },[]);
+  return <span className="hmi-clock">{t}</span>;
+}
 
-  var display=value;
-  if(mode==='1s'){
-    var c1=Date.now()-1000;
-    var r1=bufRef.current.filter(function(x){return x.t>=c1;});
-    if(r1.length>0) display=Math.round(r1.reduce(function(s,x){return s+x.v;},0)/r1.length);
-  } else if(mode==='30s'){
-    var buf=bufRef.current;
-    if(buf.length>0) display=Math.round(buf.reduce(function(s,x){return s+x.v;},0)/buf.length);
-  }
+/* ── AudioBarsCanvas ── */
+function AudioBarsCanvas({analyserRef,audioActive,onStats}){
+  const cvRef=useRef(null);
+  useEffect(function(){
+    var cv=cvRef.current;if(!cv)return;
+    var ctx=cv.getContext('2d');
+    var W=cv.width,H=cv.height,N=40,id;
+    var draw=function(){
+      ctx.fillStyle='#060d16';ctx.fillRect(0,0,W,H);
+      var data=new Uint8Array(128);
+      if(analyserRef.current)analyserRef.current.getByteFrequencyData(data);
+      var sum=0;
+      var bw=Math.floor((W-N+1)/N);
+      for(var i=0;i<N;i++){
+        var bi=Math.floor(i*64/N);
+        var raw=analyserRef.current?data[bi]:(audioActive?Math.random()*50+15:Math.random()*10+4);
+        sum+=raw;
+        var h=Math.max(3,(raw/255)*H);
+        var x=i*(bw+1),y=H-h;
+        var grd=ctx.createLinearGradient(0,y,0,H);
+        var g1=Math.round(160+raw*0.37),g2=Math.round(70+raw*0.2);
+        grd.addColorStop(0,'rgba(0,'+g1+','+Math.round(140+raw*0.3)+',1)');
+        grd.addColorStop(1,'rgba(0,'+g2+','+Math.round(60+raw*0.15)+',.4)');
+        ctx.fillStyle=grd;ctx.fillRect(x,y,bw,h);
+      }
+      if(onStats){
+        var avg=sum/N;
+        // map 0-255 avg to 30-110 dB
+        var db=Math.round(30+avg*(80/255));
+        onStats({db:db,vad:avg>30});
+      }
+      id=requestAnimationFrame(draw);
+    };
+    draw();
+    return function(){cancelAnimationFrame(id);};
+  },[]);
+  return <canvas ref={cvRef} width="400" height="90" style={{width:'100%',height:'100%',display:'block'}}/>;
+}
 
-  const col=loadColor(display);
+/* ── RoadQualityChart ── */
+function RoadQualityChart({vib}){
+  const cvRef=useRef(null);
+  const histRef=useRef([]);
+  useEffect(function(){
+    var rms=(vib&&vib.rms_z)||0;
+    histRef.current.push(rms);
+    if(histRef.current.length>120)histRef.current.shift();
+  });
+  useEffect(function(){
+    var cv=cvRef.current;if(!cv)return;
+    var ctx=cv.getContext('2d');
+    var W=cv.width,H=cv.height,id;
+    var draw=function(){
+      ctx.fillStyle='#060d16';ctx.fillRect(0,0,W,H);
+      var h=histRef.current;
+      if(h.length>1){
+        ctx.beginPath();ctx.strokeStyle='#00d4b0';ctx.lineWidth=1.5;
+        for(var i=0;i<h.length;i++){
+          var x=(i/(h.length-1))*W,y=H-(h[i]/0.9)*(H-4)-2;
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+        ctx.beginPath();ctx.strokeStyle='rgba(246,173,85,.25)';
+        ctx.lineWidth=1;ctx.setLineDash([3,3]);
+        var ty=H-(0.18/0.9)*(H-4)-2;
+        ctx.moveTo(0,ty);ctx.lineTo(W,ty);ctx.stroke();ctx.setLineDash([]);
+      }
+      id=requestAnimationFrame(draw);
+    };
+    draw();return function(){cancelAnimationFrame(id);};
+  },[]);
+  var q=(vib&&vib.road_quality)||'smooth';
+  var qc={smooth:'#00d4b0',rough:'#f6ad55',pothole:'#fc8181'};
+  var ah=vib&&vib.pothole_ahead_m;
   return (
-    <div className="card">
-      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span>Cognitive Load / Attention Risk</span>
-        <div style={{display:'flex',gap:3}}>
-          {['live','1s','30s'].map(function(m){
-            return <button key={m} onClick={function(){setMode(m);}}
-              style={{fontSize:9,padding:'1px 6px',
-                background:mode===m?'var(--accent)':'var(--panel2)',
-                color:mode===m?'var(--bg)':'var(--dim)',
-                borderColor:mode===m?'var(--accent)':'var(--line)'}}>
-              {m}
+    <div style={{height:'100%',display:'flex',flexDirection:'column',gap:5}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexShrink:0}}>
+        <span className="rq-qual" style={{color:qc[q]||'#d4dce8'}}>{q}</span>
+        {ah!=null&&<span style={{fontSize:9,color:'#f6ad55'}}>⚠ {Math.round(ah)}m ahead</span>}
+      </div>
+      <div className="rq-wrap" style={{flex:1}}>
+        <canvas ref={cvRef} width="280" height="50" style={{width:'100%',height:'100%',display:'block'}}/>
+      </div>
+    </div>
+  );
+}
+
+/* ── SeatStatusTable ── */
+function SeatStatusTable({seatConfigs,radarSeats,onSelect}){
+  var rm={};((radarSeats&&radarSeats.seats)||[]).forEach(function(s){rm[s.seat]=s;});
+  return (
+    <table className="stbl">
+      <thead>
+        <tr><th>Seat</th><th>Type</th><th>Audio</th><th>Belt</th><th>Risk</th></tr>
+      </thead>
+      <tbody>
+        {SEAT_IDS.map(function(sid){
+          var c=(seatConfigs&&seatConfigs[sid])||{};
+          var d=c.distress||0;
+          var dc=d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
+          return (
+            <tr key={sid} onClick={function(){onSelect(sid);}}>
+              <td style={{color:'#4a6580',fontSize:10}}>{SEAT_LABELS[sid]}</td>
+              <td>{c.occupied
+                ?<span className="kind-chip">{ICONS[c.kind]||'👤'} {c.kind||'adult'}</span>
+                :<span style={{color:'#1c2740'}}>—</span>}</td>
+              <td style={{fontSize:10,color:'#f6ad55'}}>
+                {c.audio_event&&c.audio_event!=='none'
+                  ?(AICONS[c.audio_event]||'')+' '+c.audio_event
+                  :<span style={{color:'#1c2740'}}>—</span>}
+              </td>
+              <td>{c.occupied
+                ?(c.buckled?<span className="belt-y">✓</span>:<span className="belt-n">✗</span>)
+                :<span style={{color:'#1c2740'}}>—</span>}</td>
+              <td>{c.occupied
+                ?<div className="dmini"><span style={{width:Math.round(d*100)+'%',background:dc}}/></div>
+                :<span style={{color:'#1c2740'}}>—</span>}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+/* ── CabinMapMini ── */
+function CabinMapMini({seatConfigs,onSelect}){
+  return (
+    <div className="cmap">
+      {SEAT_IDS.map(function(sid){
+        var c=(seatConfigs&&seatConfigs[sid])||{};
+        var d=c.distress||0;
+        var cls='cseat'+(c.occupied?d>0.7?' crit':d>0.35?' warn':' occ':'');
+        var au=c.audio_event&&c.audio_event!=='none';
+        return (
+          <div key={sid} className={cls} onClick={function(){onSelect(sid);}}>
+            <span className="ci">{c.occupied?(ICONS[c.kind]||'👤'):'·'}</span>
+            <span className="cn">{SEAT_LABELS[sid]}</span>
+            {au&&<span style={{fontSize:9,color:'#f6ad55'}}>{AICONS[c.audio_event]}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── VideoSection ── */
+function VideoSection({ws,liveVision}){
+  const [on,setOn]=useState(false);
+  const vRef=useRef(null);
+  const tRef=useRef(null);
+  const startCam=async function(){
+    try{
+      var st=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
+      vRef.current.srcObject=st;await vRef.current.play();
+      var cv=document.createElement('canvas');cv.width=320;cv.height=240;
+      var c2=cv.getContext('2d');
+      tRef.current=setInterval(function(){
+        c2.drawImage(vRef.current,0,0,320,240);
+        var b64=cv.toDataURL('image/jpeg',.7).split(',')[1];
+        if(ws.current&&ws.current.readyState===1)
+          ws.current.send(JSON.stringify({cmd:'vision_frame',data:b64}));
+      },200);setOn(true);
+    }catch(e){alert('Camera denied: '+e.message);}
+  };
+  const stopCam=function(){
+    clearInterval(tRef.current);
+    if(vRef.current&&vRef.current.srcObject)
+      vRef.current.srcObject.getTracks().forEach(function(t){t.stop();});
+    setOn(false);
+  };
+  return (
+    <div className="vid-box" style={{position:'relative'}}>
+      {!on&&!liveVision&&<span>No camera · synthetic</span>}
+      {!on&&liveVision&&(
+        <button onClick={startCam} style={{fontSize:10,padding:'5px 12px',
+          background:'rgba(0,212,176,.08)',border:'1px solid #00d4b0',borderRadius:5,color:'#00d4b0'}}>
+          📷 Start Camera
+        </button>
+      )}
+      <video ref={vRef} muted playsInline
+        style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:5,display:on?'block':'none'}}/>
+      {on&&<button onClick={stopCam} style={{position:'absolute',top:6,right:6,fontSize:9,
+        padding:'2px 7px',background:'rgba(252,129,129,.12)',border:'1px solid #fc8181',
+        borderRadius:4,color:'#fc8181'}}>⏹</button>}
+    </div>
+  );
+}
+
+/* ── VehicleFeedPanel ── */
+function VehicleFeedPanel({speed,visibility,potholeAhead,send}){
+  var [traffic,setTraffic]=useState('low');
+  var vc={good:'#00d4b0',low:'#f6ad55',rain:'#60a5fa',fog:'#a78bfa',excellent:'#00d4b0',moderate:'#f6ad55',poor:'#fc8181'};
+  var visOpts=[
+    {id:'good',label:'Good'},{id:'moderate',label:'Moderate'},
+    {id:'rain',label:'Rain'},{id:'fog',label:'Fog'},{id:'low',label:'Night'}
+  ];
+  return (
+    <div>
+      <div className="vf-row">
+        <span className="vf-key">Speed</span>
+        <input type="range" min="0" max="180" step="5" value={Math.round(speed||60)}
+          onChange={function(e){send({cmd:'configure_vehicle',speed_kmh:parseInt(e.target.value)});}}/>
+        <span className="vf-val" style={{color:speed>100?'#f6ad55':'#d4dce8',minWidth:46,textAlign:'right'}}>
+          {Math.round(speed||0)} km/h
+        </span>
+      </div>
+      <div className="vf-row" style={{flexDirection:'column',alignItems:'flex-start',gap:5}}>
+        <span className="vf-key">Visibility</span>
+        <div className="vis-btns">
+          {visOpts.map(function(v){
+            return <button key={v.id} className={'vbtn'+(visibility===v.id?' on':'')}
+              onClick={function(){send({cmd:'configure_vehicle',visibility:v.id});}}>{v.label}</button>;
+          })}
+        </div>
+      </div>
+      <div className="vf-row" style={{flexDirection:'column',alignItems:'flex-start',gap:5}}>
+        <span className="vf-key">Traffic</span>
+        <div className="vis-btns">
+          {['Low','Medium','High'].map(function(t){
+            return <button key={t} className={'vbtn'+(traffic===t.toLowerCase()?' on':'')}
+              onClick={function(){setTraffic(t.toLowerCase());}}>
+              {t}
             </button>;
           })}
         </div>
-      </h2>
-      <div className="gauge-num" style={{color:col}}>{display}</div>
-      <div className="gauge-lbl">
-        0 = relaxed · 100 = overloaded{mode!=='live'?' · '+mode+' avg':''}
       </div>
-      <div className="bar"><span style={{width:display+'%',background:col}}/></div>
-      <div className="factors">
-        {factors.length===0 && <span className="chip">nominal</span>}
-        {factors.map(function(f,i){return <span key={i} className="chip">{f}</span>;})}
+      {potholeAhead!=null&&(
+        <div className="vf-row">
+          <span className="vf-key">Pothole</span>
+          <span className="vf-val" style={{color:'#f6ad55'}}>{Math.round(potholeAhead)}m ahead</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── ScenarioBar ── */
+function ScenarioBar({list,current,demoRunning,send}){
+  return (
+    <div>
+      <div className="sc-row">
+        {list.map(function(s){
+          var nm=(s.name||s.id||'').replace(/_/g,' ');
+          return <button key={s.id} className={'sc-btn'+(current===s.id&&!demoRunning?' on':'')}
+            onClick={function(){send({cmd:'scenario',id:s.id});}}>{nm}</button>;
+        })}
+      </div>
+      <div className="demo-row">
+        <button className={demoRunning?'demo-stop':'demo-go'}
+          onClick={function(){
+            if(demoRunning)fetch('/api/demo/stop',{method:'POST'});
+            else fetch('/api/demo/play',{method:'POST'});
+          }}>
+          {demoRunning?'⏹ Stop Demo':'▶ Run Demo'}
+        </button>
+        {demoRunning&&<span className="demo-indicator">● demo running</span>}
       </div>
     </div>
   );
 }
 
-/* ─── AcousticPanel ─── */
-function AcousticPanel({audio,liveAudio,ws}){
+/* ── SeatConfigPanel (overlay) ── */
+function SeatConfigPanel({seatId,config,send,onClose}){
+  var c=config||{};
+  var isDriver=seatId==='driver';
+  var field=function(key,val){send({cmd:'configure_seat',seat:seatId,[key]:val});};
+  var aopts={adult:['none','talking','shouting'],child:['none','crying','happy'],
+    pet:['none','barking','happy'],unknown:['none','talking']};
+  var opts=aopts[c.kind||'adult']||['none','talking'];
+  return (
+    <div className="overlay" onClick={function(e){if(e.target===e.currentTarget)onClose();}}>
+      <div className="ov-panel">
+        <div className="ov-ttl">
+          <span>{SEAT_LABELS[seatId]||seatId}</span>
+          <button className="close-btn" onClick={onClose}>✕ Close</button>
+        </div>
+
+        <div className="cfg-sec">
+          <div className="cfg-lbl">Occupant</div>
+          <div className="btn-grp">
+            {['empty','adult','child','pet'].map(function(k){
+              var sel=k==='empty'?!c.occupied:(c.occupied&&c.kind===k);
+              return <button key={k} className={'xbtn'+(sel?' sel':'')}
+                onClick={function(){
+                  if(k==='empty')field('occupied',false);
+                  else{field('occupied',true);field('kind',k);}
+                }}>{k==='empty'?'Empty':(ICONS[k]||'')+' '+k}</button>;
+            })}
+          </div>
+        </div>
+
+        {c.occupied&&<>
+          <div className="cfg-row">
+            <span className="cfg-lbl">Seatbelt</span>
+            <div className="right">
+              <input type="checkbox" checked={!!c.buckled}
+                onChange={function(e){field('buckled',e.target.checked);}}/>
+              <span style={{fontSize:11,color:c.buckled?'#00d4b0':'#fc8181'}}>
+                {c.buckled?'Buckled':'Unbuckled'}
+              </span>
+            </div>
+          </div>
+
+          <div className="cfg-sec">
+            <div className="cfg-lbl">Audio Event</div>
+            <div className="btn-grp">
+              {opts.map(function(o){
+                return <button key={o} className={'xbtn'+(c.audio_event===o?' sel':'')}
+                  onClick={function(){field('audio_event',o);}}>
+                  {AICONS[o]||''} {o}
+                </button>;
+              })}
+            </div>
+          </div>
+
+          <div className="cfg-row">
+            <span className="cfg-lbl">Distress</span>
+            <div className="right">
+              <input type="range" min="0" max="1" step="0.05"
+                value={c.distress||0}
+                onChange={function(e){field('distress',parseFloat(e.target.value));}}/>
+              <span className="rval">{Math.round((c.distress||0)*100)}%</span>
+            </div>
+          </div>
+
+          <div className="cfg-sec">
+            <div className="cfg-lbl">Emotion</div>
+            <div className="btn-grp">
+              {['calm','stressed','tired','happy'].map(function(em){
+                return <button key={em} className={'xbtn'+(c.emotion===em?' sel':'')}
+                  onClick={function(){field('emotion',em);}}>{em}</button>;
+              })}
+            </div>
+          </div>
+
+          <div className="cfg-cols">
+            <div>
+              <div className="cfg-lbl">Heart Rate</div>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+                <input type="range" min="40" max="160" step="1"
+                  value={c.heart_rate_bpm||72}
+                  onChange={function(e){field('heart_rate_bpm',parseInt(e.target.value));}}/>
+                <span className="rval" style={{minWidth:40}}>{c.heart_rate_bpm||72} bpm</span>
+              </div>
+            </div>
+            <div>
+              <div className="cfg-lbl">Respiration</div>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+                <input type="range" min="8" max="40" step="1"
+                  value={c.respiration_rpm||14}
+                  onChange={function(e){field('respiration_rpm',parseInt(e.target.value));}}/>
+                <span className="rval" style={{minWidth:40}}>{c.respiration_rpm||14} rpm</span>
+              </div>
+            </div>
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+/* ── CircularGauge ── */
+function CircularGauge({value}){
+  var R=65,CX=80,CY=80;
+  var circ=Math.round(2*Math.PI*R);
+  var filled=Math.round((value/100)*circ);
+  var col=loadCol(value);
+  var tr='rotate(-90 '+CX+' '+CY+')';
+  return (
+    <div className="gauge-section">
+      <div className="gauge-ttl">Load Score</div>
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#1a2535" strokeWidth="11"/>
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke={col} strokeWidth="11"
+          strokeDasharray={filled+' '+circ} strokeLinecap="round" transform={tr}/>
+        <text x={CX} y={CY+8} textAnchor="middle" fill={col}
+          fontSize="40" fontWeight="700" fontFamily="inherit">{value}</text>
+      </svg>
+      <div className="gauge-sub" style={{color:col}}>{loadLbl(value)}</div>
+    </div>
+  );
+}
+
+/* ── Car SVG for Infotainment ── */
+function CarSVG({seatConfigs}){
+  var seats=[
+    {id:'driver',cx:32,cy:38},
+    {id:'front_passenger',cx:88,cy:38},
+    {id:'rear_left',cx:32,cy:95},
+    {id:'rear_right',cx:88,cy:95}
+  ];
+  return (
+    <svg width="135" height="148" viewBox="0 0 140 150">
+      <rect x="12" y="15" width="116" height="118" rx="16" fill="#0d1420" stroke="#1c2740" strokeWidth="1.5"/>
+      <rect x="22" y="18" width="96" height="30" rx="8" fill="#111f35" stroke="#1c2740" strokeWidth="1"/>
+      <rect x="60" y="24" width="20" height="92" rx="4" fill="#0d1a2a" stroke="#1c2740" strokeWidth="1"/>
+      {seats.map(function(s){
+        var c=(seatConfigs&&seatConfigs[s.id])||{};
+        var d=c.distress||0;
+        var fi=!c.occupied?'#0d1520':d>0.7?'rgba(252,129,129,.18)':d>0.35?'rgba(246,173,85,.18)':'rgba(0,212,176,.1)';
+        var st=!c.occupied?'#1c2740':d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
+        return (
+          <circle key={s.id} cx={s.cx} cy={s.cy} r="22"
+            fill={fi} stroke={st} strokeWidth="1.5"/>
+        );
+      })}
+      <circle cx="32" cy="65" r="10" fill="none" stroke="#1c2740" strokeWidth="1.5"/>
+      <line x1="23" y1="65" x2="41" y2="65" stroke="#1c2740" strokeWidth="1"/>
+      <line x1="32" y1="56" x2="32" y2="74" stroke="#1c2740" strokeWidth="1"/>
+    </svg>
+  );
+}
+
+/* ── IssuePanel ── */
+function IssuePanel({state}){
+  var load=state.cognitive_load||0;
+  var factors=state.factors||[];
+  var top=factors[0]||null;
+  var audio=state.audio||{};
+  var conf=audio.confidence
+    ?Math.round(audio.confidence*100)
+    :(load>0?Math.min(98,Math.round(load*0.82+8)):0);
+  var col=loadCol(load);
+
+  const detRef=useRef(null);
+  const [dur,setDur]=useState(0);
+  var above=load>25;
+  useEffect(function(){
+    if(above){
+      if(!detRef.current)detRef.current=new Date();
+      var id=setInterval(function(){
+        setDur(Math.round((Date.now()-detRef.current.getTime())/1000));
+      },1000);
+      return function(){clearInterval(id);};
+    }else{detRef.current=null;setDur(0);}
+  },[above]);
+
+  var detTime=detRef.current
+    ?detRef.current.toLocaleTimeString('en-US',{hour12:true,hour:'2-digit',minute:'2-digit',second:'2-digit'})
+    :'—';
+  var durStr=dur>0?'00:'+fmt2(Math.floor(dur/60))+':'+fmt2(dur%60):'00:00:00';
+
+  return (
+    <div>
+      <div className="iss-lbl">Issue / Distract</div>
+      <div className="iss-title">
+        {top?(top.charAt(0).toUpperCase()+top.slice(1)):'No disturbance detected'}
+      </div>
+      {load>0&&<>
+        <div className="iss-conf" style={{color:col}}>{conf}%</div>
+        <div className="iss-clbl">Confidence</div>
+      </>}
+      <div>
+        <div className="iss-meta-row">
+          <span className="iss-mk">Detected In</span>
+          <span className="iss-mv">{detTime}</span>
+        </div>
+        <div className="iss-meta-row">
+          <span className="iss-mk">Duration</span>
+          <span className="iss-mv">{durStr}</span>
+        </div>
+        <div className="iss-meta-row">
+          <span className="iss-mk">Scenario</span>
+          <span className="iss-mv" style={{color:'#4a6580',fontSize:10}}>
+            {(state.scenario||'idle').replace(/_/g,' ')}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── RecommendationPanel ── */
+function RecommendationPanel({mitigations,send}){
+  var vis=(mitigations||[]).filter(function(m){return m.status!=='dismissed';});
+  var proposed=vis.filter(function(m){return m.status==='proposed'&&m.confirm;});
+  return (
+    <div>
+      <div className="rec-ttl">Recommendation</div>
+      <div className="rec-list">
+        {vis.length===0&&<div className="rec-empty">Cabin nominal — no action needed.</div>}
+        {vis.map(function(m,i){
+          var sc={active:'#00d4b0',proposed:'#f6ad55',dismissed:'#3d5070'};
+          return (
+            <div key={m.id} className="rec-item">
+              <div className="rec-num">{i+1}</div>
+              <div>
+                <div className="rec-txt">{m.title}</div>
+                <div className="rec-uc">{m.usecase} ·{' '}
+                  <span style={{color:sc[m.status]||'#3d5070'}}>{m.status}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {vis.length>0&&(
+        <div className="rec-acts">
+          {proposed.length>0&&(
+            <button className="btn-apply"
+              onClick={function(){proposed.forEach(function(m){send({cmd:'confirm',id:m.id});});}}>
+              Apply All
+            </button>
+          )}
+          <button className="btn-dis"
+            onClick={function(){vis.forEach(function(m){send({cmd:'dismiss',id:m.id});});}}>
+            Dismiss All
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── DataReplayView ── */
+function DataReplayView({state,send,ws,liveAudio,liveVision,onSelectSeat,scenarios}){
   const [micOn,setMicOn]=useState(false);
+  const [noiseDb,setNoiseDb]=useState(30);
+  const [vad,setVad]=useState(false);
   const procRef=useRef(null);
   const ctxRef=useRef(null);
   const analyserRef=useRef(null);
-  const canvasRef=useRef(null);
-  const animRef=useRef(null);
   const SR=16000;
+  var imuPresets=[
+    {id:'smooth',label:'Smooth Road',q:'smooth',rms:0.05},
+    {id:'breaker',label:'Speed Breaker',q:'rough',rms:0.38},
+    {id:'pothole',label:'Pothole',q:'pothole',rms:0.68},
+    {id:'turn',label:'Agg. Turn',q:'rough',rms:0.42},
+    {id:'brake',label:'Hard Braking',q:'rough',rms:0.50}
+  ];
+  var curPreset=(state.vib_override&&state.vib_road_quality)||'replay';
 
-  const drawSpect=function(){
-    if(!analyserRef.current||!canvasRef.current)return;
-    var analyser=analyserRef.current;
-    var canvas=canvasRef.current;
-    var ctx2d=canvas.getContext('2d');
-    var bufLen=analyser.frequencyBinCount;
-    var data=new Uint8Array(bufLen);
-    analyser.getByteFrequencyData(data);
-    var img=ctx2d.getImageData(1,0,canvas.width-1,canvas.height);
-    ctx2d.putImageData(img,0,0);
-    var H=canvas.height, W=canvas.width;
-    for(var i=0;i<H;i++){
-      var binIdx=Math.floor((H-1-i)*bufLen/H);
-      var v=data[Math.min(binIdx,bufLen-1)];
-      var r=v>128?255:v*2;
-      var g=v<128?v*2:Math.max(0,255-(v-128)*2);
-      var b=v<64?v*4:0;
-      ctx2d.fillStyle='rgb('+r+','+g+','+b+')';
-      ctx2d.fillRect(W-1,i,1,1);
-    }
-    animRef.current=requestAnimationFrame(drawSpect);
-  };
-
-  const startMic=async()=>{
+  const startMic=async function(){
     try{
-      const stream=await navigator.mediaDevices.getUserMedia({audio:{sampleRate:SR,channelCount:1}});
-      const ctx=new AudioContext({sampleRate:SR});
+      var st=await navigator.mediaDevices.getUserMedia({audio:{sampleRate:SR,channelCount:1}});
+      var ctx=new AudioContext({sampleRate:SR});
       ctxRef.current=ctx;
-      const src=ctx.createMediaStreamSource(stream);
-      const analyser=ctx.createAnalyser();
-      analyser.fftSize=256;
-      analyser.smoothingTimeConstant=0.55;
-      analyserRef.current=analyser;
-      src.connect(analyser);
+      var src=ctx.createMediaStreamSource(st);
+      var an=ctx.createAnalyser();an.fftSize=256;an.smoothingTimeConstant=0.6;
+      analyserRef.current=an;src.connect(an);
       await ctx.audioWorklet.addModule(window._CHUNKER_URL);
-      const node=new AudioWorkletNode(ctx,'chunker');
+      var node=new AudioWorkletNode(ctx,'chunker');
       node.port.onmessage=function(e){
         if(ws.current&&ws.current.readyState===1)
           ws.current.send(JSON.stringify({cmd:'audio_chunk',data:Array.from(e.data)}));
       };
-      src.connect(node);
-      procRef.current={stream,node,src};
-      if(canvasRef.current){
-        var cc=canvasRef.current.getContext('2d');
-        cc.fillStyle='#050d14';
-        cc.fillRect(0,0,canvasRef.current.width,canvasRef.current.height);
-      }
-      drawSpect();
-      setMicOn(true);
+      src.connect(node);procRef.current={stream:st,node,src};setMicOn(true);
     }catch(e){alert('Mic denied: '+e.message);}
   };
-  const stopMic=()=>{
-    cancelAnimationFrame(animRef.current);
+  const stopMic=function(){
     analyserRef.current=null;
-    procRef.current&&procRef.current.stream&&procRef.current.stream.getTracks().forEach(function(t){t.stop();});
-    ctxRef.current&&ctxRef.current.close();
-    procRef.current=null;
-    setMicOn(false);
+    if(procRef.current&&procRef.current.stream)
+      procRef.current.stream.getTracks().forEach(function(t){t.stop();});
+    if(ctxRef.current)ctxRef.current.close();
+    procRef.current=null;setMicOn(false);
   };
+  useEffect(function(){return stopMic;},[]);
 
-  useEffect(function(){return function(){stopMic();};},[]);
-
-  const active=audio&&audio.label&&audio.label!=='none';
-  const col=AUDIO_COLORS[audio&&audio.label]||'var(--dim)';
-  return (
-    <div className="card">
-      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span>Acoustic Anomaly</span>
-        {liveAudio&&<button onClick={micOn?stopMic:startMic}
-          style={{fontSize:10,padding:'2px 8px',
-            background:micOn?'rgba(255,77,79,.15)':'var(--panel2)',
-            color:micOn?'var(--crit)':'var(--dim)',borderColor:micOn?'var(--crit)':'var(--line)'}}>
-          {micOn?'⏹ live':'🎤 mic'}
-        </button>}
-      </h2>
-      <div className="audio-event-row">
-        <span className="audio-label" style={{color:active?col:'var(--dim)'}}>
-          {active?(AUDIO_ICONS[audio.label]||'🔊')+' '+(audio.label):'🔇 quiet'}
-        </span>
-        {active&&<span className="chip">{Math.round((audio.confidence||0)*100)}%</span>}
-        {micOn&&!active&&<span className="chip" style={{color:'var(--ok)'}}>listening…</span>}
-      </div>
-      <canvas ref={canvasRef} width="300" height="60"
-        style={{width:'100%',height:'60px',marginTop:8,borderRadius:4,display:'block',
-          border:'1px solid '+(active?col:'var(--line)'),background:'#050d14'}}/>
-      <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:'var(--dim)',marginTop:3}}>
-        <span>{micOn?'spectrogram · low freq ↓ high freq ↑':'enable mic for live spectrogram'}</span>
-        {active&&<span style={{color:col}}>peak detected</span>}
-      </div>
-      {!liveAudio&&<div style={{fontSize:10,color:'var(--dim)',marginTop:6}}>synthetic — per-seat audio config active</div>}
-    </div>
-  );
-}
-
-/* ─── VisionPanel ─── */
-function VisionPanel({visionDriver,visionObjects,liveVision,ws}){
-  const [camOn,setCamOn]=useState(false);
-  const [open,setOpen]=useState(false);
-  const videoRef=useRef(null);
-  const timerRef=useRef(null);
-
-  const startCam=async()=>{
-    try{
-      const stream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
-      videoRef.current.srcObject=stream;
-      await videoRef.current.play();
-      const canvas=document.createElement('canvas');
-      canvas.width=320;canvas.height=240;
-      const ctx2d=canvas.getContext('2d');
-      timerRef.current=setInterval(function(){
-        ctx2d.drawImage(videoRef.current,0,0,320,240);
-        const b64=canvas.toDataURL('image/jpeg',0.7).split(',')[1];
-        if(ws.current&&ws.current.readyState===1)
-          ws.current.send(JSON.stringify({cmd:'vision_frame',data:b64}));
-      },200);
-      setCamOn(true);
-    }catch(e){alert('Camera denied: '+e.message);}
-  };
-  const stopCam=()=>{
-    clearInterval(timerRef.current);
-    videoRef.current&&videoRef.current.srcObject&&
-      videoRef.current.srcObject.getTracks().forEach(function(t){t.stop();});
-    setCamOn(false);
-  };
-
-  const vd=visionDriver||{};
-  const dets=((visionObjects&&visionObjects.detections)||[]).slice(0,3);
-  const emoCol={calm:'var(--ok)',happy:'var(--ok)',stressed:'var(--warn)',tired:'var(--crit)'};
+  var aud=state.audio||{};
+  var audActive=aud.label&&aud.label!=='none';
+  var audCol=audActive?'#f6ad55':'#2a3a50';
 
   return (
-    <div className="card">
-      <h2 style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}}
-          onClick={function(){setOpen(function(o){return !o;});}}>
-        <span>Vision · Face + Objects</span>
-        <span style={{fontSize:10,color:'var(--dim)'}}>{open?'▲':'▼'}</span>
-      </h2>
-      {open&&<>
-        {liveVision&&<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-          <button onClick={camOn?stopCam:startCam}
-            style={{fontSize:10,padding:'3px 9px',
-              background:camOn?'rgba(255,77,79,.15)':'var(--panel2)',
-              color:camOn?'var(--crit)':'var(--dim)',borderColor:camOn?'var(--crit)':'var(--line)'}}>
-            {camOn?'⏹ cam live':'📷 use cam'}
-          </button>
-          {camOn&&<span style={{fontSize:9,color:'var(--dim)'}}>emotion: geometry heuristic only</span>}
-        </div>}
-        <video ref={videoRef} muted playsInline
-          style={{width:'100%',borderRadius:6,marginBottom:8,
-            display:camOn?'block':'none',
-            border:'1px solid var(--line)',background:'#000'}}/>
-        {vd.face_detected?(
-          <div className="vision-row">
-            <div><span className="lbl">emotion</span>
-              <b style={{color:emoCol[vd.emotion]||'var(--txt)'}}>{vd.emotion}</b></div>
-            <div><span className="lbl">EAR</span>
-              <b style={{color:vd.drowsy?'var(--crit)':'var(--txt)'}}>{vd.ear}</b></div>
-            <div><span className="lbl">drowsy</span>
-              <b style={{color:vd.drowsy?'var(--crit)':'var(--ok)'}}>{vd.drowsy?'yes':'no'}</b></div>
+    <div className="drv">
+      {/* ── Col 1: Video + Vehicle ── */}
+      <div className="drv-col">
+        <div className="dp" style={{flex:'0 0 56%'}}>
+          <div className="dp-hdr">
+            <span className="dp-ttl">Video In-Cabin</span>
+            {state.vision_driver&&state.vision_driver.face_detected&&(
+              <span style={{fontSize:9,color:state.vision_driver.drowsy?'#fc8181':'#00d4b0'}}>
+                {state.vision_driver.emotion}{state.vision_driver.drowsy?' ⚠ drowsy':''}
+              </span>
+            )}
           </div>
-        ):<div style={{color:'var(--dim)',fontSize:12}}>{camOn?'scanning for face…':'no face detected'}</div>}
-        {dets.length>0&&<div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:5}}>
-          {dets.map(function(d,i){return <span key={i} className="chip">{d.label} {Math.round(d.confidence*100)}%</span>;})}
-        </div>}
-        {!liveVision&&<div style={{fontSize:10,color:'var(--dim)',marginTop:6}}>synthetic — mediapipe off</div>}
-      </>}
-    </div>
-  );
-}
-
-/* ─── MitigationPanel ─── */
-function MitigationPanel({mitigations,send}){
-  const visible=(mitigations||[]).filter(function(m){return m.status!=='dismissed';});
-  return (
-    <div className="card">
-      <h2>Adaptive Mitigations · confirm-first</h2>
-      <div className="mit-scroll">
-        {visible.length===0&&<div className="empty-mit">Cabin nominal — no action needed.</div>}
-        {visible.map(function(m){
-          return <div key={m.id} className={'mit '+m.severity}>
-            <div className="mit-top">
-              <span className="mit-title">{m.title}</span>
-              <span className={'st '+m.status}>{m.status}</span>
-            </div>
-            <div className="mit-uc">{m.usecase}</div>
-            <div className="mit-detail">{m.detail}</div>
-            {m.confirm&&m.status==='proposed'&&(
-              <div className="mit-acts">
-                <button className="primary" onClick={function(){send({cmd:'confirm',id:m.id});}}>Apply</button>
-                <button className="ghost" onClick={function(){send({cmd:'dismiss',id:m.id});}}>Dismiss</button>
-              </div>
-            )}
-            {m.confirm&&m.status==='active'&&(
-              <div className="mit-acts">
-                <span style={{color:'var(--ok)',fontSize:11,fontWeight:600}}>✓ Applied</span>
-                <button className="ghost" onClick={function(){send({cmd:'dismiss',id:m.id});}}>Dismiss</button>
-              </div>
-            )}
-          </div>;
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ─── VibrationMini (in left col) ─── */
-function VibrationMini({vib}){
-  const quality=(vib&&vib.road_quality)||'smooth';
-  const rms=(vib&&vib.rms_z)||0;
-  const ahead=vib&&vib.pothole_ahead_m;
-  const qCol={smooth:'var(--ok)',rough:'var(--warn)',pothole:'var(--crit)'};
-  const pct=Math.min(100,(rms/0.9)*100);
-  return (
-    <div className="card">
-      <h2>IMU · Road Quality</h2>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-        <span style={{fontWeight:700,fontSize:16,color:qCol[quality]||'var(--txt)'}}>{quality}</span>
-        <div style={{flex:1}}>
-          <div className="bar"><span style={{width:pct+'%',background:qCol[quality]}}/></div>
+          <div className="dp-body" style={{display:'flex'}}>
+            <VideoSection ws={ws} liveVision={liveVision}/>
+          </div>
         </div>
-        <span style={{fontSize:12,color:'var(--dim)',minWidth:40,textAlign:'right'}}>
-          {ahead!=null?Math.round(ahead)+'m':'—'}
-        </span>
+        <div className="dp" style={{flex:1}}>
+          <div className="dp-hdr">
+            <span className="dp-ttl">Vehicle Feed</span>
+          </div>
+          <div className="dp-body" style={{overflowY:'auto'}}>
+            <VehicleFeedPanel
+              speed={state.world_speed_kmh}
+              visibility={state.world_visibility}
+              potholeAhead={state.world_pothole_ahead_m}
+              send={send}/>
+          </div>
+        </div>
       </div>
-      {ahead!=null&&ahead<80&&<div style={{fontSize:11,color:'var(--warn)'}}>
-        ⚠ Rough road ~{Math.round(ahead)} m ahead
-      </div>}
+
+      {/* ── Col 2: Audio + Road Quality + Scenarios ── */}
+      <div className="drv-col">
+        <div className="dp" style={{flex:'0 0 52%'}}>
+          <div className="dp-hdr">
+            <span className="dp-ttl">Audio Input</span>
+            {liveAudio&&(
+              <button onClick={micOn?stopMic:startMic}
+                style={{fontSize:9,padding:'2px 8px',borderRadius:4,
+                  background:micOn?'rgba(252,129,129,.1)':'rgba(0,212,176,.08)',
+                  border:'1px solid '+(micOn?'#fc8181':'#00d4b0'),
+                  color:micOn?'#fc8181':'#00d4b0'}}>
+                {micOn?'⏹ Stop':'🎤 Start Microphone'}
+              </button>
+            )}
+          </div>
+          <div className="noise-row">
+            <span className="noise-db" style={{color:noiseDb>75?'#fc8181':noiseDb>55?'#f6ad55':'#00d4b0'}}>
+              {noiseDb} dB
+            </span>
+            <div className="noise-bar-wrap">
+              <div className="noise-bar"
+                style={{width:Math.min(100,((noiseDb-30)/80)*100)+'%',
+                  background:noiseDb>75?'#fc8181':noiseDb>55?'#f6ad55':'#00d4b0'}}/>
+            </div>
+            <span className={'vad '+(vad?'on':'off')}>{vad?'● Voice':'○ Quiet'}</span>
+          </div>
+          <div className="dp-body audio-wrap">
+            <AudioBarsCanvas analyserRef={analyserRef} audioActive={audActive}
+              onStats={function(s){setNoiseDb(s.db);setVad(s.vad);}}/>
+          </div>
+          {audActive&&<div style={{fontSize:10,color:'#f6ad55',marginTop:5,flexShrink:0}}>
+            {AICONS[aud.label]||''} {aud.label} detected · {Math.round((aud.confidence||0)*100)}% conf
+          </div>}
+          {!liveAudio&&<div style={{fontSize:9,color:'#1c2740',marginTop:4,flexShrink:0}}>
+            synthetic · per-seat config active
+          </div>}
+        </div>
+
+        <div className="dp" style={{flex:'0 0 28%'}}>
+          <div className="dp-hdr">
+            <span className="dp-ttl">IMU / Road Quality</span>
+            {state.vib_override&&<span style={{fontSize:9,color:'#f6ad55'}}>override</span>}
+          </div>
+          <div className="dp-body" style={{display:'flex',flexDirection:'column',gap:6}}>
+            <RoadQualityChart vib={state.vibration}/>
+            <div style={{flexShrink:0}}>
+              <div style={{fontSize:9,color:'#2a3a50',marginBottom:4,textTransform:'uppercase',letterSpacing:'.8px'}}>Driving Condition</div>
+              <div className="imu-btns">
+                {imuPresets.map(function(p){
+                  var isOn=state.vib_override&&state.vib_road_quality===p.q&&
+                    Math.abs((state.vib_rms||0)-p.rms)<0.1;
+                  return <button key={p.id} className={'imu-btn'+(isOn?' on':'')}
+                    onClick={function(){send({cmd:'configure_vibration',override:true,road_quality:p.q,rms:p.rms});}}>
+                    {p.label}
+                  </button>;
+                })}
+                <button className={'imu-btn'+((!state.vib_override)?' on':'')}
+                  onClick={function(){send({cmd:'configure_vibration',override:false});}}>
+                  CSV Replay
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="dp" style={{flex:1}}>
+          <div className="dp-hdr">
+            <span className="dp-ttl">Scenarios</span>
+          </div>
+          <div className="dp-body" style={{overflowY:'auto'}}>
+            <ScenarioBar list={scenarios} current={state.scenario}
+              demoRunning={state.demo_running} send={send}/>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Col 3: Seat Status + Cabin Map ── */}
+      <div className="drv-col">
+        <div className="dp" style={{flex:'0 0 52%'}}>
+          <div className="dp-hdr">
+            <span className="dp-ttl">Seat Configuration &amp; Status</span>
+            <span className="dp-sub">click to edit</span>
+          </div>
+          <div className="dp-body" style={{overflowY:'auto'}}>
+            <SeatStatusTable
+              seatConfigs={state.seat_configs}
+              radarSeats={state.radar}
+              onSelect={onSelectSeat}/>
+          </div>
+        </div>
+        <div className="dp" style={{flex:1}}>
+          <div className="dp-hdr">
+            <span className="dp-ttl">Cabin Occupancy</span>
+          </div>
+          <div className="dp-body">
+            <CabinMapMini seatConfigs={state.seat_configs} onSelect={onSelectSeat}/>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-/* ─── App ─── */
+/* ── InfotainmentView ── */
+function InfotainmentView({state,send}){
+  var load=state.cognitive_load||0;
+  var col=loadCol(load);
+  var top=(state.factors||[])[0]||null;
+  return (
+    <div className="iv">
+      {/* Top: full-width vehicle cabin visualization */}
+      <div className="iv-top">
+        <div style={{textAlign:'center'}}>
+          <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'1.5px',color:'#2a3a50',marginBottom:10}}>
+            Vehicle Cabin Status
+          </div>
+          <CarSVG seatConfigs={state.seat_configs}/>
+          <div style={{fontSize:10,color:'#2a3a50',marginTop:8}}>
+            {top
+              ? (top.charAt(0).toUpperCase()+top.slice(1))
+              : 'All occupants nominal'}
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:160}}>
+          {SEAT_IDS.map(function(sid){
+            var c=(state.seat_configs&&state.seat_configs[sid])||{};
+            if(!c.occupied)return null;
+            var d=c.distress||0;
+            var sc=d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
+            return (
+              <div key={sid} style={{display:'flex',alignItems:'center',gap:8,fontSize:10}}>
+                <span style={{color:sc}}>{ICONS[c.kind]||'👤'}</span>
+                <span style={{color:'#4a6580',width:70}}>{SEAT_LABELS[sid]}</span>
+                <span style={{color:sc,fontWeight:600}}>{c.audio_event&&c.audio_event!=='none'?c.audio_event:c.emotion||'calm'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Bottom: Issue | Load Score | Recommendation */}
+      <div className="iv-bottom">
+        <div className="iv-col iv-l">
+          <IssuePanel state={state}/>
+        </div>
+        <div className="iv-col iv-c">
+          <CircularGauge value={load}/>
+        </div>
+        <div className="iv-col iv-r">
+          <RecommendationPanel mitigations={state.mitigations} send={send}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── App ── */
 function App(){
-  const INIT = {
+  const INIT={
     cognitive_load:0,factors:[],radar:{},audio:{},vehicle:{},mitigations:[],
     scenario:'idle',demo_running:false,latency_ms:0,
     seat_configs:{
@@ -950,7 +1028,8 @@ function App(){
   const [scenarios,setScenarios]=useState([]);
   const [liveAudio,setLiveAudio]=useState(false);
   const [liveVision,setLiveVision]=useState(false);
-  const [selectedSeat,setSelectedSeat]=useState(null);
+  const [tab,setTab]=useState('replay');
+  const [selSeat,setSelSeat]=useState(null);
   const ws=useRef(null);
 
   useEffect(function(){
@@ -958,8 +1037,7 @@ function App(){
       .then(function(d){setScenarios(d.scenarios||[]);}).catch(function(){});
     fetch('/api/caps').then(function(r){return r.json();})
       .then(function(d){setLiveAudio(d.live_audio);setLiveVision(d.live_vision);}).catch(function(){});
-
-    var proto = location.protocol==='https:'?'wss:':'ws:';
+    var proto=location.protocol==='https:'?'wss:':'ws:';
     var sock=new WebSocket(proto+'//'+location.host+'/ws');
     ws.current=sock;
     sock.onopen=function(){setConn(true);};
@@ -969,73 +1047,59 @@ function App(){
   },[]);
 
   const send=useCallback(function(msg){
-    if(ws.current&&ws.current.readyState===1)
-      ws.current.send(JSON.stringify(msg));
+    if(ws.current&&ws.current.readyState===1)ws.current.send(JSON.stringify(msg));
   },[]);
 
+  var tabNames={replay:'Data Replay View',info:'Infotainment View'};
+
   return (
-    <div className="app">
-      <header>
-        <h1><span className="tag">Cabin</span>Sense</h1>
-        <span className="sub">In-Cabin Disturbance Intelligence</span>
+    <div className="hmi">
+      <div className="hmi-hdr">
+        <div>
+          <div className="logo"><span>Cabin</span>Sense</div>
+          <div className="tagline">In-Cabin Intelligence</div>
+        </div>
+        <div className="sp"/>
+        <span className="view-lbl">{tabNames[tab]}</span>
+        <div className="sp"/>
+        <Clock/>
         <div className={'conn-dot'+(conn?' on':'')}/>
-        <span className="conn-label">{conn?'live':'offline'}</span>
-        <span className="latency">{state.latency_ms} ms</span>
-      </header>
-
-      <DemoBar scenario={state.scenario} demoRunning={state.demo_running}/>
-
-      <div className="main">
-        {/* ── Left monitoring column ── */}
-        <div className="left-col">
-          <CognitiveLoad value={state.cognitive_load} factors={state.factors}/>
-          <AcousticPanel audio={state.audio} liveAudio={liveAudio} ws={ws}/>
-          <VibrationMini vib={state.vibration}/>
-          <VisionPanel visionDriver={state.vision_driver} visionObjects={state.vision_objects}
-            liveVision={liveVision} ws={ws}/>
-          <MitigationPanel mitigations={state.mitigations} send={send}/>
-        </div>
-
-        {/* ── Right interactive column ── */}
-        <div className="right-col">
-          {/* Car interior */}
-          <CabinView
-            seatConfigs={state.seat_configs}
-            radarSeats={state.radar}
-            selectedSeat={selectedSeat}
-            onSelectSeat={setSelectedSeat}
-            scenario={state.scenario}
-            speed={state.world_speed_kmh}
-            visibility={state.world_visibility}
-            potholeAhead={state.world_pothole_ahead_m}
-          />
-
-          {/* Seat config panel (conditional) */}
-          {selectedSeat && (
-            <SeatConfigPanel
-              seatId={selectedSeat}
-              config={state.seat_configs&&state.seat_configs[selectedSeat]}
-              send={send}
-              onClose={function(){setSelectedSeat(null);}}
-            />
-          )}
-
-          {/* Controls row */}
-          <div className="controls-row">
-            <VehicleControls
-              speed={state.world_speed_kmh}
-              visibility={state.world_visibility}
-              potholeAhead={state.world_pothole_ahead_m}
-              send={send}/>
-            <VibrationControls
-              override={state.vib_override}
-              roadQuality={state.vib_road_quality}
-              rms={state.vib_rms}
-              send={send}/>
-            <ScenarioPanel list={scenarios} current={state.scenario} send={send}/>
-          </div>
-        </div>
+        <span className="lat">{state.latency_ms}ms</span>
       </div>
+
+      <div className="hmi-content">
+        {tab==='replay'&&(
+          <div className="hmi-view">
+            <DataReplayView state={state} send={send} ws={ws}
+              liveAudio={liveAudio} liveVision={liveVision}
+              onSelectSeat={setSelSeat} scenarios={scenarios}/>
+          </div>
+        )}
+        {tab==='info'&&(
+          <div className="hmi-view">
+            <InfotainmentView state={state} send={send}/>
+          </div>
+        )}
+      </div>
+
+      <div className="hmi-tabs">
+        <button className={'hmi-tab'+(tab==='replay'?' on':'')}
+          onClick={function(){setTab('replay');}}>
+          📊 Data Replay View
+        </button>
+        <button className={'hmi-tab'+(tab==='info'?' on':'')}
+          onClick={function(){setTab('info');}}>
+          🚗 Infotainment View
+        </button>
+      </div>
+
+      {selSeat&&(
+        <SeatConfigPanel
+          seatId={selSeat}
+          config={state.seat_configs&&state.seat_configs[selSeat]}
+          send={send}
+          onClose={function(){setSelSeat(null);}}/>
+      )}
     </div>
   );
 }
