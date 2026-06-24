@@ -55,7 +55,8 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 
 /* ─── Panels ─── */
 .panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;
-  padding:11px 13px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  padding:11px 13px;display:flex;flex-direction:column;overflow:auto;resize:both;
+  min-height:80px;min-width:120px}
 .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0}
 .pt{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
 .ps{font-size:11px;color:rgba(255,255,255,.7)}
@@ -98,7 +99,7 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:15px;height:15px}
   font-family:inherit;cursor:pointer;transition:all .2s}
 .mic-start{background:rgba(0,212,176,.1);border:1px solid #00d4b0;color:#00d4b0}
 .mic-stop{background:rgba(252,129,129,.1);border:1px solid #fc8181;color:#fc8181}
-.canvas-wrap{border-radius:4px;overflow:hidden;background:rgba(0,0,0,.5);flex-shrink:0;
+.canvas-wrap{border-radius:4px;overflow:hidden;background:rgba(0,0,0,.5);
   border:1px solid rgba(255,255,255,.05)}
 .det-badge{font-size:12px;padding:4px 10px;border-radius:10px;background:rgba(246,173,85,.12);
   border:1px solid rgba(246,173,85,.3);color:#f6ad55;flex-shrink:0;align-self:flex-start}
@@ -317,8 +318,10 @@ function WaveformCanvas({analyserRef}){
   const cvRef=useRef(null);
   useEffect(function(){
     var cv=cvRef.current;if(!cv)return;
-    var ctx=cv.getContext('2d');var W=cv.width,H=cv.height,id;
+    var ctx=cv.getContext('2d');var id;
     var draw=function(){
+      var W=cv.clientWidth||340;var H=cv.clientHeight||44;
+      if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
       ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
       var buf=new Uint8Array(analyserRef.current?analyserRef.current.fftSize:256);
       if(analyserRef.current)analyserRef.current.getByteTimeDomainData(buf);
@@ -333,7 +336,7 @@ function WaveformCanvas({analyserRef}){
     };
     draw();return function(){cancelAnimationFrame(id);};
   },[]);
-  return <canvas ref={cvRef} width="340" height="44" style={{width:'100%',height:'44px',display:'block'}}/>;
+  return <canvas ref={cvRef} style={{width:'100%',height:'100%',display:'block'}}/>;
 }
 
 /* ── SpectrogramCanvas: scrolling waterfall ── */
@@ -341,8 +344,13 @@ function SpectrogramCanvas({analyserRef}){
   const cvRef=useRef(null);
   useEffect(function(){
     var cv=cvRef.current;if(!cv)return;
-    var ctx=cv.getContext('2d');var W=cv.width,H=cv.height,id;
+    var ctx=cv.getContext('2d');var id;
     var draw=function(){
+      var W=cv.clientWidth||340;var H=cv.clientHeight||80;
+      if(cv.width!==W||cv.height!==H){
+        cv.width=W;cv.height=H;
+        ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
+      }
       var img=ctx.getImageData(1,0,W-1,H);ctx.putImageData(img,0,0);
       var data=new Uint8Array(128);
       if(analyserRef.current)analyserRef.current.getByteFrequencyData(data);
@@ -357,10 +365,9 @@ function SpectrogramCanvas({analyserRef}){
       }
       id=requestAnimationFrame(draw);
     };
-    ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
     draw();return function(){cancelAnimationFrame(id);};
   },[]);
-  return <canvas ref={cvRef} width="340" height="50" style={{width:'100%',height:'50px',display:'block'}}/>;
+  return <canvas ref={cvRef} style={{width:'100%',height:'100%',display:'block'}}/>;
 }
 
 /* ── AudioWidget ── */
@@ -443,12 +450,12 @@ function AudioWidget({ws,liveAudio,audio}){
           fontVariantNumeric:'tabular-nums',lineHeight:1}}>{db}</span>
         <span style={{fontSize:10,color:'rgba(255,255,255,.8)',alignSelf:'flex-end',marginBottom:2}}>dB</span>
       </div>
-      {/* Waveform */}
-      <div className="canvas-wrap" style={{marginBottom:4}}>
+      {/* Waveform — 25% of remaining space */}
+      <div className="canvas-wrap" style={{flex:1,minHeight:0,marginBottom:4}}>
         <WaveformCanvas analyserRef={analyserRef}/>
       </div>
-      {/* Spectrogram */}
-      <div className="canvas-wrap" style={{flex:1,minHeight:0}}>
+      {/* Spectrogram — 75% of remaining space */}
+      <div className="canvas-wrap" style={{flex:3,minHeight:0}}>
         <SpectrogramCanvas analyserRef={analyserRef}/>
       </div>
       {audActive&&(
