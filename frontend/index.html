@@ -150,37 +150,37 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .iv-col{flex:1;display:flex;flex-direction:column;justify-content:center;
   padding:18px 16px;overflow:hidden;border-right:1px solid #1c2740}
 .iv-col:last-child{border-right:none}
-.iv-cabin{background:#090d12;align-items:center}
+.iv-cabin{background:#090d12;align-items:center;justify-content:flex-start;padding-top:16px}
 .iv-issue{background:#0c1520}
 .iv-gauge{background:#090d12;align-items:center}
 .iv-rec{background:#0c1520}
 
 /* infotainment text — white */
-.iss-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1.2px;color:rgba(255,255,255,.35);margin-bottom:5px}
+.iss-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:5px}
 .iss-name{font-size:16px;font-weight:700;color:#ffffff;line-height:1.25;margin-bottom:10px}
 .iss-conf{font-size:36px;font-weight:700;line-height:1;margin-bottom:2px}
-.iss-clbl{font-size:8px;color:rgba(255,255,255,.35);margin-bottom:12px}
+.iss-clbl{font-size:8px;color:rgba(255,255,255,.55);margin-bottom:12px}
 .iss-meta{display:flex;flex-direction:column;gap:0}
-.iss-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:10px}
+.iss-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:10px}
 .iss-row:last-child{border-bottom:none}
-.iss-k{color:rgba(255,255,255,.4)}
+.iss-k{color:rgba(255,255,255,.55)}
 .iss-v{color:#ffffff;font-weight:600;font-variant-numeric:tabular-nums}
 
 /* gauge */
 .gauge-sec{text-align:center;width:100%}
-.gauge-ttl{font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.35);margin-bottom:10px}
-.gauge-lbl{font-size:13px;font-weight:700;margin-top:8px}
+.gauge-ttl{font-size:8px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:10px}
+.gauge-lbl{font-size:13px;font-weight:700;margin-top:8px;color:#ffffff}
 
 /* rec panel */
-.rec-ttl{font-size:8px;text-transform:uppercase;letter-spacing:1.2px;color:rgba(255,255,255,.35);margin-bottom:12px}
+.rec-ttl{font-size:8px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:12px}
 .rec-list{display:flex;flex-direction:column;gap:9px;margin-bottom:14px}
 .rec-item{display:flex;gap:8px;align-items:flex-start}
 .rec-num{width:18px;height:18px;border-radius:50%;background:rgba(0,212,176,.1);
   border:1px solid rgba(0,212,176,.3);display:flex;align-items:center;justify-content:center;
   font-size:9px;font-weight:700;color:#00d4b0;flex-shrink:0;margin-top:1px}
 .rec-text{font-size:11px;color:#ffffff;line-height:1.35}
-.rec-detail{font-size:8px;color:rgba(255,255,255,.35);margin-top:1px}
-.rec-empty{font-size:11px;color:rgba(255,255,255,.3);padding:4px 0}
+.rec-detail{font-size:8px;color:rgba(255,255,255,.5);margin-top:1px}
+.rec-empty{font-size:11px;color:rgba(255,255,255,.45);padding:4px 0}
 .apply-btn{display:block;width:100%;padding:9px;border-radius:7px;font-size:12px;font-weight:700;
   background:rgba(0,212,176,.14);border:1px solid #00d4b0;color:#00d4b0;
   cursor:pointer;transition:all .2s;font-family:inherit;text-align:center}
@@ -964,7 +964,7 @@ function CabinSVG({seatConfigs,factors}){
     {id:'rear_right',       x:118, y:116, label:'Rear R'}
   ];
   return (
-    <svg width="140" height="185" viewBox="0 0 160 220" style={{maxWidth:'100%',maxHeight:'24vh'}}>
+    <svg viewBox="0 0 160 220" style={{width:'82%',height:'auto',display:'block',margin:'0 auto',flexShrink:0}}>
       {/* Car body */}
       <rect x="10" y="12" width="140" height="196" rx="22" fill="#0d1520" stroke="#1c2740" strokeWidth="1.5"/>
       {/* Windshield */}
@@ -1139,7 +1139,7 @@ function InfotainmentView({state,send}){
       {/* Col 1: Vehicle Seat View */}
       <div className="iv-col iv-cabin">
         <div style={{fontSize:7,textTransform:'uppercase',letterSpacing:'1.5px',
-          color:'rgba(255,255,255,.3)',marginBottom:8,textAlign:'center'}}>Vehicle Cabin</div>
+          color:'#ffffff',fontWeight:600,marginBottom:8,textAlign:'center'}}>Vehicle Cabin</div>
         <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
         {/* Occupant status list below SVG */}
         <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:4,width:'100%'}}>
@@ -1154,7 +1154,7 @@ function InfotainmentView({state,send}){
                 border:'1px solid rgba(255,255,255,.07)'}}>
                 <span style={{color:col,fontSize:12}}>{ICONS[c.kind]||'👤'}</span>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:8,color:'rgba(255,255,255,.4)',textTransform:'uppercase'}}>{SEAT_LABELS[sid]}</div>
+                  <div style={{fontSize:8,color:'rgba(255,255,255,.7)',textTransform:'uppercase'}}>{SEAT_LABELS[sid]}</div>
                   <div style={{fontSize:9,color:col,fontWeight:600}}>
                     {c.audio_event&&c.audio_event!=='none'
                       ?(AICONS[c.audio_event]+' '+c.audio_event)
@@ -1169,7 +1169,7 @@ function InfotainmentView({state,send}){
           }).filter(Boolean)}
           {SEAT_IDS.every(function(sid){
             var c=(state.seat_configs&&state.seat_configs[sid])||{};return !c.occupied;
-          })&&<div style={{fontSize:10,color:'rgba(255,255,255,.25)',textAlign:'center'}}>No occupants</div>}
+          })&&<div style={{fontSize:10,color:'rgba(255,255,255,.5)',textAlign:'center'}}>No occupants</div>}
         </div>
       </div>
       {/* Col 2: Issue / Distract */}
