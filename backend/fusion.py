@@ -49,7 +49,7 @@ def _effective_audio() -> tuple[str, float]:
     sensor = _latest["audio"]
     s_label = sensor.get("label", "none")
     s_conf = sensor.get("confidence", 0.0)
-    if s_label not in ("none", "", None) and s_conf > 0.4:
+    if s_label not in ("none", "", None) and s_conf > 0.25:
         return s_label, s_conf
     # Fallback: audio state derived from per-seat config (set by _sync_audio_from_seats)
     if world.audio_label not in ("none", "", None):
@@ -82,13 +82,13 @@ def _cognitive_load() -> tuple[int, list[str]]:
 
     # ── Audio anomaly (sensor or seat-config fallback) ───────────────────
     audio_label, audio_conf = _effective_audio()
-    if audio_label in ("crying", "barking", "animal") and audio_conf > 0.4:
+    if audio_label in ("crying", "barking", "animal") and audio_conf > 0.25:
         score += 25; factors.append(audio_label + " in cabin")
-    elif audio_label == "shouting" and audio_conf > 0.4:
+    elif audio_label == "shouting" and audio_conf > 0.25:
         score += 20; factors.append("shouting in cabin")
-    elif audio_label == "rattle" and audio_conf > 0.4:
+    elif audio_label == "rattle" and audio_conf > 0.25:
         score += 10; factors.append("rattling object")
-    elif audio_label == "talking" and audio_conf > 0.4:
+    elif audio_label == "talking" and audio_conf > 0.25:
         score += 5; factors.append("speech activity")
 
     # ── Vehicle context ──────────────────────────────────────────────────
@@ -141,7 +141,7 @@ def _proposed() -> list[dict]:
     rear_child_or_pet = any(
         s.get("occupant") in ("child", "pet") and s.get("occupied")
         for s in _latest["radar"].get("seats", []))
-    if audio_label in ("crying", "animal", "barking") and audio_conf > 0.4 \
+    if audio_label in ("crying", "animal", "barking") and audio_conf > 0.25 \
             and rear_child_or_pet:
         who = "child" if audio_label == "crying" else "pet"
         out.append(dict(
@@ -152,7 +152,7 @@ def _proposed() -> list[dict]:
             severity="advisory", confirm=True))
 
     # --- Shouting / passenger distress ---
-    if audio_label == "shouting" and audio_conf > 0.4:
+    if audio_label == "shouting" and audio_conf > 0.25:
         out.append(dict(
             id="shouting_alert", title="Passenger distress",
             usecase="Audio comfort",
@@ -244,19 +244,39 @@ def _proposed() -> list[dict]:
     return out
 
 
+_GRACE = 6.0  # seconds to keep confirmed/dismissed mitigations after condition clears
+
+
 def _reconcile(proposed: list[dict]) -> list[dict]:
-    """Merge proposed list with existing confirmation state."""
+    """Merge proposed list with existing confirmation state.
+
+    Confirmed/dismissed mitigations are kept for _GRACE seconds after their
+    trigger condition clears, so a momentary radar flicker doesn't reset a
+    user's explicit Apply/Dismiss choice.
+    """
+    now = time.time()
     seen = set()
     for m in proposed:
         seen.add(m["id"])
-        if m["id"] in _mitigations:
-            m["status"] = _mitigations[m["id"]]["status"]
+        prev = _mitigations.get(m["id"])
+        if prev:
+            m["status"] = prev["status"]
         else:
             m["status"] = "active" if not m["confirm"] else "proposed"
-        _mitigations[m["id"]] = m
-    for stale in [k for k in _mitigations if k not in seen]:
-        del _mitigations[stale]
-    return list(_mitigations.values())
+        _mitigations[m["id"]] = dict(m, _ts=now)
+
+    to_del = []
+    for k, m in _mitigations.items():
+        if k not in seen:
+            age = now - m.get("_ts", now)
+            if m.get("status") in ("active", "dismissed") and age < _GRACE:
+                continue  # grace period: keep user's choice visible
+            to_del.append(k)
+    for k in to_del:
+        del _mitigations[k]
+
+    return [{kk: vv for kk, vv in m.items() if kk != "_ts"}
+            for m in _mitigations.values()]
 
 
 def confirm(mitigation_id: str) -> None:

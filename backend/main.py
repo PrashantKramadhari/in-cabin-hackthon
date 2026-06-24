@@ -139,7 +139,8 @@ def _sync_audio_from_seats() -> None:
         if pri > best_pri:
             best_pri = pri
             best_label = occ.audio_event
-            best_conf = round(min(1.0, 0.80 + occ.distress * 0.15), 2)
+            # Minimum 0.70 so configured events always clear fusion threshold
+            best_conf = round(min(1.0, max(0.70, 0.80 + occ.distress * 0.15)), 2)
     scenarios.world.audio_label = best_label
     scenarios.world.audio_conf = best_conf
 

@@ -41,7 +41,7 @@ _LABEL_MAP = {
     468: "rattle",
     0:  "speech",
 }
-_THRESHOLD = 0.25
+_THRESHOLD = 0.15
 _MODEL_ID = "MIT/ast-finetuned-audioset-10-10-0.4593"
 
 chunk_queue: asyncio.Queue[list[float]] = asyncio.Queue(maxsize=8)
