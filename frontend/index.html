@@ -142,14 +142,14 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
   padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit}
 
 /* ─── Infotainment View ─── */
-.iv{display:flex;flex-direction:column;height:100%;overflow:hidden}
-.iv-top{flex:0 0 42%;background:#090d12;border-bottom:1px solid #1c2740;
-  display:flex;align-items:center;justify-content:center;gap:32px;padding:12px 20px;overflow:hidden}
-.iv-bottom{flex:1;display:flex;overflow:hidden}
-.iv-col{display:flex;flex-direction:column;justify-content:center;padding:24px 22px;overflow:hidden}
-.iv-issue{flex:0 0 30%;background:#0d1520;border-right:1px solid #1c2740}
-.iv-gauge{flex:0 0 34%;background:#090d12;border-right:1px solid #1c2740;align-items:center}
-.iv-rec{flex:1;background:#0d1520}
+.iv{display:flex;flex-direction:row;height:100%;overflow:hidden}
+.iv-col{flex:1;display:flex;flex-direction:column;justify-content:center;
+  padding:28px 24px;overflow:hidden;border-right:1px solid #1c2740}
+.iv-col:last-child{border-right:none}
+.iv-cabin{background:#090d12;align-items:center}
+.iv-issue{background:#0d1520}
+.iv-gauge{background:#090d12;align-items:center}
+.iv-rec{background:#0d1520}
 
 /* infotainment issue panel */
 .iss-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#2a3a50;margin-bottom:6px}
@@ -959,29 +959,34 @@ function CabinSVG({seatConfigs,factors}){
     {id:'rear_right',       x:118, y:116, label:'Rear R'}
   ];
   return (
-    <svg width="175" height="175" viewBox="0 0 160 175">
+    <svg width="220" height="290" viewBox="0 0 160 220" style={{maxWidth:'100%',maxHeight:'42vh'}}>
       {/* Car body */}
-      <rect x="10" y="14" width="140" height="148" rx="20" fill="#0d1520" stroke="#1c2740" strokeWidth="1.5"/>
+      <rect x="10" y="12" width="140" height="196" rx="22" fill="#0d1520" stroke="#1c2740" strokeWidth="1.5"/>
       {/* Windshield */}
-      <rect x="20" y="16" width="120" height="36" rx="12" fill="#111f35" stroke="#1c2740" strokeWidth="1"/>
+      <rect x="20" y="14" width="120" height="42" rx="14" fill="#111f35" stroke="#1c2740" strokeWidth="1"/>
       {/* Rear window */}
-      <rect x="20" y="126" width="120" height="32" rx="8" fill="#111f35" stroke="#1c2740" strokeWidth="1"/>
+      <rect x="20" y="164" width="120" height="40" rx="10" fill="#111f35" stroke="#1c2740" strokeWidth="1"/>
       {/* Center console */}
-      <rect x="72" y="28" width="16" height="106" rx="5" fill="#0a111e" stroke="#1c2740" strokeWidth="1"/>
+      <rect x="72" y="30" width="16" height="140" rx="5" fill="#0a111e" stroke="#1c2740" strokeWidth="1"/>
       {/* Steering wheel */}
-      <circle cx="42" cy="75" r="12" fill="none" stroke="#1c2740" strokeWidth="1.5"/>
-      <line x1="31" y1="75" x2="53" y2="75" stroke="#1c2740" strokeWidth="1"/>
-      <line x1="42" y1="64" x2="42" y2="86" stroke="#1c2740" strokeWidth="1"/>
+      <circle cx="42" cy="95" r="13" fill="none" stroke="#1c2740" strokeWidth="1.5"/>
+      <line x1="30" y1="95" x2="54" y2="95" stroke="#1c2740" strokeWidth="1"/>
+      <line x1="42" y1="83" x2="42" y2="107" stroke="#1c2740" strokeWidth="1"/>
       {/* Seats */}
-      {seats.map(function(s){
+      {[
+        {id:'driver',          x:42,  y:62 },
+        {id:'front_passenger', x:118, y:62 },
+        {id:'rear_left',       x:42,  y:152},
+        {id:'rear_right',      x:118, y:152}
+      ].map(function(s){
         var c=(seatConfigs&&seatConfigs[s.id])||{};
         var d=c.distress||0;
         var fill=!c.occupied?'rgba(13,21,32,.5)':d>0.7?'rgba(252,129,129,.18)':d>0.35?'rgba(246,173,85,.18)':'rgba(0,212,176,.1)';
         var stroke=!c.occupied?'#1c2740':d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
         return (
           <g key={s.id}>
-            <circle cx={s.x} cy={s.y} r="26" fill={fill} stroke={stroke} strokeWidth="1.5"/>
-            <text x={s.x} y={s.y+4} textAnchor="middle" fill={stroke} fontSize="16" fontFamily="inherit">
+            <circle cx={s.x} cy={s.y} r="28" fill={fill} stroke={stroke} strokeWidth="2"/>
+            <text x={s.x} y={s.y+6} textAnchor="middle" fill={stroke} fontSize="18" fontFamily="inherit">
               {c.occupied?(ICONS[c.kind]||'👤'):''}
             </text>
           </g>
@@ -1041,22 +1046,24 @@ function IssuePanel({state}){
 
 /* ── CircularGauge ── */
 function CircularGauge({value}){
-  var R=70,CX=85,CY=85;
+  var R=95,CX=110,CY=110;
   var circ=Math.round(2*Math.PI*R);
   var filled=Math.round((value/100)*circ);
   var col=loadCol(value);
   return (
     <div className="gauge-sec">
-      <div className="gauge-ttl">Load Score</div>
-      <svg width="170" height="170" viewBox="0 0 170 170">
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#1a2535" strokeWidth="12"/>
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke={col} strokeWidth="12"
+      <div className="gauge-ttl">Cognitive Load Score</div>
+      <svg width="220" height="220" viewBox="0 0 220 220" style={{maxWidth:'100%',maxHeight:'40vh'}}>
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#1a2535" strokeWidth="14"/>
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke={col} strokeWidth="14"
           strokeDasharray={filled+' '+circ} strokeLinecap="round"
           transform={'rotate(-90 '+CX+' '+CY+')'}/>
-        <text x={CX} y={CY+10} textAnchor="middle" fill={col}
-          fontSize="44" fontWeight="700" fontFamily="inherit">{value}</text>
+        <text x={CX} y={CY+8} textAnchor="middle" fill={col}
+          fontSize="58" fontWeight="700" fontFamily="inherit">{value}</text>
+        <text x={CX} y={CY+34} textAnchor="middle" fill={col}
+          fontSize="13" fontFamily="inherit" opacity="0.7">/ 100</text>
       </svg>
-      <div className="gauge-lbl" style={{color:col}}>{loadLbl(value)}</div>
+      <div className="gauge-lbl" style={{color:col,fontSize:18}}>{loadLbl(value)}</div>
     </div>
   );
 }
@@ -1117,61 +1124,60 @@ function RecommendationPanel({mitigations,send}){
   );
 }
 
-/* ── InfotainmentView (Tab 2) ── */
+/* ── InfotainmentView (Tab 2) — 4 equal columns, single row ── */
 function InfotainmentView({state,send}){
   var load=state.cognitive_load||0;
   var factors=state.factors||[];
   var topFactor=factors[0]||null;
   return (
     <div className="iv">
-      {/* Top: cabin visualization */}
-      <div className="iv-top">
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
-          <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'1.5px',
-            color:'#2a3a50',marginBottom:8}}>Vehicle Cabin</div>
-          <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
-          <div style={{fontSize:11,color:load>25?loadCol(load):'#2a3a50',marginTop:8,fontWeight:load>25?600:400}}>
-            {topFactor?(ISSUE_MAP[topFactor]||topFactor):'All systems nominal'}
-          </div>
-        </div>
-        {/* Occupant status list */}
-        <div style={{display:'flex',flexDirection:'column',gap:7,minWidth:150}}>
+      {/* Col 1: Vehicle Seat View */}
+      <div className="iv-col iv-cabin">
+        <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:'1.5px',
+          color:'#2a3a50',marginBottom:12,textAlign:'center'}}>Vehicle Cabin</div>
+        <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
+        {/* Occupant status list below SVG */}
+        <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:8,width:'100%',maxWidth:200}}>
           {SEAT_IDS.map(function(sid){
             var c=(state.seat_configs&&state.seat_configs[sid])||{};
             if(!c.occupied)return null;
             var d=c.distress||0;
             var col=d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
             return (
-              <div key={sid} style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{color:col,fontSize:14}}>{ICONS[c.kind]||'👤'}</span>
-                <div>
-                  <div style={{fontSize:10,color:'#4a6580'}}>{SEAT_LABELS[sid]}</div>
-                  <div style={{fontSize:11,color:col,fontWeight:600}}>
+              <div key={sid} style={{display:'flex',alignItems:'center',gap:10,
+                background:'rgba(255,255,255,.03)',borderRadius:6,padding:'6px 10px',
+                border:'1px solid #1c2740'}}>
+                <span style={{color:col,fontSize:16}}>{ICONS[c.kind]||'👤'}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:9,color:'#4a6580',textTransform:'uppercase',letterSpacing:'.5px'}}>{SEAT_LABELS[sid]}</div>
+                  <div style={{fontSize:11,color:col,fontWeight:600,marginTop:1}}>
                     {c.audio_event&&c.audio_event!=='none'
                       ?(AICONS[c.audio_event]+' '+c.audio_event)
                       :(c.emotion||'calm')}
-                    {!c.buckled&&<span style={{color:'#fc8181',marginLeft:6}}>No belt</span>}
                   </div>
                 </div>
+                <span style={{fontSize:11,color:c.buckled?'#00d4b0':'#fc8181',fontWeight:700}}>
+                  {c.buckled?'✓':'✗'}
+                </span>
               </div>
             );
           }).filter(Boolean)}
           {SEAT_IDS.every(function(sid){
             var c=(state.seat_configs&&state.seat_configs[sid])||{};return !c.occupied;
-          })&&<div style={{fontSize:11,color:'#2a3a50'}}>No occupants configured</div>}
+          })&&<div style={{fontSize:11,color:'#2a3a50',textAlign:'center'}}>No occupants</div>}
         </div>
       </div>
-      {/* Bottom: Issue | Load Score | Recommendation */}
-      <div className="iv-bottom">
-        <div className="iv-col iv-issue">
-          <IssuePanel state={state}/>
-        </div>
-        <div className="iv-col iv-gauge">
-          <CircularGauge value={load}/>
-        </div>
-        <div className="iv-col iv-rec">
-          <RecommendationPanel mitigations={state.mitigations} send={send}/>
-        </div>
+      {/* Col 2: Issue / Distract */}
+      <div className="iv-col iv-issue">
+        <IssuePanel state={state}/>
+      </div>
+      {/* Col 3: Load Score */}
+      <div className="iv-col iv-gauge">
+        <CircularGauge value={load}/>
+      </div>
+      {/* Col 4: Recommendation */}
+      <div className="iv-col iv-rec">
+        <RecommendationPanel mitigations={state.mitigations} send={send}/>
       </div>
     </div>
   );
