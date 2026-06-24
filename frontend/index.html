@@ -43,7 +43,7 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
   text-transform:uppercase;margin-top:3px}
 
 /* ─── Sensor View Grid ─── */
-.sv{display:grid;grid-template-columns:repeat(3,1fr);
+.sv{display:grid;grid-template-columns:1fr 1fr 1.3fr;
   grid-template-rows:1fr 1fr 72px;gap:8px;padding:8px;
   width:81vw;height:81vh;min-width:900px;min-height:480px;
   border-radius:14px;overflow:auto;resize:both;
@@ -55,7 +55,7 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 
 /* ─── Panels ─── */
 .panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;
-  padding:11px 13px;display:flex;flex-direction:column;overflow:auto;resize:both;
+  padding:11px 13px;display:flex;flex-direction:column;overflow:auto;
   min-height:80px;min-width:120px}
 .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0}
 .pt{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
@@ -280,7 +280,15 @@ var ISSUE_MAP={
   'agitated child':'Passenger Disturbance',
   'agitated pet':'Pet Disturbance',
   'baby babbling in cabin':'Baby Active',
-  'baby happy in cabin':'Baby Content'
+  'baby happy in cabin':'Baby Content',
+  'child elevated HR':'Child Heartbeat Alert',
+  'pet elevated HR':'Pet Heartbeat Alert',
+  'child in cabin':'Child Detected',
+  'pet in cabin':'Pet Detected',
+  'child distress':'Child Distress Detected',
+  'pet distress':'Pet Distress Detected',
+  'child rapid breathing':'Child Respiratory Alert',
+  'pet rapid breathing':'Pet Respiratory Alert'
 };
 
 /* IMU driving presets */
@@ -802,30 +810,37 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
 }
 
 /* ── SeatWidget ── */
-function SeatWidget({seatConfigs,onSelect}){
+function SeatWidget({seatConfigs,onSelect,compact}){
   return (
     <div className="panel">
       <div className="ph">
         <span className="pt">Seat Status</span>
         <span className="ps">tap to configure</span>
       </div>
-      <div className="seat-grid">
+      <div className="seat-grid" style={compact?{gap:3}:{}}>
         {SEAT_IDS.map(function(sid){
           var c=(seatConfigs&&seatConfigs[sid])||{};
           var d=c.distress||0;
           var cls='seat-cell'+(c.occupied?d>0.7?' crit':d>0.35?' warn':' occ':'');
           var au=c.audio_event&&c.audio_event!=='none';
           return (
-            <div key={sid} className={cls} onClick={function(){onSelect(sid);}}>
+            <div key={sid} className={cls}
+              style={compact?{padding:'3px 4px',gap:1,borderRadius:4}:{}}
+              onClick={function(){onSelect(sid);}}>
               {c.occupied&&(
-                <span className="seat-belt" style={{color:c.buckled?'#00d4b0':'#fc8181'}}>
+                <span className="seat-belt"
+                  style={{color:c.buckled?'#00d4b0':'#fc8181',
+                    fontSize:compact?8:11,top:compact?3:5,right:compact?4:7}}>
                   {c.buckled?'✓':'✗'}
                 </span>
               )}
-              <span className="seat-icon">{c.occupied?(ICONS[c.kind]||'👤'):'·'}</span>
-              <span className="seat-name">{SEAT_LABELS[sid]}</span>
-              {au&&<span className="seat-tag">{AICONS[c.audio_event]} {c.audio_event}</span>}
-              {c.occupied&&!au&&<span style={{fontSize:8,color:'rgba(255,255,255,.8)'}}>{c.emotion||'calm'}</span>}
+              <span className="seat-icon"
+                style={compact?{fontSize:14}:{}}>{c.occupied?(ICONS[c.kind]||'👤'):'·'}</span>
+              <span className="seat-name"
+                style={compact?{fontSize:8,letterSpacing:0}:{}}>{SEAT_LABELS[sid]}</span>
+              {au&&<span className="seat-tag"
+                style={compact?{fontSize:8,marginTop:0}:{}}>{AICONS[c.audio_event]} {c.audio_event}</span>}
+              {c.occupied&&!au&&<span style={{fontSize:compact?7:8,color:'rgba(255,255,255,.8)'}}>{c.emotion||'calm'}</span>}
             </div>
           );
         })}
@@ -1113,9 +1128,227 @@ function RoadQualityWidget({vib,send}){
   );
 }
 
+/* ── RadarWidget ── */
+var SEAT_POS_RADAR={
+  driver:          {x:42, y:28},
+  front_passenger: {x:118,y:28},
+  rear_left:       {x:42, y:88},
+  rear_right:      {x:118,y:88}
+};
+var _RADAR_SHORT={driver:'Drv',front_passenger:'FP',rear_left:'RL',rear_right:'RR'};
+var _RADAR_KIND_CYCLE=['none','adult','child','pet'];
+var _RADAR_DIST=[
+  {id:0,l:'C',col:'#00d4b0'},
+  {id:0.35,l:'M',col:'#f6ad55'},
+  {id:0.7,l:'H',col:'#fc8181'},
+  {id:1.0,l:'P',col:'#f56565'}
+];
+
+function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
+  var cvRef=useRef(null);
+  var radarRef=useRef(radar);
+  var scRef=useRef(seatConfigs);
+  var dotsRef=useRef([]);
+  var animRef=useRef(null);
+
+  useEffect(function(){radarRef.current=radar;},[radar]);
+  useEffect(function(){scRef.current=seatConfigs;},[seatConfigs]);
+
+  useEffect(function(){
+    var cv=cvRef.current; if(!cv)return;
+    var ctx=cv.getContext('2d');
+    var W=cv.width,H=cv.height,SX=W/160,SY=H/115;
+
+    function spawnDots(){
+      var r=radarRef.current||{};
+      var seats=(r.seats||[]).filter(function(s){return s.occupied;});
+      dotsRef.current=[];
+      var perSeat=Math.max(6,Math.round((r.point_count||20)/Math.max(1,seats.length)));
+      seats.forEach(function(s){
+        var pos=SEAT_POS_RADAR[s.seat];if(!pos)return;
+        for(var i=0;i<perSeat;i++){
+          var a=Math.random()*Math.PI*2,r2=Math.random()*12;
+          dotsRef.current.push({seat:s.seat,
+            x:pos.x*SX+Math.cos(a)*r2*SX,y:pos.y*SY+Math.sin(a)*r2*SY,
+            vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,
+            life:Math.floor(Math.random()*60+20),maxLife:80});
+        }
+      });
+    }
+    spawnDots();
+    var si=setInterval(spawnDots,1400);
+
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='rgba(0,212,176,.12)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.roundRect(8*SX,3*SY,144*SX,109*SY,8);ctx.stroke();
+      ctx.strokeStyle='rgba(0,212,176,.07)';
+      ctx.beginPath();ctx.roundRect(18*SX,4*SY,124*SX,18*SY,6);ctx.stroke();
+      ctx.fillStyle='rgba(0,212,176,.03)';ctx.fillRect(72*SX,10*SY,16*SX,80*SY);
+
+      var sc=scRef.current||{};
+      var seatIds=['driver','front_passenger','rear_left','rear_right'];
+      seatIds.forEach(function(sid){
+        var pos=SEAT_POS_RADAR[sid];if(!pos)return;
+        var cfg=sc[sid]||{};
+        var kind=cfg.occupied?(cfg.kind||'adult'):'none';
+        var isOcc=kind!=='none';
+        var kc={adult:'rgba(0,212,176,',child:'rgba(246,173,85,',pet:'rgba(167,139,250,',none:'rgba(255,255,255,'};
+        var baseCol=kc[kind]||kc['none'];
+        ctx.beginPath();ctx.arc(pos.x*SX,pos.y*SY,18*SX,0,Math.PI*2);
+        ctx.fillStyle=isOcc?baseCol+'.07)':'rgba(255,255,255,.02)';ctx.fill();
+        ctx.strokeStyle=isOcc?baseCol+'.35)':'rgba(255,255,255,.08)';
+        ctx.lineWidth=1;ctx.stroke();
+        ctx.fillStyle=isOcc?baseCol+'.7)':'rgba(255,255,255,.18)';
+        ctx.font='bold '+(9*SX)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(isOcc?(ICONS[kind]||'?'):'·',pos.x*SX,pos.y*SY);
+        ctx.fillStyle='rgba(255,255,255,.25)';ctx.font=(6.5*SX)+'px sans-serif';
+        var sh=sid==='driver'?'DRV':sid==='front_passenger'?'F.P':sid==='rear_left'?'R.L':'R.R';
+        ctx.fillText(sh,pos.x*SX,(pos.y+14)*SY);
+      });
+
+      var dots=dotsRef.current;
+      for(var i=dots.length-1;i>=0;i--){
+        var d=dots[i];d.x+=d.vx;d.y+=d.vy;d.life--;
+        var pos=SEAT_POS_RADAR[d.seat];
+        if(pos){var dx=d.x-pos.x*SX,dy=d.y-pos.y*SY;
+          if(Math.sqrt(dx*dx+dy*dy)>16*Math.min(SX,SY)){d.vx=-d.vx*.7;d.vy=-d.vy*.7;}}
+        if(d.life<=0){dots.splice(i,1);continue;}
+        ctx.beginPath();ctx.arc(d.x,d.y,1.2,0,Math.PI*2);
+        ctx.fillStyle='rgba(0,212,176,'+(d.life/d.maxLife*.7)+')';ctx.fill();
+      }
+      animRef.current=requestAnimationFrame(draw);
+    }
+    draw();
+    return function(){cancelAnimationFrame(animRef.current);clearInterval(si);};
+  },[]);
+
+  var radarSeats=(radar&&radar.seats)||[];
+  var occ=radarSeats.filter(function(s){return s.occupied;});
+  var pts=(radar&&radar.point_count)||0;
+
+  return (
+    <div className="panel" style={{gap:0}}>
+      <div className="ph" style={{marginBottom:6}}>
+        <span className="pt">mmWave Radar</span>
+        <span style={{fontSize:9,color:'#00d4b0'}}>{pts} pts</span>
+      </div>
+
+      <canvas ref={cvRef} width="160" height="115"
+        style={{width:'100%',height:'auto',flexShrink:0,display:'block',marginBottom:6}}/>
+
+      {/* Inline seat kind selector — FP, RL, RR (driver excluded) */}
+      {(function(){
+        var _seats=[
+          {id:'front_passenger',label:'F.P'},
+          {id:'rear_left',      label:'R.L'},
+          {id:'rear_right',     label:'R.R'},
+        ];
+        var _kinds=[
+          {k:'none',   icon:'—',   col:'rgba(255,255,255,.22)'},
+          {k:'adult',  icon:'👤',  col:'#00d4b0'},
+          {k:'child',  icon:'🧒',  col:'#f6ad55'},
+          {k:'pet',    icon:'🐾',  col:'#a78bfa'},
+        ];
+        var _setKind=function(sid,k){
+          if(scenario&&scenario!=='idle')send({cmd:'scenario',name:'idle'});
+          if(k==='none') send({cmd:'configure_seat',seat:sid,occupied:false});
+          else           send({cmd:'configure_seat',seat:sid,occupied:true,kind:k});
+        };
+        var _setHR=function(sid,val){
+          if(scenario&&scenario!=='idle')send({cmd:'scenario',name:'idle'});
+          send({cmd:'configure_seat',seat:sid,heart_rate_bpm:parseInt(val)});
+        };
+        return (
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8,flexShrink:0}}>
+            {_seats.map(function(s){
+              var c=(seatConfigs&&seatConfigs[s.id])||{};
+              var curKind=c.occupied?(c.kind||'adult'):'none';
+              var hr=c.heart_rate_bpm||72;
+              var hrNorm=c.kind==='child'?115:c.kind==='pet'?125:95;
+              var hrCol=hr>hrNorm?'#fc8181':hr>(hrNorm-20)?'#f6ad55':'#00d4b0';
+              return (
+                <div key={s.id} style={{display:'flex',flexDirection:'column',gap:3}}>
+                  {/* Kind row */}
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <span style={{fontSize:10,color:'rgba(255,255,255,.4)',width:26,flexShrink:0,textAlign:'right',fontWeight:600}}>{s.label}</span>
+                    {_kinds.map(function(kd){
+                      var sel=curKind===kd.k;
+                      return (
+                        <button key={kd.k} onClick={function(){_setKind(s.id,kd.k);}}
+                          style={{flex:1,padding:'7px 0',fontSize:14,borderRadius:5,cursor:'pointer',border:'none',
+                            background:sel?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)',
+                            color:sel?kd.col:'rgba(255,255,255,.25)',
+                            outline:sel?('1.5px solid '+kd.col):'1px solid rgba(255,255,255,.08)',
+                            transition:'all .15s'}}>
+                          {kd.icon}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* HR row — only when occupied */}
+                  {c.occupied&&(
+                    <div style={{display:'flex',alignItems:'center',gap:6,paddingLeft:30}}>
+                      <span style={{fontSize:9,color:'rgba(255,255,255,.3)',flexShrink:0}}>HR</span>
+                      <input type="range" min="40" max="180" step="1" value={hr}
+                        onChange={function(e){_setHR(s.id,e.target.value);}}
+                        style={{flex:1,accentColor:hrCol,height:3,cursor:'pointer'}}/>
+                      <span style={{fontSize:10,fontWeight:600,color:hrCol,minWidth:36,textAlign:'right'}}>{hr} bpm</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* Live vitals — scrollable remainder */}
+      <div style={{flex:1,overflowY:'auto',minHeight:0}}>
+        {occ.length===0
+          ? <div style={{fontSize:8,color:'rgba(255,255,255,.15)',textAlign:'center',paddingTop:4}}>no radar returns</div>
+          : <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 8px'}}>
+            {occ.map(function(s){
+              var hr=s.heart_rate_bpm||0,resp=s.respiration_rpm||0;
+              var hrCol=hr>115?'#fc8181':hr>95?'#f6ad55':'#00d4b0';
+              return (
+                <div key={s.seat} style={{minWidth:0}}>
+                  <div style={{fontSize:7,color:'rgba(255,255,255,.5)',marginBottom:2,display:'flex',gap:3,alignItems:'center'}}>
+                    <span>{ICONS[s.occupant]||'👤'}</span>
+                    <span style={{color:'rgba(255,255,255,.3)'}}>{_RADAR_SHORT[s.seat]}</span>
+                    {(s.motion||0)>0.4&&<span style={{color:'#fc8181',marginLeft:'auto',fontSize:6}}>agit</span>}
+                  </div>
+                  {hr>0&&(
+                    <div style={{display:'flex',alignItems:'center',gap:2,marginBottom:2}}>
+                      <span style={{fontSize:6,color:'rgba(255,255,255,.25)',width:12,flexShrink:0}}>HR</span>
+                      <div style={{flex:1,height:2,background:'rgba(255,255,255,.06)',borderRadius:1}}>
+                        <div style={{width:Math.min(100,(hr/160)*100)+'%',height:'100%',background:hrCol,borderRadius:1,transition:'width .4s'}}/>
+                      </div>
+                      <span style={{fontSize:7,color:hrCol,minWidth:20,textAlign:'right'}}>{Math.round(hr)}</span>
+                    </div>
+                  )}
+                  {resp>0&&(
+                    <div style={{display:'flex',alignItems:'center',gap:2}}>
+                      <span style={{fontSize:6,color:'rgba(255,255,255,.25)',width:12,flexShrink:0}}>BR</span>
+                      <div style={{flex:1,height:2,background:'rgba(255,255,255,.06)',borderRadius:1}}>
+                        <div style={{width:Math.min(100,(resp/40)*100)+'%',height:'100%',background:'rgba(130,180,255,.6)',borderRadius:1,transition:'width .4s'}}/>
+                      </div>
+                      <span style={{fontSize:7,color:'rgba(130,180,255,.8)',minWidth:20,textAlign:'right'}}>{Math.round(resp)}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            </div>
+        }
+      </div>
+    </div>
+  );
+}
+
 /* ── TimelineBar ── */
 function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,onScenarioSelect,
-                      showVideo,showAudio,showSeats,
+                      showVideo,showAudio,showSeats,liveAudio,liveVision,
                       onToggleVideo,onToggleAudio,onToggleSeats}){
   var chipStyle=function(on){return {
     padding:'2px 9px',fontSize:9,borderRadius:3,cursor:'pointer',border:'none',
@@ -1127,26 +1360,41 @@ function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,onScenario
     send({cmd:'scenario',name:name});
     if(onScenarioSelect)onScenarioSelect();
   };
+
+  /* Derive input mode */
+  var scenarioActive=current&&current!=='idle'&&!demoRunning;
+  var modeLabel=scenarioActive
+    ? ('Scenario: '+current.replace(/_/g,' '))
+    : (liveAudio||liveVision)?'Live A/V':'Manual';
+  var modeCol=scenarioActive?'#f6ad55':(liveAudio||liveVision)?'#00d4b0':'#82b4ff';
+
   return (
-    <div className="panel sv-timeline" style={{flexDirection:'column',padding:'8px 12px',gap:7}}>
-      {/* Panel toggles row */}
-      <div style={{display:'flex',alignItems:'center',gap:6}}>
+    <div className="panel sv-timeline" style={{flexDirection:'column',padding:'8px 12px',gap:6}}>
+      {/* Mode indicator row */}
+      <div style={{display:'flex',alignItems:'center',gap:8}}>
         <span style={{fontSize:9,color:'rgba(255,255,255,.35)',textTransform:'uppercase',
-          letterSpacing:'1px',marginRight:2,flexShrink:0}}>Panels:</span>
+          letterSpacing:'1px',flexShrink:0}}>Mode:</span>
+        <span style={{fontSize:10,fontWeight:600,color:modeCol,letterSpacing:.3}}>{modeLabel}</span>
+        {scenarioActive&&<span style={{fontSize:8,color:'rgba(246,173,85,.6)',
+          border:'1px solid rgba(246,173,85,.3)',borderRadius:3,padding:'1px 5px',flexShrink:0}}>
+          overrides manual
+        </span>}
+        {!scenarioActive&&<span style={{fontSize:8,color:'rgba(255,255,255,.2)',flexShrink:0}}>
+          {scenarioActive?'':(liveAudio&&liveVision)?'audio+vision active'
+            :liveAudio?'audio active':liveVision?'vision active':'configure via Seat Status or Radar'}
+        </span>}
+        <span style={{flex:1}}/>
+        {/* Panel toggles inline */}
+        <span style={{fontSize:9,color:'rgba(255,255,255,.25)',flexShrink:0}}>Panels:</span>
         <button style={chipStyle(showVideo)} onClick={onToggleVideo}>Video</button>
         <button style={chipStyle(showAudio)} onClick={onToggleAudio}>Audio</button>
         <button style={chipStyle(showSeats)} onClick={onToggleSeats}>Seats</button>
-        <span style={{flex:1}}/>
-        <span style={{fontSize:9,color:'rgba(255,255,255,.25)'}}>
-          Select audio/video above, then Run →
-        </span>
       </div>
       {/* Events + Run row */}
       <div style={{display:'flex',alignItems:'center',gap:8}}>
         <span style={{fontSize:9,color:'rgba(255,255,255,.8)',textTransform:'uppercase',
           letterSpacing:'1px',flexShrink:0}}>Events</span>
         <div className="sc-scroll">
-          {/* "none" resets to idle and clears manual config */}
           <button className={'sc-btn'+(current==='idle'&&!demoRunning?' on':'')}
             onClick={function(){pickScenario('idle');}}>
             none
@@ -1174,12 +1422,31 @@ function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,onScenario
 }
 
 /* ── SeatConfigOverlay ── */
-function SeatConfigOverlay({seatId,config,send,onClose}){
+function SeatConfigOverlay({seatId,config,send,onClose,scenario}){
   var c=config||{};
+  /* Local optimistic state for kind+occupied so clicks are instant */
+  var [localKind,setLocalKind]=useState(c.kind||'unknown');
+  var [localOcc,setLocalOcc]=useState(!!c.occupied);
+  /* Sync when server pushes an update (but don't clobber while user is clicking) */
+  useEffect(function(){
+    setLocalKind(c.kind||'unknown');
+    setLocalOcc(!!c.occupied);
+  },[c.kind,c.occupied]);
+
   var field=function(key,val){send({cmd:'configure_seat',seat:seatId,[key]:val});};
+  var setOccupant=function(k){
+    if(scenario&&scenario!=='idle')send({cmd:'scenario',name:'idle'});
+    if(k==='empty'){
+      setLocalOcc(false);
+      send({cmd:'configure_seat',seat:seatId,occupied:false});
+    } else {
+      setLocalOcc(true);setLocalKind(k);
+      send({cmd:'configure_seat',seat:seatId,occupied:true,kind:k});
+    }
+  };
   var aopts={adult:['none','talking','shouting'],child:['none','crying','happy'],
     pet:['none','barking','happy'],unknown:['none','talking']};
-  var opts=aopts[c.kind||'adult']||['none','talking'];
+  var opts=aopts[localKind]||['none','talking'];
   return (
     <div className="overlay" onClick={function(e){if(e.target===e.currentTarget)onClose();}}>
       <div className="ov-box">
@@ -1191,16 +1458,15 @@ function SeatConfigOverlay({seatId,config,send,onClose}){
           <div className="cfg-lbl">Occupant</div>
           <div className="btn-grp">
             {['empty','adult','child','pet'].map(function(k){
-              var sel=k==='empty'?!c.occupied:(c.occupied&&c.kind===k);
+              var sel=k==='empty'?!localOcc:(localOcc&&localKind===k);
               return <button key={k} className={'xbtn'+(sel?' sel':'')}
-                onClick={function(){
-                  if(k==='empty')field('occupied',false);
-                  else{field('occupied',true);field('kind',k);}
-                }}>{k==='empty'?'Empty':(ICONS[k]||'')+' '+k}</button>;
+                onClick={function(){setOccupant(k);}}>
+                {k==='empty'?'Empty':(ICONS[k]||'')+' '+k}
+              </button>;
             })}
           </div>
         </div>
-        {c.occupied&&<>
+        {localOcc&&<>
           <div className="cfg-sec">
             <div className="cfg-row">
               <input type="checkbox" checked={!!c.buckled}
@@ -1236,34 +1502,12 @@ function SeatConfigOverlay({seatId,config,send,onClose}){
               })}
             </div>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-            <div className="cfg-sec">
-              <div className="cfg-lbl">Weight</div>
-              <div className="cfg-row">
-                <input type="range" min="0" max="120" step="1" value={c.weight_kg||70}
-                  onChange={function(e){field('weight_kg',parseInt(e.target.value));}}/>
-                <span className="rval" style={{minWidth:42}}>{c.weight_kg||70} kg</span>
-              </div>
-            </div>
-            <div className="cfg-sec">
-              <div className="cfg-lbl">Heart Rate</div>
-              <div className="cfg-row">
-                <input type="range" min="40" max="160" step="1" value={c.heart_rate_bpm||72}
-                  onChange={function(e){field('heart_rate_bpm',parseInt(e.target.value));}}/>
-                <span className="rval" style={{minWidth:42}}>{c.heart_rate_bpm||72}</span>
-              </div>
-            </div>
-          </div>
-          {/* Pressure visualization */}
           <div className="cfg-sec">
-            <div className="cfg-lbl">Seat Pressure</div>
-            <div style={{height:10,background:'#1a2535',borderRadius:5,overflow:'hidden'}}>
-              <div style={{height:'100%',borderRadius:5,transition:'width .3s,background .3s',
-                width:Math.round(((c.weight_kg||70)/120)*100)+'%',
-                background:loadCol(Math.round(((c.weight_kg||70)/120)*100))}}/>
-            </div>
-            <div style={{fontSize:9,color:'rgba(255,255,255,.8)',marginTop:3}}>
-              {Math.round(((c.weight_kg||70)/120)*100)}% — {c.weight_kg||70} kg
+            <div className="cfg-lbl">Heart Rate</div>
+            <div className="cfg-row">
+              <input type="range" min="40" max="160" step="1" value={c.heart_rate_bpm||72}
+                onChange={function(e){field('heart_rate_bpm',parseInt(e.target.value));}}/>
+              <span className="rval" style={{minWidth:42}}>{c.heart_rate_bpm||72} bpm</span>
             </div>
           </div>
         </>}
@@ -1280,27 +1524,33 @@ function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat,
   const [showSeats,setShowSeats]=useState(true);
   return (
     <div className="sv">
-      {/* Row 1 — optional panels (display:none removes from grid flow) */}
-      {showVideo
-        ? <VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver}
-            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>
-        : null}
-      {showAudio
-        ? <AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio}
-            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>
-        : null}
-      {showSeats
-        ? <SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat}/>
-        : null}
-      {/* Row 2 */}
-      <VehicleWidget speed={state.world_speed_kmh} visibility={state.world_visibility} send={send}/>
-      <IMUWidget vibState={state.vibration} send={send}/>
-      <RoadQualityWidget vib={state.vibration} send={send}/>
-      {/* Row 3: Timeline + panel toggles */}
+      {/* Explicit grid slots — positions never shift on conditional render */}
+      <div style={{gridColumn:1,gridRow:1,minHeight:0,overflow:'hidden'}}>
+        {showVideo&&<VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver}
+            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>}
+      </div>
+      <div style={{gridColumn:2,gridRow:1,minHeight:0,overflow:'hidden'}}>
+        {showAudio&&<AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio}
+            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>}
+      </div>
+      <div style={{gridColumn:3,gridRow:'1 / 3',minHeight:0,overflow:'hidden'}}>
+        <RadarWidget radar={state.radar} seatConfigs={state.seat_configs}
+          onSelectSeat={onSelectSeat} send={send} scenario={state.scenario}/>
+      </div>
+      <div style={{gridColumn:1,gridRow:2,display:'flex',flexDirection:'column',gap:8,minHeight:0}}>
+        <VehicleWidget speed={state.world_speed_kmh} visibility={state.world_visibility} send={send}/>
+        <RoadQualityWidget vib={state.vibration} send={send}/>
+      </div>
+      <div style={{gridColumn:2,gridRow:2,display:'flex',flexDirection:'column',gap:8,minHeight:0}}>
+        {showSeats&&<SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat} compact/>}
+        <IMUWidget vibState={state.vibration} send={send}/>
+      </div>
+
       <TimelineBar scenarios={scenarios} current={state.scenario}
         demoRunning={localDemoRunning} send={send} onDemoToggle={onDemoToggle}
         onScenarioSelect={function(){if(onDemoToggle)onDemoToggle(false);}}
         showVideo={showVideo} showAudio={showAudio} showSeats={showSeats}
+        liveAudio={liveAudio} liveVision={liveVision}
         onToggleVideo={function(){setShowVideo(function(v){return !v;});}}
         onToggleAudio={function(){setShowAudio(function(v){return !v;});}}
         onToggleSeats={function(){setShowSeats(function(v){return !v;});}}/>
@@ -1444,7 +1694,10 @@ function RecommendationPanel({mitigations,send}){
       'Secure loose item (camera)':'Secure Loose Items',
       'CHILD PRESENCE ALERT':'Child Left Behind — Act Now',
       'Engage baby':'Play Nursery Content',
-      'Passenger content':'Maintain Cabin Comfort'
+      'Passenger content':'Maintain Cabin Comfort',
+      'Child heartbeat elevated':'Child Heartbeat Alert',
+      'Pet heartbeat elevated':'Pet Heartbeat Alert',
+      'Cabin monitoring active':'Radar Monitoring Active'
     };
     return map[t]||t;
   };
@@ -1525,12 +1778,21 @@ function OccupantList({seatConfigs}){
 function InfotainmentView({state,send}){
   var load=state.cognitive_load||0;
   var factors=state.factors||[];
+  var scenario=state.scenario||'idle';
+  var modeTag=scenario!=='idle'
+    ?('Scenario: '+scenario.replace(/_/g,' '))
+    :'Manual / Live';
   return (
     <div className="iv">
       {/* Col 1: Vehicle Cabin — centered */}
       <div className="iv-col iv-cabin">
-        <div style={{fontSize:7,textTransform:'uppercase',letterSpacing:'1.5px',
-          color:'#ffffff',fontWeight:600,marginBottom:6,textAlign:'center'}}>Vehicle Cabin</div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginBottom:6}}>
+          <span style={{fontSize:7,textTransform:'uppercase',letterSpacing:'1.5px',
+            color:'#ffffff',fontWeight:600}}>Vehicle Cabin</span>
+          <span style={{fontSize:7,color:'#00d4b0',border:'1px solid rgba(0,212,176,.4)',
+            borderRadius:3,padding:'1px 5px',letterSpacing:.5}}>● LIVE</span>
+          <span style={{fontSize:7,color:'rgba(255,255,255,.3)'}}>{modeTag}</span>
+        </div>
         <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
         {/* Qwen vision debug strip */}
         {(function(){
@@ -1690,7 +1952,7 @@ function App(){
       {selSeat&&(
         <SeatConfigOverlay seatId={selSeat}
           config={state.seat_configs&&state.seat_configs[selSeat]}
-          send={send} onClose={function(){setSelSeat(null);}}/>
+          send={send} scenario={state.scenario} onClose={function(){setSelSeat(null);}}/>
       )}
     </div>
   );

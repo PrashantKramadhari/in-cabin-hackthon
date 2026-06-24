@@ -1,8 +1,12 @@
 Next features:
 
-1 )Audio model also needs to be improved
-2 )Improve Visual Emotion Prediction Model
-3 )In Cabin feed give two options, one for live camera, and one for prerecorded synthetic feed and detect all occupant and use the information in processing and also in displaying in second panel
+Rquiement
+option 1 : (video + audio )
+option 2 : Seat status select manual (from SEAT status panel )
+option 3. Down in Event, select any scenario
+(option 1 or option 2) but  option 3 will override option 1 and 2 and generate congetive load
 
-Bug: 
-1 ) When camera feed is ON, and Mic is ON, infotainment view breaks.
+-None should be selected when manually chosing, if any other options is selected it will be run from default loaded data
+-radar panel should have option to chose, occupant type Kid, PET or Adult based on seat, Frontright, rear right and rear left and it should generate synthetic data
+
+

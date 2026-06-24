@@ -106,12 +106,46 @@ def _cognitive_load() -> tuple[int, list[str]]:
     if veh.get("speed_kmh", 0) > 100:
         score += 8; factors.append("high speed")
 
-    # ── Agitated rear occupants (count all, not just first) ──────────────
+    # ── Child/pet: presence + distress + HR (world.seats — instant, no radar lag) ──
+    _scored_hr_seats: set[str] = set()
+    for sid, occ in world.seats.items():
+        if sid == "driver" or not occ.occupied or occ.kind not in ("child", "pet"):
+            continue
+        score += 5
+        factors.append(occ.kind + " in cabin (" + sid.replace("_", " ") + ")")
+        if occ.distress > 0.05:
+            score += min(30, occ.distress * 40)
+            factors.append(occ.kind + " distress " + str(int(occ.distress * 100)) + "%")
+        # HR — use manual override if set, otherwise auto-derived default
+        hr_thresh = 115 if occ.kind == "child" else 125
+        hr = occ.heart_rate_bpm  # None = auto (radar.py derives it)
+        if hr is not None and hr > hr_thresh:
+            over = hr - hr_thresh
+            score += min(40, over * 1.5)   # more aggressive: 150bpm child → +52.5 → capped 40
+            factors.append(occ.kind + " elevated HR (" + str(int(hr)) + " bpm)")
+            _scored_hr_seats.add(sid)
+
+    # ── Rear occupant vitals + motion from radar (motion not in world.seats) ──
     for s in _latest["radar"].get("seats", []):
         if s.get("seat") == "driver":
             continue
-        if s.get("occupant") in ("child", "pet") and s.get("occupied") and (s.get("motion") or 0) > 0.4:
-            score += 10; factors.append("agitated " + s["occupant"])
+        if not (s.get("occupant") in ("child", "pet") and s.get("occupied")):
+            continue
+        seat_id  = s.get("seat", "")
+        occ_hr   = s.get("heart_rate_bpm") or 0
+        occ_resp = s.get("respiration_rpm") or 0
+        motion   = s.get("motion") or 0
+        kind     = s["occupant"]
+        hr_thresh = 115 if kind == "child" else 125
+        # Only score HR from radar if world.seats didn't already score it
+        if seat_id not in _scored_hr_seats and occ_hr > hr_thresh:
+            score += min(20, (occ_hr - hr_thresh) * 0.8)
+            factors.append(kind + " elevated HR (" + str(int(occ_hr)) + " bpm)")
+        if occ_resp > 28:
+            score += min(10, (occ_resp - 28) * 0.5)
+            factors.append(kind + " rapid breathing")
+        if motion > 0.4:
+            score += 10; factors.append("agitated " + kind)
 
     # ── Road quality (IMU) ───────────────────────────────────────────────
     vib = _latest["vibration"]
@@ -146,13 +180,21 @@ def _proposed() -> list[dict]:
     d = _driver_seat()
 
     # --- USE CASE 1: audio comfort, corroborated by occupancy in ANY seat ---
-    child_pet_seats = [
-        s for s in _latest["radar"].get("seats", [])
+    # Merge radar seats + world.seats so mitigations fire immediately on manual config,
+    # without waiting for the radar node to republish after a scenario/seat change.
+    radar_child_pet = {
+        s["seat"] for s in _latest["radar"].get("seats", [])
         if s.get("occupant") in ("child", "pet") and s.get("occupied")
-    ] + _vision_child_pet_seats()
+    }
+    world_child_pet = {
+        sid for sid, occ in world.seats.items()
+        if sid != "driver" and occ.occupied and occ.kind in ("child", "pet")
+    }
+    child_pet_seat_ids = radar_child_pet | world_child_pet
+    child_pet_seats = [{"seat": sid} for sid in child_pet_seat_ids] + _vision_child_pet_seats()
     seat_names = ", ".join(
-        s["seat"].replace("_", " ").title() for s in child_pet_seats
-    ) if child_pet_seats else ""
+        sid.replace("_", " ").title() for sid in child_pet_seat_ids
+    ) if child_pet_seat_ids else ""
 
     if audio_label in ("crying", "animal", "barking") and audio_conf > 0.25 \
             and child_pet_seats:
@@ -207,13 +249,13 @@ def _proposed() -> list[dict]:
                        "lighting, fresh-air burst, suggest a break.",
                 severity="advisory", confirm=True))
 
-    # --- USE CASE 3a: seatbelt misuse ---
-    for s in _latest["radar"].get("seats", []):
-        if s.get("occupied") and not s.get("buckled"):
+    # --- USE CASE 3a: seatbelt misuse (world.seats is always current) ---
+    for sid, occ in world.seats.items():
+        if occ.occupied and not occ.buckled:
             out.append(dict(
-                id=f"belt_{s['seat']}", title="Seatbelt not engaged",
+                id="belt_" + sid, title="Seatbelt not engaged",
                 usecase="Seatbelt safety",
-                detail=f"{s['seat'].replace('_', ' ').title()} occupied but "
+                detail=sid.replace("_", " ").title() + " occupied but "
                        "belt not properly worn. Chime + visual reminder.",
                 severity="warning", confirm=False))
 
@@ -258,6 +300,46 @@ def _proposed() -> list[dict]:
                 detail=f"{yolo_obj['label'].title()} detected by camera, rough road "
                        f"in ~{int(dist)} m. Secure it now.",
                 severity="warning", confirm=True))
+
+    # --- Elevated child/pet HR mitigation (fires immediately from world.seats) ---
+    for sid, occ in world.seats.items():
+        if sid == "driver" or not occ.occupied or occ.kind not in ("child", "pet"):
+            continue
+        hr = occ.heart_rate_bpm
+        if hr is None:
+            continue
+        hr_thresh = 115 if occ.kind == "child" else 125
+        if hr > hr_thresh:
+            seat_label = sid.replace("_", " ").title()
+            severity = "critical" if hr > hr_thresh + 20 else "warning"
+            out.append(dict(
+                id="hr_alert_" + sid,
+                title=occ.kind.title() + " heartbeat elevated",
+                usecase="Radar vital monitoring",
+                detail=seat_label + " — " + occ.kind + " heart rate " + str(int(hr)) + " bpm "
+                       + "(normal <" + str(hr_thresh) + "). "
+                       + ("Immediate check recommended." if severity == "critical"
+                          else "Monitor and adjust cabin comfort."),
+                severity=severity, confirm=True))
+
+    # --- Child/pet monitoring card (fires on manual config, no audio required) ---
+    manual_child_pet = [
+        (sid, occ) for sid, occ in world.seats.items()
+        if sid != "driver" and occ.occupied and occ.kind in ("child", "pet")
+    ]
+    if manual_child_pet and not any(m["id"] in ("comfort_audio", "baby_engagement") for m in out):
+        high_distress = any(occ.distress > 0.5 for _, occ in manual_child_pet)
+        who_list = ", ".join(
+            occ.kind.title() + " (" + sid.replace("_", " ").title() + ")"
+            for sid, occ in manual_child_pet
+        )
+        out.append(dict(
+            id="cabin_monitoring", title="Cabin monitoring active",
+            usecase="Child / pet welfare",
+            detail=who_list + " detected via radar. Vitals monitoring active. "
+                   + ("Elevated distress — check cabin comfort." if high_distress
+                      else "Adjust volume, AC or lighting as needed."),
+            severity="warning" if high_distress else "advisory", confirm=False))
 
     # --- safety-critical: child left behind ---
     driver_present = bool(d and d.get("occupied"))
@@ -356,7 +438,8 @@ def _build_seat_configs() -> dict:
         if isinstance(seat_v, dict) and seat_v.get("occupied"):
             cfg["occupied"] = True
             raw_kind = seat_v.get("kind", "")
-            if raw_kind:
+            # Only let vision override kind when the world has no manual setting
+            if raw_kind and occ.kind in ("unknown", ""):
                 cfg["kind"] = _norm_kind(raw_kind)
             cfg["emotion"] = seat_v.get("emotion", cfg["emotion"])
         configs[sid] = cfg

@@ -48,11 +48,12 @@ CabinSense is a **multi-modal in-cabin intelligence layer** that sits alongside 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  SENSING NODES  (each an async coroutine, independent Hz)               │
 │                                                                         │
-│  radar.py       → "radar"    topic  (10 Hz)  mmWave vitals/occupancy   │
-│  audio_yamnet.py→ "audio"    topic  (on-demand) AST model / mic        │
-│  vehicle.py     → "vehicle"  topic  (5 Hz)   speed/visibility/pothole  │
-│  vibration.py   → "vibration"topic  (50 Hz)  IMU RMS / road quality    │
-│  vision.py      → "vision_driver", "vision_objects"  (5 fps webcam)    │
+│  radar.py         → "radar"           topic  (10 Hz)  mmWave vitals    │
+│  audio_yamnet.py  → "audio"           topic  (on-demand) AST/mic       │
+│  vehicle.py       → "vehicle"         topic  (5 Hz)   speed/visibility │
+│  vibration.py     → "vibration"       topic  (50 Hz)  IMU RMS          │
+│  vision.py        → "vision_driver", "vision_objects"  (5 fps webcam)  │
+│  qwen_vision.py   → "vision_all_seats","vision_driver" (per-frame GPU) │
 └──────────────────────────┬──────────────────────────────────────────────┘
                            │  async pub/sub  (bus.py — bounded queue)
                            ▼
@@ -60,9 +61,10 @@ CabinSense is a **multi-modal in-cabin intelligence layer** that sits alongside 
 │  FUSION / DECISION ENGINE  (fusion.py, 10 Hz)                           │
 │                                                                         │
 │  _latest[topic]  ←  subscribe to all sensor topics                     │
-│  _cognitive_load()   →  score 0–100 + contributing factors list        │
-│  _proposed()         →  active mitigation cards                        │
-│  _reconcile()        →  merge confirm/dismiss state across ticks       │
+│  _build_seat_configs()   →  merge world.seats + radar + vision         │
+│  _cognitive_load()       →  score 0–100 + contributing factors list    │
+│  _proposed()             →  active mitigation cards                    │
+│  _reconcile()            →  merge confirm/dismiss state across ticks   │
 │                                                                         │
 │  Publishes fused state snapshot → "fused" topic                        │
 └──────────────────────────┬──────────────────────────────────────────────┘
@@ -85,19 +87,18 @@ CabinSense is a **multi-modal in-cabin intelligence layer** that sits alongside 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  REACT HMI  (frontend/index.html — CDN-free, zero build step)          │
 │                                                                         │
-│  • Interactive top-down cabin view with 4 clickable seats              │
-│  • Per-seat configurator (type, audio event, vitals, emotion)          │
-│  • Cognitive-load gauge + factor chips                                  │
-│  • Adaptive mitigation cards (Apply / Dismiss)                         │
-│  • Vehicle controls (speed, visibility, pothole)                       │
-│  • IMU override (road quality + intensity)                             │
-│  • 8-scenario selector + auto-play demo bar                            │
+│  Sensor View (3-column grid):                                           │
+│   Col 1: Video | Vehicle + Road Quality                                 │
+│   Col 2: Audio | Seat Status (compact) + IMU                           │
+│   Col 3: Radar panel (full height, kind selector + HR sliders)         │
+│  Timeline bar: mode indicator + scenario selector + auto-play          │
+│  Infotainment View: cognitive-load gauge, live issues, mitigations     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Threading / Concurrency Model
 
-The entire backend is single-process, single-thread, built on **Python asyncio**. All sensor nodes, the fusion engine, and the WebSocket pump are independent `asyncio.Task` coroutines running on the same event loop. There are no threads (except for model inference, which runs in a thread-pool executor via `loop.run_in_executor`).
+The entire backend is single-process, single-thread, built on **Python asyncio**. All sensor nodes, the fusion engine, and the WebSocket pump are independent `asyncio.Task` coroutines running on the same event loop. Model inference (AST audio, Qwen vision) runs in a thread-pool executor via `loop.run_in_executor`.
 
 ---
 
@@ -191,7 +192,7 @@ motion = distress × 0.6 + object_motion (driver only) + random(0, 0.08)
 | Child | 100 + distress×25 bpm | 24 + distress×12 rpm | Higher at rest; distress raises further |
 | Pet | 110 + distress×30 bpm | 30 + distress×20 rpm | Higher metabolic rate |
 
-If `occ.heart_rate_bpm` or `occ.respiration_rpm` are set (via HMI seat config), those values override the defaults before jitter is applied.
+If `occ.heart_rate_bpm` or `occ.respiration_rpm` are set (via HMI seat config or the Radar panel HR slider), those values override the defaults before jitter is applied.
 
 Published schema: `RadarFrame { seats: [SeatState], point_count: int }`  
 `SeatState { seat, occupied, occupant, buckled, respiration_rpm, heart_rate_bpm, motion }`
@@ -259,21 +260,42 @@ Two operating modes:
 
 A 4-second look-ahead window (200 rows) scans upcoming rows; if that window has rough RMS ≥ 0.18, `world.pothole_ahead_m` is set to the estimated distance so the vehicle node can count it down and the fusion engine can issue the pre-emptive advisory.
 
-**Manual Override mode:** When `world.vib_override = True` (toggled from the HMI), the CSV is bypassed entirely and the node publishes `world.vib_road_quality` and `world.vib_rms` directly at 50 Hz.
+**Manual Override mode:** When `world.vib_override = True` (toggled from the HMI IMU panel), the CSV is bypassed entirely and the node publishes `world.vib_road_quality` and `world.vib_rms` directly at 50 Hz.
 
 ---
 
-#### Vision Node (`sensors/vision.py`) — ~5 fps
+#### Vision Node — Two Modes
 
-Active when `mediapipe` + `ultralytics` are installed (`live_vision: true`).
+##### Mode A: Qwen2-VL Live Vision (`sensors/qwen_vision.py`) — per frame, GPU
 
-Browser captures webcam frames (320×240 JPEG), sends them via WebSocket. The node:
+Active when `qwen_vision: true` is set in `main.py`. Runs **Qwen2-VL-2B-Instruct** (4-bit quantized via BitsAndBytes, ~2.5 GB VRAM, ~100–150 ms on RTX 3080).
 
-1. **MediaPipe FaceLandmarker (Tasks API v0.10+):** Detects 478 facial landmarks. Computes the **Eye Aspect Ratio (EAR)** from 6 points per eye using the standard formula `EAR = (v1 + v2) / (2 × horizontal)`. EAR < 0.20 → `drowsy: true`. Emotion is approximated from mouth-open ratio (mouth height / width): wide open → stressed, otherwise calm/happy.
+Browser captures webcam frames (JPEG), sends via WebSocket to `frame_queue`. The model receives the frame and a structured prompt asking it to analyse all four seats, returning a JSON object:
 
-2. **YOLOv8n:** Detects loose objects in the frame. Objects of interest: `backpack, suitcase, bottle, cup, book, laptop`. These inform the pothole-aware advisory mitigation.
+```json
+{
+  "driver":            {"occupied": bool, "kind": "adult|child|infant|pet|unknown", "emotion": "calm|happy|stressed|tired|distressed", "buckled": bool},
+  "front_passenger":   {...},
+  "rear_left":         {...},
+  "rear_right":        {...}
+}
+```
 
-Publishes to two topics:
+Publishes two bus topics:
+- `"vision_all_seats"` — full per-seat dict for use in `_build_seat_configs()`
+- `"vision_driver"` — legacy compat (drowsy/emotion from driver seat)
+
+**Vision override guard:** Qwen inferences only update a seat's `kind` when the current world state has `kind in ("unknown", "")`. If the user has manually configured a seat as "child", "pet", or "adult", the vision model will not override that choice.
+
+##### Mode B: MediaPipe + YOLOv8n (`sensors/vision.py`) — ~5 fps
+
+Active when `mediapipe` + `ultralytics` are installed (but Qwen is not available).
+
+1. **MediaPipe FaceLandmarker:** Detects 478 facial landmarks. Computes **Eye Aspect Ratio (EAR)** from 6 points per eye: `EAR = (v1 + v2) / (2 × horizontal)`. EAR < 0.20 → `drowsy: true`. Emotion approximated from mouth-open ratio.
+
+2. **YOLOv8n:** Detects loose objects (backpack, suitcase, bottle, cup, book, laptop). Informs the pothole-aware advisory mitigation.
+
+Publishes to:
 - `"vision_driver"` → `{face_detected, ear, drowsy, emotion, mouth_ratio}`
 - `"vision_objects"` → `{detections: [{label, confidence, box}]}`
 
@@ -284,15 +306,28 @@ Publishes to two topics:
 The heart of the system. Runs at **10 Hz** as an asyncio coroutine. Maintains `_latest[topic]` — one cached dict per sensor topic, updated whenever a new frame arrives on the bus.
 
 Each tick:
-1. Calls `_cognitive_load()` → `(score: int, factors: list[str])`
-2. Calls `_proposed()` → list of mitigation dicts
-3. Calls `_reconcile(proposed)` → merges with stored confirm/dismiss state
-4. Publishes the full fused state snapshot to the `"fused"` bus topic
-5. The WebSocket pump reads from `"fused"` and pushes to all connected browser clients
+1. Calls `_build_seat_configs()` → merges `world.seats` + radar + vision into per-seat config dict
+2. Calls `_cognitive_load()` → `(score: int, factors: list[str])`
+3. Calls `_proposed()` → list of mitigation dicts
+4. Calls `_reconcile(proposed)` → merges with stored confirm/dismiss state
+5. Publishes the full fused state snapshot to the `"fused"` bus topic
+6. The WebSocket pump reads from `"fused"` and pushes to all connected browser clients
+
+#### `_build_seat_configs()` — Seat State Merging
+
+Merges three data sources per seat, with explicit priority:
+
+```
+1. world.seats (Occupant dataclass) — always current, mutated by configure_seat
+2. radar SeatState — motion, radar-derived HR/resp (stale by up to 100ms)
+3. vision_all_seats — kind/emotion from Qwen (only if kind is unknown)
+```
+
+Priority: `world.seats` wins for `kind`, `occupied`, `heart_rate_bpm`, `respiration_rpm`. Vision only fills in kind when `occ.kind in ("unknown", "")`.
 
 #### `_effective_audio()` — Hybrid Audio Resolution
 
-This function is the bridge between live mic inference and the seat configurator. It resolves which audio label to use for cognitive load and mitigation calculations:
+This function resolves which audio label to use for cognitive load and mitigation calculations:
 
 ```
 IF sensor audio (from AST model) has label ≠ "none" AND confidence > 0.40:
@@ -305,7 +340,17 @@ ELSE:
     label = "none", conf = 0.0
 ```
 
-This ensures that when the live model is running but the cabin is quiet (mic idle), manually configured seat audio events still drive the cognitive load. Real mic detections always win when present.
+#### `_cognitive_load()` — Scoring Data Source Priority
+
+**Critical design:** `world.seats` is read directly rather than relying on radar's `_latest["radar"]`, which can be stale by up to 100 ms after a `configure_seat` command. This ensures the score updates on the *first* fusion tick after any manual configuration change.
+
+A `_scored_hr_seats` set tracks which seats have had HR scored from `world.seats`, preventing double-counting when the radar loop also processes those seats.
+
+#### `_proposed()` — Mitigation Data Source
+
+Same principle: `child_pet_seat_ids` is built from the **union** of `world.seats` and radar data, so mitigations fire immediately on the first tick after any seat configuration, even before the radar node republishes.
+
+Seatbelt check reads from `world.seats.buckled` directly (not from radar), for the same reason.
 
 ---
 
@@ -336,7 +381,7 @@ The `/ws` endpoint is bidirectional. The browser sends JSON commands; the server
   "scenario": "idle",
   "demo_running": false,
   "cognitive_load": 42,
-  "factors": ["elevated heart rate", "crying in cabin"],
+  "factors": ["child in cabin (rear right)", "child elevated HR (150 bpm)"],
   "radar": { "seats": [...], "point_count": 87 },
   "audio": { "label": "crying", "confidence": 0.87 },
   "vehicle": { "speed_kmh": 60, "pothole_ahead_m": null, "visibility": "good" },
@@ -389,26 +434,124 @@ Built with **React 18 (CDN)** + **Babel 7.12.17** (pinned — later versions bre
 - No backtick template literals inside `<script type="text/babel">` blocks (AudioWorklet is defined in a plain `<script>` tag above Babel, using a Blob URL)
 - All components are plain functions with `React.useState`, `React.useRef`, etc. (no JSX imports)
 
-**Component tree:**
+#### Two Views
+
+The HMI has two top-level tabs:
+
+**Sensor View** — raw sensor data, direct manual configuration  
+**Infotainment View** — driver-facing: cognitive load gauge, active issues, mitigation cards
+
+#### Sensor View Layout (3-column CSS Grid)
+
 ```
-App
- ├─ DemoBar              (auto-play progress, run/stop buttons)
- ├─ Left column
- │   ├─ CognitiveLoad    (gauge + factor chips)
- │   ├─ AcousticPanel    (label + confidence + mic toggle)
- │   ├─ VibrationMini    (road quality + distance to rough road)
- │   ├─ VisionPanel      (collapsible: EAR, emotion, YOLO detections)
- │   └─ MitigationPanel  (cards with Apply / Dismiss)
- └─ Right column
-     ├─ CabinView         (top-down car interior, 4 clickable seats)
-     │   └─ SeatCard ×4
-     ├─ SeatConfigPanel   (conditional, shown when seat selected)
-     ├─ VehicleControls   (speed, visibility, pothole)
-     ├─ VibrationControls (CSV vs override, road quality, intensity)
-     └─ ScenarioPanel     (8 scenario buttons)
+grid-template-columns: 1fr 1fr 1.3fr
+grid-template-rows:    1fr 1fr 72px
 ```
 
-The entire app state is driven by the WebSocket stream (`sock.onmessage → setState`). The browser holds no local state for sensor readings — it is a pure view of the server fused state. Only UI-local state (which seat is selected, whether the vision card is expanded) lives in React state.
+| | Col 1 | Col 2 | Col 3 |
+|---|---|---|---|
+| **Row 1** | VideoWidget (live webcam) | AudioWidget (waveform + label) | RadarWidget (spans rows 1–2) |
+| **Row 2** | VehicleWidget + RoadQualityWidget | SeatWidget (compact) + IMUWidget | ← RadarWidget cont. |
+| **Row 3** | TimelineBar (spans all 3 columns) | | |
+
+Every child has an explicit `gridColumn` / `gridRow` wrapper — CSS auto-placement is not used because conditional panel toggling would shift other panels and block clicks.
+
+`.panel` CSS does **not** use `resize: both` — that property was removed because it created invisible overlay regions blocking pointer events on panels below.
+
+Hidden panels keep an empty `<div>` placeholder in their grid slot to prevent layout reflow.
+
+#### Input Mode System (TimelineBar)
+
+The TimelineBar shows the current input mode as a coloured badge:
+
+| Mode | Colour | Condition |
+|------|--------|-----------|
+| **Manual** | Blue `#82b4ff` | `scenario === "idle"`, no live sensors active |
+| **Live A/V** | Teal `#00d4b0` | `live_audio` or `live_vision` caps are true |
+| **Scenario: \<name\>** | Amber `#f6ad55` + "overrides manual" badge | Any scenario other than idle is active |
+
+**Auto-clear:** When the user clicks a kind button in RadarWidget or changes occupant type in SeatConfigOverlay, the HMI automatically sends `{cmd:'scenario', name:'idle'}` if a scenario was active. This switches mode to Manual and clears scenario-driven overrides.
+
+#### RadarWidget (col 3, spans both rows)
+
+The radar panel contains:
+
+1. **Canvas visualisation (160×115 px):** Animated mmWave point cloud with per-seat colour rings:
+   - `—` empty: dim white
+   - `👤` adult: teal `#00d4b0`
+   - `🧒` child: amber `#f6ad55`
+   - `🐾` pet: purple `#a78bfa`
+
+2. **Inline seat configurator** for F.P (front passenger), R.L (rear left), R.R (rear right) — driver excluded:
+
+   Each seat row shows:
+   ```
+   [Seat Label]  [—]  [👤 Adult]  [🧒 Kid]  [🐾 Pet]
+   ```
+   Clicking a kind button sends `{cmd:'configure_seat', seat, occupied:true/false, kind}` directly. If a scenario is active, it is cleared to idle first.
+
+3. **HR Slider** — shown per seat when that seat is occupied:
+   - Range: 40–180 bpm
+   - Colour: green → amber → red based on kind threshold (child: 115, pet: 125, adult: 95)
+   - Sends `{cmd:'configure_seat', seat, heart_rate_bpm: val}` on change
+
+4. **Vitals bars** — live HR and respiration bars from radar synthetic data, per occupied seat
+
+#### SeatConfigOverlay
+
+Opened by clicking any seat in the CabinView or Seat Status compact panel. Props: `{seatId, config, send, onClose, scenario}`.
+
+Key implementation details:
+- **Local optimistic state** (`localKind`, `localOcc`) — buttons respond instantly in the UI without waiting for the server round-trip and WebSocket echo
+- Occupant kind change sends a single combined message `{occupied:true, kind:k}` (not two separate messages, which caused a race condition)
+- Clears active scenario on any manual occupant change
+- Controls: occupant type, heart rate (40–180 bpm), respiration, distress, audio event, emotion, buckled
+
+#### Infotainment View
+
+Driver-facing summary panel shown on the second tab:
+
+- **Vehicle Cabin header** with `● LIVE` badge (pulsing green) and mode tag (`Manual / Live` or `Scenario: <name>`)
+- **CircularGauge** — cognitive load 0–100, colour bands: green (0–32) / amber (33–65) / red (66–100)
+- **IssuePanel** — maps `factors[]` strings to human-readable labels via `ISSUE_MAP`:
+
+| Factor substring | Display label |
+|-----------------|---------------|
+| `child elevated HR` | Child Heartbeat Alert |
+| `pet elevated HR` | Pet Heartbeat Alert |
+| `child in cabin` | Child Detected |
+| `pet in cabin` | Pet Detected |
+| `child distress` | Child Distress Detected |
+| `pet distress` | Pet Distress Detected |
+| `child rapid breathing` | Child Respiratory Alert |
+| `pet rapid breathing` | Pet Respiratory Alert |
+| `elevated heart rate` | Driver HR Elevated |
+| `crying in cabin` | Crying Detected |
+| *(etc.)* | *(standard labels)* |
+
+- **RecommendationPanel** — active mitigation cards with Apply / Dismiss. `friendlyTitle` map translates mitigation titles (e.g., `"Child heartbeat elevated"` → `"Child Heartbeat Alert"`, `"Cabin monitoring active"` → `"Radar Monitoring Active"`).
+
+#### Component Tree Summary
+
+```
+App
+ ├── Sensor View (tab 1)
+ │    ├── [col1,row1] VideoWidget
+ │    ├── [col2,row1] AudioWidget
+ │    ├── [col3,rows1-2] RadarWidget
+ │    │       ├── Canvas (mmWave visualisation)
+ │    │       ├── SeatRow × 3 (kind buttons + HR slider per seat)
+ │    │       └── VitalsBars × occupied seats
+ │    ├── [col1,row2] VehicleWidget + RoadQualityWidget
+ │    ├── [col2,row2] SeatWidget (compact) + IMUWidget
+ │    └── [col1-3,row3] TimelineBar (mode badge + scenario buttons + demo)
+ │         └── SeatConfigOverlay (modal, on seat select)
+ └── Infotainment View (tab 2)
+      ├── Header (● LIVE + mode tag)
+      ├── CircularGauge (cognitive load)
+      ├── IssuePanel (factor chips)
+      └── RecommendationPanel (mitigation cards: Apply / Dismiss)
+```
 
 ---
 
@@ -498,7 +641,20 @@ The cognitive load score is an **additive rule-based model** computed in `fusion
 
 Below is every check, in execution order:
 
-### Group 1: Driver Physiology (from Radar micro-Doppler)
+### Group 1: Child / Pet Presence and Vitals (from `world.seats` — instant)
+
+Source: `world.seats` — read directly, no radar lag. Scores immediately after any `configure_seat` command.
+
+| Condition | Score added | Factor label |
+|-----------|-------------|--------------|
+| Child or pet in any non-driver seat | +5 per seat | `"child in cabin (rear right)"` / `"pet in cabin (rear left)"` |
+| Occupant distress > 0.05 | `min(30, distress × 40)` per seat | `"child distress 85%"` |
+| Child HR > 115 bpm (manual override) | `min(40, (HR−115) × 1.5)` | `"child elevated HR (150 bpm)"` |
+| Pet HR > 125 bpm (manual override) | `min(40, (HR−125) × 1.5)` | `"pet elevated HR (130 bpm)"` |
+
+The `_scored_hr_seats` dedup set prevents a seat's HR from being counted twice if it also appears in the radar data.
+
+### Group 2: Driver Physiology (from Radar micro-Doppler)
 
 Source: `_latest["radar"]` → driver seat SeatState
 
@@ -510,7 +666,7 @@ Source: `_latest["radar"]` → driver seat SeatState
 
 HR and respiration are read from the latest radar frame (which adds ±5% jitter to world.driver_hr / world.driver_resp or the seat-level override values).
 
-### Group 2: Driver Emotional State (from World / Seat Config)
+### Group 3: Driver Emotional State (from World / Seat Config)
 
 Source: `world.driver_emotion` (set via scenario or HMI driver-seat emotion selector)
 
@@ -520,7 +676,7 @@ Source: `world.driver_emotion` (set via scenario or HMI driver-seat emotion sele
 | `driver_emotion == "tired"` | +8 | `"driver fatigued"` |
 | `driver_emotion == "calm"` or `"happy"` | 0 | — |
 
-### Group 3: Acoustic Anomaly (via `_effective_audio()`)
+### Group 4: Acoustic Anomaly (via `_effective_audio()`)
 
 Source: AST model output OR world.audio_label (see Q1 above). Confidence threshold: **> 0.40**.
 
@@ -534,7 +690,7 @@ Source: AST model output OR world.audio_label (see Q1 above). Confidence thresho
 | `talking` | +5 | `"speech activity"` |
 | `happy` / `none` / `speech` | 0 | — |
 
-### Group 4: Vehicle Context
+### Group 5: Vehicle Context
 
 Source: `_latest["vehicle"]` (published by `sensors/vehicle.py` at 5 Hz from `world.speed_kmh` and `world.visibility`)
 
@@ -543,17 +699,20 @@ Source: `_latest["vehicle"]` (published by `sensors/vehicle.py` at 5 Hz from `wo
 | visibility ∈ {`"low"`, `"rain"`, `"fog"`} | +12 | `"reduced visibility"` |
 | speed > 100 km/h | +8 | `"high speed"` |
 
-### Group 5: Agitated Rear Occupants (from Radar)
+### Group 6: Agitated Rear Occupants (from Radar)
 
-Source: `_latest["radar"]` → all non-driver seats. Checks ALL rear seats (no early break).
+Source: `_latest["radar"]` → all non-driver seats. HR from radar is skipped for seats already scored in Group 1 (via `_scored_hr_seats`).
 
 | Condition | Score added (per seat) | Factor label |
 |-----------|------------------------|--------------|
-| Seat occupant ∈ {`"child"`, `"pet"`} AND motion > 0.40 | +10 | `"agitated child"` / `"agitated pet"` |
+| Child/pet HR from radar > threshold (if not already scored) | `min(20, over × 0.8)` | `"child elevated HR"` |
+| Child resp > 28 rpm | `min(10, (resp−28) × 1.5)` | `"child rapid breathing"` |
+| Pet resp > 35 rpm | same formula | `"pet rapid breathing"` |
+| motion > 0.40 | +10 | `"agitated child"` / `"agitated pet"` |
 
 Motion is computed by the radar node as: `distress × 0.6 + random(0, 0.08)`. A distress setting of 0.67+ reliably pushes motion above the 0.40 threshold.
 
-### Group 6: Road Quality (from IMU / Vibration)
+### Group 7: Road Quality (from IMU / Vibration)
 
 Source: `_latest["vibration"]` (published by `sensors/vibration.py` at 50 Hz)
 
@@ -563,16 +722,16 @@ Source: `_latest["vibration"]` (published by `sensors/vibration.py` at 50 Hz)
 | road_quality == `"rough"` | +8 | `"rough road (IMU)"` |
 | pothole_ahead_m ≠ null AND < 80 m | +5 | `"rough road ahead (IMU)"` |
 
-### Group 7: Vision — Driver Face (from Camera / MediaPipe)
+### Group 8: Vision — Driver Face (from Camera / MediaPipe or Qwen)
 
 Source: `_latest["vision_driver"]` — only contributes when `face_detected: true`
 
 | Condition | Score added | Factor label |
 |-----------|-------------|--------------|
 | `drowsy: true` (EAR < 0.20) | +15 | `"drowsy eyes (camera)"` |
-| `emotion == "stressed"` (mouth geometry) | +10 | `"stress expression (camera)"` |
+| `emotion == "stressed"` | +10 | `"stress expression (camera)"` |
 
-### Group 8: Vision — Loose Objects (from Camera / YOLOv8n)
+### Group 9: Vision — Loose Objects (from Camera / YOLOv8n)
 
 Source: `_latest["vision_objects"]` — detections list
 
@@ -592,8 +751,13 @@ This section gives the complete scoring table with example configurations and th
 
 | Disturbance Attribute | Sensor | Max contribution | Score formula |
 |-----------------------|--------|-----------------|---------------|
-| Driver high heart rate | Radar (μ-Doppler) | 30 | `min(30, (HR−95) × 1.5)` |
-| Driver rapid breathing | Radar (μ-Doppler) | 15 | `min(15, (resp−20) × 2)` |
+| Child/pet presence (per seat) | world.seats | 5 per seat | flat +5 |
+| Child/pet distress | world.seats | 30 per seat | `min(30, distress×40)` |
+| Child HR > 115 bpm (manual) | world.seats HR override | 40 | `min(40, (HR−115)×1.5)` |
+| Pet HR > 125 bpm (manual) | world.seats HR override | 40 | `min(40, (HR−125)×1.5)` |
+| Child HR from radar (if not manually set) | Radar vitals | 20 | `min(20, over×0.8)` |
+| Driver high heart rate | Radar (μ-Doppler) | 30 | `min(30, (HR−95)×1.5)` |
+| Driver rapid breathing | Radar (μ-Doppler) | 15 | `min(15, (resp−20)×2)` |
 | Driver low HR / fatigue | Radar (μ-Doppler) | 12 | flat +12 |
 | Driver emotion: stressed | World state / seat config | 10 | flat +10 |
 | Driver emotion: tired | World state / seat config | 8 | flat +8 |
@@ -608,8 +772,8 @@ This section gives the complete scoring table with example configurations and th
 | Pothole / road shock | IMU (vibration) | 18 | flat +18 |
 | Rough road | IMU (vibration) | 8 | flat +8 |
 | Rough road ahead (<80 m) | IMU (vibration) | 5 | flat +5 |
-| Driver drowsiness (EAR) | Camera (MediaPipe) | 15 | flat +15 |
-| Driver stress expression | Camera (MediaPipe) | 10 | flat +10 |
+| Driver drowsiness (EAR) | Camera (MediaPipe / Qwen) | 15 | flat +15 |
+| Driver stress expression | Camera (MediaPipe / Qwen) | 10 | flat +10 |
 | Loose object detected | Camera (YOLOv8n) | 6 | flat +6 |
 | **Theoretical maximum** | — | **≈ 200+** | capped to **100** |
 
@@ -623,16 +787,27 @@ This section gives the complete scoring table with example configurations and th
 
 ### Example Scenarios with Expected Scores
 
-**Scenario A: Child crying in rear seat (typical demo)**
+**Scenario A: Child with elevated HR in rear seat (manual config via Radar panel)**
+
+| Factor | Contribution |
+|--------|-------------|
+| Seat config: rear_right = child, HR = 150 bpm (set via radar HR slider) | — |
+| → child in cabin | +5 |
+| → child HR 150 > 115: (150−115) × 1.5 = 52.5 → capped | +40 |
+| **Total** | **45** (Elevated → triggers critical hr_alert mitigation) |
+
+**Scenario B: Child crying in rear seat (typical demo)**
 
 | Factor | Contribution |
 |--------|-------------|
 | Seat config: rear_right = child, audio_event=crying, distress=0.85 | — |
+| → child in cabin | +5 |
 | → world.audio_label = "crying", conf = 0.93 | +25 |
+| → child distress 0.85 × 40 = 34 → capped | +30 |
 | → radar: child motion = 0.85×0.6 + noise ≈ 0.55 > 0.40 | +10 |
-| **Total** | **≈ 35** (Elevated) |
+| **Total** | **≈ 70** (Critical) |
 
-**Scenario B: Stressed driver, low visibility, rough road**
+**Scenario C: Stressed driver, low visibility, rough road**
 
 | Factor | Contribution |
 |--------|-------------|
@@ -642,7 +817,7 @@ This section gives the complete scoring table with example configurations and th
 | Road quality = rough | +8 |
 | **Total** | **≈ 49** (Elevated) |
 
-**Scenario C: Multi-disturbance overload**
+**Scenario D: Multi-disturbance overload**
 
 | Factor | Contribution |
 |--------|-------------|
@@ -655,16 +830,16 @@ This section gives the complete scoring table with example configurations and th
 | Rough road ahead (< 80 m) | +5 |
 | **Raw total** | **110 → capped to 100** (Critical) |
 
-**Scenario D: Child left behind (safety critical)**
+**Scenario E: Child left behind (safety critical)**
 
 | Factor | Contribution |
 |--------|-------------|
 | Driver seat: unoccupied (speed = 0) | 0 |
 | Rear child present, speed = 0, no driver | → triggers `CHILD PRESENCE ALERT` critical mitigation (auto-active) |
 | child distress = 0.4 → motion ≈ 0.26 (below 0.40 threshold) | 0 |
-| **Cognitive load** | **≈ 0** but critical mitigation always surfaced |
+| **Cognitive load** | **≈ 5** (child in cabin) but critical mitigation always surfaced |
 
-This highlights that **mitigations are independent of the cognitive load score** — safety-critical alerts (child left behind, unbuckled occupant) are always surfaced regardless of the overall score.
+This highlights that **mitigations are independent of the cognitive load score** — safety-critical alerts (child left behind, unbuckled occupant, elevated child HR) are always surfaced regardless of the overall score.
 
 ### Distress Level → Motion → Score Relationship (child/pet)
 
@@ -680,74 +855,70 @@ The `distress` slider (0–100%) on the HMI seat configurator directly controls 
 
 > Note: ±5% jitter on HR/resp, and `random(0, 0.08)` additive noise on motion, means scores vary slightly between ticks. The ranges above are representative of expected values.
 
+### HR Slider → Score Relationship (child/pet via Radar panel)
+
+The HR slider in RadarWidget sets `occ.heart_rate_bpm` directly in `world.seats`, bypassing radar synthetic defaults:
+
+| HR set (child, threshold=115) | Over-threshold | Score added |
+|-------------------------------|----------------|-------------|
+| 100 bpm | 0 | 0 |
+| 120 bpm | 5 | +7.5 |
+| 140 bpm | 25 | +37.5 |
+| 150 bpm | 35 | +40 (capped) |
+| 180 bpm | 65 | +40 (capped) |
+
+Score becomes visible in Infotainment View after the next fusion tick (< 100 ms).
+
 ---
 
 ## 7. Data Flow: End-to-End Walk-Through
 
-Example: **User configures rear-left seat as a crying child with 85% distress, then sets driver to stressed.**
+Example: **User selects child + sets HR = 150 bpm via Radar panel, then switches to Infotainment View.**
 
 ```
-1. HMI: User clicks rear_left seat card → SeatConfigPanel opens
-2. HMI: Clicks "Child" → WS send {cmd:"configure_seat", seat:"rear_left", occupied:true, kind:"child"}
-   Server: kind changed (unknown→child) → resets audio_event="none"
-           _sync_audio_from_seats() → world.audio_label="none"
+1. HMI: User clicks "🧒 Kid" button on rear_right row in RadarWidget
+   WS send: {cmd:'scenario', name:'idle'}           ← clears active scenario
+   WS send: {cmd:'configure_seat', seat:'rear_right', occupied:true, kind:'child'}
+   Server: world.seats["rear_right"].kind = "child"
+           world.seats["rear_right"].occupied = True
 
-3. HMI: Clicks "Crying" → WS send {cmd:"configure_seat", seat:"rear_left", audio_event:"crying"}
-   Server: occ.audio_event="crying"
-           _sync_audio_from_seats(): crying(5) > none → world.audio_label="crying", conf=0.80
-
-4. HMI: Drags distress to 85% → WS send {cmd:"configure_seat", seat:"rear_left", distress:0.85}
-   Server: occ.distress=0.85
-           _sync_audio_from_seats(): conf = min(1.0, 0.80+0.85×0.15) = 0.9275
-
-5. HMI: Driver seat → emotion "stressed" + HR 108
-   Server: world.driver_emotion="stressed", world.driver_hr=108
-
-── sensor tick (100ms) ────────────────────────────────────────────────────
-
-6. radar.py (10 Hz):
-   rear_left: child, motion = 0.85×0.6 + ~0.04 = 0.55
-   driver:    hr_base=108 → _jitter(108)=~108±5 bpm
-   Publishes RadarFrame → bus("radar")
-
-7. audio_yamnet.py (if mic is quiet): publishes label="none", conf=0.0
-   audio_synthetic fallback: N/A (live mode active)
-
-8. vehicle.py (5 Hz):
-   Publishes VehicleContext(speed=60, visibility="good", pothole_ahead_m=None)
-
-9. vibration.py (50 Hz, CSV mode):
-   Publishes {road_quality:"smooth", rms_z:0.08}
+2. HMI: User drags HR slider to 150 bpm
+   WS send: {cmd:'configure_seat', seat:'rear_right', heart_rate_bpm:150}
+   Server: world.seats["rear_right"].heart_rate_bpm = 150
 
 ── fusion tick (100ms) ────────────────────────────────────────────────────
 
-10. fusion._effective_audio():
-    sensor audio label="none" (mic quiet) → fallback to world.audio_label="crying", conf=0.93
-    returns ("crying", 0.93)
+3. fusion._cognitive_load():
+   Group 1 — world.seats scan:
+     rear_right: kind=child, occupied=True → +5 ("child in cabin (rear right)")
+     heart_rate_bpm=150 > 115 → (150−115)×1.5 = 52.5, capped → +40
+                                 ("child elevated HR (150 bpm)")
+     _scored_hr_seats.add("rear_right")
+   All other groups: no contribution (driver calm, audio quiet, smooth road)
+   Score = 5 + 40 = 45
 
-11. fusion._cognitive_load():
-    HR 108 → (108−95)×1.5 = 19.5, factor "elevated heart rate"
-    driver_emotion="stressed" → +10, factor "driver stressed"
-    audio="crying", conf=0.93>0.40 → +25, factor "crying in cabin"
-    rear_left: child, motion=0.55>0.40 → +10, factor "agitated child"
-    Score = 19.5+10+25+10 = 64 → int = 64
+4. fusion._proposed():
+   world_child_pet = {"rear_right"}
+   → cabin_monitoring mitigation: id="cabin_monitoring", title="Cabin monitoring active",
+     severity="advisory"
+   → hr_alert mitigation: id="hr_alert_rear_right",
+     title="Child heartbeat elevated",
+     detail="Rear Right — child heart rate 150 bpm (normal <115). Monitor and adjust cabin comfort.",
+     severity="warning" (150 < 115+20=135? No, 150 > 135 → severity="critical")
+     severity="critical"
+   → no belt mitigation (rear_right buckled=True from world)
+   → no comfort_audio (no audio event set)
 
-12. fusion._proposed():
-    rear_child_or_pet = True (rear_left has child)
-    audio="crying" → "comfort_audio" mitigation proposed
-    driver HR=108>95 → "persona_calm" mitigation proposed
-    All seats buckled → no belt mitigation
+5. fused state published:
+   {cognitive_load: 45, factors: ["child in cabin (rear right)", "child elevated HR (150 bpm)"],
+    mitigations: [{id:"cabin_monitoring",...}, {id:"hr_alert_rear_right", severity:"critical",...}]}
 
-13. fusion broadcasts to "fused" topic:
-    {cognitive_load: 64, factors: ["elevated heart rate","driver stressed","crying in cabin","agitated child"],
-     mitigations: [{id:"comfort_audio", status:"proposed"}, {id:"persona_calm", status:"proposed"}]}
+6. WebSocket pump → browser
 
-14. WebSocket pump forwards to all connected browsers
-
-15. HMI React: setState(newData)
-    Gauge renders 64 (amber zone)
-    Factor chips: "elevated heart rate", "driver stressed", "crying in cabin", "agitated child"
-    Mitigation cards: "Soothe cabin" + "Calming persona" (both with Apply/Dismiss buttons)
+7. HMI: Infotainment View renders:
+   Gauge = 45 (Amber zone)
+   IssuePanel: "Child Heartbeat Alert" (from ISSUE_MAP)
+   RecommendationPanel: "Child heartbeat elevated" card (critical red, Apply/Dismiss)
 ```
 
 ---
@@ -771,18 +942,26 @@ Each scenario calls `_reset(world)` first (returning all seats to baseline) then
 
 ## 9. Adaptive Mitigations Reference
 
-Mitigations are **propose-first**: they appear as cards requiring the driver to tap Apply. Only the `CHILD PRESENCE ALERT` and seatbelt warnings are auto-active (no confirm required, as they are safety-critical).
+Mitigations are **propose-first**: they appear as cards requiring the driver to tap Apply. Only the `CHILD PRESENCE ALERT`, seatbelt warnings, and elevated child/pet HR alerts are auto-active or critical severity.
 
 | ID | Title | Trigger condition | Severity | Confirm? |
 |----|-------|------------------|----------|---------|
-| `comfort_audio` | Soothe cabin | audio ∈ {crying, animal, barking} AND radar confirms child/pet in rear | advisory | Yes |
+| `comfort_audio` | Soothe cabin | audio ∈ {crying, animal, barking} AND child/pet in rear (world or radar) | advisory | Yes |
+| `baby_engagement` | Baby engagement | audio=crying AND child/infant present | advisory | Yes |
 | `shouting_alert` | Passenger distress | audio = shouting AND conf > 0.40 | warning | Yes |
 | `persona_calm` | Calming persona | driver HR > 95 OR emotion = stressed | advisory | Yes |
 | `persona_alert` | Alertness boost | driver HR < 60 OR emotion = tired | advisory | Yes |
-| `belt_<seat>` | Seatbelt not engaged | Any occupied seat with buckled=False | warning | No (auto-active) |
+| `belt_<seat>` | Seatbelt not engaged | Any occupied seat in `world.seats` with `buckled=False` | warning | No (auto-active) |
 | `secure_object` | Secure loose item | world.unsecured_object AND pothole_ahead ≤ 120 m | warning | Yes |
 | `secure_object_cam` | Secure loose item (camera) | YOLO loose object AND pothole_ahead ≤ 120 m | warning | Yes |
 | `child_left` | CHILD PRESENCE ALERT | Rear child detected AND driver seat empty | critical | No (auto-active) |
+| `hr_alert_<seat>` | Child/pet heartbeat elevated | `world.seats[seat].heart_rate_bpm` > threshold (child:115, pet:125) | warning / critical | Yes |
+| `cabin_monitoring` | Cabin monitoring active | Child/pet in `world.seats`, no audio-specific mitigation active | advisory | No |
+
+**hr_alert severity escalation:** `warning` if HR ≤ threshold+20; `critical` if HR > threshold+20.  
+Example: child HR=150 > 115+20=135 → critical.
+
+**cabin_monitoring suppression:** Not shown if `comfort_audio` or `baby_engagement` is already active (those are more specific).
 
 ---
 
@@ -802,8 +981,9 @@ technothon/
 │   │   ├── audio.py         Synthetic audio node (5 Hz, reads world.audio_label)
 │   │   ├── audio_yamnet.py  Live AST audio classifier (PyTorch, on-demand)
 │   │   ├── vehicle.py       Speed / visibility / pothole-distance node (5 Hz)
-│   │   └── vibration.py     IMU CSV replay or manual override (50 Hz)
-│   │   └── vision.py        MediaPipe face + YOLOv8n objects (~5 fps)
+│   │   ├── vibration.py     IMU CSV replay or manual override (50 Hz)
+│   │   ├── vision.py        MediaPipe face + YOLOv8n objects (~5 fps)
+│   │   └── qwen_vision.py   Qwen2-VL-2B-Instruct all-seat vision (4-bit, RTX 3080)
 │   ├── models/
 │   │   └── face_landmarker.task   MediaPipe model file
 │   ├── data/
@@ -825,4 +1005,4 @@ technothon/
 
 ---
 
-*Document generated from source code inspection — June 2026*
+*Document updated from source code inspection — June 2026*
