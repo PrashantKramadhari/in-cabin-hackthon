@@ -278,7 +278,9 @@ var ISSUE_MAP={
   'rough road (IMU)':'Road Discomfort',
   'rough road ahead (IMU)':'Rough Road Ahead',
   'agitated child':'Passenger Disturbance',
-  'agitated pet':'Pet Disturbance'
+  'agitated pet':'Pet Disturbance',
+  'baby babbling in cabin':'Baby Active',
+  'baby happy in cabin':'Baby Content'
 };
 
 /* IMU driving presets */
@@ -380,16 +382,47 @@ var AUDIO_FILES=[
   {id:'baby_talking', label:'baby_talking.mp3'},
   {id:'baby_happy',   label:'baby_happy.mp3'}
 ];
+var AUDIO_SEAT_OPTS=[
+  {id:'none',              label:'No seat'},
+  {id:'driver',            label:'Driver'},
+  {id:'front_passenger',   label:'Front P.'},
+  {id:'rear_left',         label:'Rear L'},
+  {id:'rear_right',        label:'Rear R'}
+];
+var AUDIO_KIND_OPTS=[{id:'child',label:'Baby'},{id:'pet',label:'Pet'}];
+var _AUDIO_EVENT_MAP={baby_crying:'crying',baby_talking:'talking',baby_happy:'happy'};
+var _AUDIO_DISTRESS={baby_crying:0.85,baby_talking:0.35,baby_happy:0.1};
 
-function AudioWidget({ws,liveAudio,audio}){
+function AudioWidget({ws,liveAudio,audio,send}){
   const [audioMode,setAudioMode]=useState('off');
+  const [seatTarget,setSeatTarget]=useState('none');
+  const [kindTarget,setKindTarget]=useState('child');
   const [db,setDb]=useState(28);
   const [vad,setVad]=useState(false);
   const procRef=useRef(null);
   const ctxRef=useRef(null);
   const analyserRef=useRef(null);
   const dbTimerRef=useRef(null);
+  const prevCfgRef=useRef(null); /* tracks last configure_seat sent */
   const SR=16000;
+
+  /* reset the previously configured seat */
+  var _clearSeat=function(){
+    if(prevCfgRef.current&&send){
+      send({cmd:'configure_seat',seat:prevCfgRef.current,audio_event:'none',distress:0});
+    }
+    prevCfgRef.current=null;
+  };
+
+  /* configure a seat with the current audio mode */
+  var _applySeat=function(seat,kind,mode){
+    if(!seat||seat==='none'||!send)return;
+    var audioEvent=_AUDIO_EVENT_MAP[mode]||'none';
+    var distress=_AUDIO_DISTRESS[mode]||0;
+    send({cmd:'configure_seat',seat:seat,occupied:true,kind:kind,
+          audio_event:audioEvent,distress:distress});
+    prevCfgRef.current=seat;
+  };
 
   var stopAudio=function(){
     clearInterval(dbTimerRef.current);
@@ -404,7 +437,6 @@ function AudioWidget({ws,liveAudio,audio}){
     procRef.current=null;setDb(28);setVad(false);
   };
 
-  /* shared setup: creates AudioContext, Analyser, Chunker; returns {actx, an, chunker} */
   var _setupContext=async function(){
     var actx=new AudioContext({sampleRate:SR});
     ctxRef.current=actx;
@@ -416,7 +448,6 @@ function AudioWidget({ws,liveAudio,audio}){
       if(ws.current&&ws.current.readyState===1)
         ws.current.send(JSON.stringify({cmd:'audio_chunk',data:Array.from(e.data)}));
     };
-    /* dB meter */
     var tdata=new Uint8Array(an.fftSize);
     dbTimerRef.current=setInterval(function(){
       if(!analyserRef.current)return;
@@ -425,8 +456,7 @@ function AudioWidget({ws,liveAudio,audio}){
       for(var i=0;i<tdata.length;i++){var s=(tdata[i]-128)/128;rms+=s*s;}
       rms=Math.sqrt(rms/tdata.length);
       var dbVal=rms>0?Math.round(20*Math.log10(rms)+90):28;
-      setDb(Math.max(28,Math.min(110,dbVal)));
-      setVad(dbVal>45);
+      setDb(Math.max(28,Math.min(110,dbVal)));setVad(dbVal>45);
     },80);
     return {actx,an,chunker};
   };
@@ -456,22 +486,40 @@ function AudioWidget({ws,liveAudio,audio}){
   };
 
   var handleMode=function(newMode){
+    _clearSeat();
     stopAudio();
     setAudioMode(newMode);
     if(newMode==='mic')startMic();
-    else if(newMode!=='off')startFile(newMode);
+    else if(newMode!=='off'){
+      startFile(newMode);
+      _applySeat(seatTarget,kindTarget,newMode);
+    }
   };
 
-  useEffect(function(){return stopAudio;},[]);
+  var handleSeat=function(newSeat){
+    _clearSeat();
+    setSeatTarget(newSeat);
+    if(audioMode!=='off'&&audioMode!=='mic')
+      _applySeat(newSeat,kindTarget,audioMode);
+  };
+
+  var handleKind=function(newKind){
+    setKindTarget(newKind);
+    if(audioMode!=='off'&&audioMode!=='mic'&&seatTarget!=='none')
+      _applySeat(seatTarget,newKind,audioMode);
+  };
+
+  useEffect(function(){return function(){_clearSeat();stopAudio();};},[]);
 
   var aud=audio||{};
   var audActive=aud.label&&aud.label!=='none';
+  var isFile=audioMode!=='off'&&audioMode!=='mic';
   var dbPct=Math.min(100,((db-28)/82)*100);
   var dbCol=db>75?'#fc8181':db>55?'#f6ad55':'#00d4b0';
-  var isFile=audioMode!=='off'&&audioMode!=='mic';
 
   return (
     <div className="panel" style={{gap:0}}>
+      {/* Header row: title + file dropdown */}
       <div className="ph">
         <span className="pt">Audio Input</span>
         <select value={audioMode} onChange={function(e){handleMode(e.target.value);}}
@@ -483,7 +531,38 @@ function AudioWidget({ws,liveAudio,audio}){
           })}
         </select>
       </div>
-      {/* dB meter row */}
+      {/* Seat + type selector — only when a file is playing */}
+      {isFile&&(
+        <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:6,flexShrink:0,alignItems:'center'}}>
+          <span style={{fontSize:9,color:'rgba(255,255,255,.5)'}}>Seat:</span>
+          {AUDIO_SEAT_OPTS.map(function(o){
+            var active=seatTarget===o.id;
+            return (
+              <button key={o.id} onClick={function(){handleSeat(o.id);}}
+                style={{padding:'2px 7px',fontSize:9,borderRadius:3,cursor:'pointer',border:'none',
+                  background:active?'rgba(0,212,176,.25)':'rgba(255,255,255,.07)',
+                  color:active?'#00d4b0':'rgba(255,255,255,.65)',
+                  outline:active?'1px solid #00d4b0':'none'}}>
+                {o.label}
+              </button>
+            );
+          })}
+          <span style={{fontSize:9,color:'rgba(255,255,255,.5)',marginLeft:4}}>As:</span>
+          {AUDIO_KIND_OPTS.map(function(o){
+            var active=kindTarget===o.id;
+            return (
+              <button key={o.id} onClick={function(){handleKind(o.id);}}
+                style={{padding:'2px 7px',fontSize:9,borderRadius:3,cursor:'pointer',border:'none',
+                  background:active?'rgba(246,173,85,.25)':'rgba(255,255,255,.07)',
+                  color:active?'#f6ad55':'rgba(255,255,255,.65)',
+                  outline:active?'1px solid #f6ad55':'none'}}>
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {/* dB meter */}
       <div className="row" style={{marginBottom:6,flexShrink:0}}>
         <span className="vad-dot" style={{background:vad?'#00d4b0':'#1c2740',
           boxShadow:vad?'0 0 6px rgba(0,212,176,.6)':'none'}}/>
@@ -497,21 +576,21 @@ function AudioWidget({ws,liveAudio,audio}){
           fontVariantNumeric:'tabular-nums',lineHeight:1}}>{db}</span>
         <span style={{fontSize:10,color:'rgba(255,255,255,.8)',alignSelf:'flex-end',marginBottom:2}}>dB</span>
       </div>
-      {/* Waveform — 25% of remaining space */}
+      {/* Waveform 25% / Spectrogram 75% */}
       <div className="canvas-wrap" style={{flex:1,minHeight:0,marginBottom:4}}>
         <WaveformCanvas analyserRef={analyserRef}/>
       </div>
-      {/* Spectrogram — 75% of remaining space */}
       <div className="canvas-wrap" style={{flex:3,minHeight:0}}>
         <SpectrogramCanvas analyserRef={analyserRef}/>
       </div>
-      {isFile&&(
+      {/* Status + detection */}
+      {isFile&&seatTarget!=='none'&&(
         <div style={{fontSize:9,color:'#f6ad55',marginTop:4,flexShrink:0}}>
-          FILE: {audioMode}.mp3 — looping
+          {ICONS[kindTarget]||'👤'} {kindTarget==='child'?'Baby':'Pet'} in {seatTarget.replace(/_/g,' ')} — {audioMode.replace('baby_','')}.mp3
         </div>
       )}
       {audActive&&(
-        <div className="det-badge" style={{marginTop:5}}>
+        <div className="det-badge" style={{marginTop:4}}>
           {AICONS[aud.label]||''} {aud.label} · {Math.round((aud.confidence||0)*100)}% conf
         </div>
       )}
@@ -1149,7 +1228,7 @@ function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat})
     <div className="sv">
       {/* Row 1 */}
       <VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver} send={send}/>
-      <AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio}/>
+      <AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio} send={send}/>
       <SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat}/>
       {/* Row 2 */}
       <VehicleWidget speed={state.world_speed_kmh} visibility={state.world_visibility} send={send}/>
@@ -1296,7 +1375,9 @@ function RecommendationPanel({mitigations,send}){
       'Seatbelt not engaged':'Fasten Seatbelt',
       'Secure loose item':'Secure Loose Items',
       'Secure loose item (camera)':'Secure Loose Items',
-      'CHILD PRESENCE ALERT':'Child Left Behind — Act Now'
+      'CHILD PRESENCE ALERT':'Child Left Behind — Act Now',
+      'Engage baby':'Play Nursery Content',
+      'Passenger content':'Maintain Cabin Comfort'
     };
     return map[t]||t;
   };

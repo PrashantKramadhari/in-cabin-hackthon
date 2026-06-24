@@ -82,6 +82,8 @@ def _cognitive_load() -> tuple[int, list[str]]:
 
     # ── Audio anomaly (sensor or seat-config fallback) ───────────────────
     audio_label, audio_conf = _effective_audio()
+    _child_pet_seats = [s for s in _latest["radar"].get("seats", [])
+                        if s.get("occupant") in ("child", "pet") and s.get("occupied")]
     if audio_label in ("crying", "barking", "animal") and audio_conf > 0.25:
         score += 25; factors.append(audio_label + " in cabin")
     elif audio_label == "shouting" and audio_conf > 0.25:
@@ -89,7 +91,12 @@ def _cognitive_load() -> tuple[int, list[str]]:
     elif audio_label == "rattle" and audio_conf > 0.25:
         score += 10; factors.append("rattling object")
     elif audio_label == "talking" and audio_conf > 0.25:
-        score += 5; factors.append("speech activity")
+        if _child_pet_seats:
+            score += 10; factors.append("baby babbling in cabin")
+        else:
+            score += 5; factors.append("speech activity")
+    elif audio_label == "happy" and audio_conf > 0.25:
+        score += 2; factors.append("baby happy in cabin")
 
     # ── Vehicle context ──────────────────────────────────────────────────
     veh = _latest["vehicle"]
@@ -137,18 +144,39 @@ def _proposed() -> list[dict]:
     veh = _latest["vehicle"]
     d = _driver_seat()
 
-    # --- USE CASE 1: audio comfort, corroborated by radar occupancy ---
-    rear_child_or_pet = any(
-        s.get("occupant") in ("child", "pet") and s.get("occupied")
-        for s in _latest["radar"].get("seats", []))
+    # --- USE CASE 1: audio comfort, corroborated by occupancy in ANY seat ---
+    child_pet_seats = [
+        s for s in _latest["radar"].get("seats", [])
+        if s.get("occupant") in ("child", "pet") and s.get("occupied")
+    ]
+    seat_names = ", ".join(
+        s["seat"].replace("_", " ").title() for s in child_pet_seats
+    ) if child_pet_seats else ""
+
     if audio_label in ("crying", "animal", "barking") and audio_conf > 0.25 \
-            and rear_child_or_pet:
-        who = "child" if audio_label == "crying" else "pet"
+            and child_pet_seats:
+        who = "child" if audio_label in ("crying",) else "pet"
         out.append(dict(
             id="comfort_audio", title="Soothe cabin",
             usecase="Audio comfort",
-            detail=f"{who.title()} distress detected (radar-confirmed). "
+            detail=f"{who.title()} distress detected in {seat_names}. "
                    "Lower media volume 30%, warm AC +1°C, soft cabin lighting.",
+            severity="advisory", confirm=True))
+
+    elif audio_label == "talking" and audio_conf > 0.25 and child_pet_seats:
+        out.append(dict(
+            id="baby_engagement", title="Engage baby",
+            usecase="Audio comfort",
+            detail=f"Baby babbling in {seat_names}. Play a nursery rhyme or "
+                   "soft music to maintain a calm, stimulating environment.",
+            severity="advisory", confirm=True))
+
+    elif audio_label == "happy" and audio_conf > 0.25 and child_pet_seats:
+        out.append(dict(
+            id="baby_happy", title="Passenger content",
+            usecase="Cabin monitoring",
+            detail=f"Baby sounds happy in {seat_names}. Maintain current "
+                   "cabin temperature, lighting and media volume.",
             severity="advisory", confirm=True))
 
     # --- Shouting / passenger distress ---
