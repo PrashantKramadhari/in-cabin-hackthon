@@ -471,55 +471,145 @@ function AudioWidget({ws,liveAudio,audio}){
 }
 
 /* ── VideoWidget ── */
-function VideoWidget({ws,liveVision,visionDriver}){
-  const [on,setOn]=useState(false);
+var SYNTH_CLIPS=[
+  {id:'off',       label:'Camera Off'},
+  {id:'live',      label:'Live Camera'},
+  {id:'baby_crying', label:'Synthetic: Baby Crying'},
+  {id:'baby_talking',label:'Synthetic: Baby Talking'},
+  {id:'baby_happy',  label:'Synthetic: Baby Happy'}
+];
+
+function VideoWidget({ws,liveVision,visionDriver,send}){
+  const [mode,setMode]=useState('off');
   const vRef=useRef(null);
-  const tRef=useRef(null);
-  const startCam=async function(){
+  const camRef=useRef(null);  /* {interval, canvas, ctx, stream} */
+  const synthRef=useRef(null); /* {audio, interval} */
+
+  /* ── helpers ── */
+  var wsSend=function(msg){
+    if(ws.current&&ws.current.readyState===1)
+      ws.current.send(JSON.stringify(msg));
+  };
+
+  var stopAll=function(){
+    if(camRef.current){
+      clearInterval(camRef.current.interval);
+      if(camRef.current.stream)
+        camRef.current.stream.getTracks().forEach(function(t){t.stop();});
+      camRef.current=null;
+    }
+    if(synthRef.current){
+      clearInterval(synthRef.current.interval);
+      if(synthRef.current.audio){
+        synthRef.current.audio.pause();
+        synthRef.current.audio.src='';
+      }
+      synthRef.current=null;
+    }
+    if(vRef.current){vRef.current.srcObject=null;}
+  };
+
+  var startLive=async function(){
     try{
       var st=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240}});
       vRef.current.srcObject=st;await vRef.current.play();
-      var cv=document.createElement('canvas');cv.width=320;cv.height=240;
-      var c2=cv.getContext('2d');
-      tRef.current=setInterval(function(){
+      var cv2=document.createElement('canvas');cv2.width=320;cv2.height=240;
+      var c2=cv2.getContext('2d');
+      /* throttle to 500 ms when mic also active — prevents WS flood */
+      var interval=setInterval(function(){
         c2.drawImage(vRef.current,0,0,320,240);
-        var b64=cv.toDataURL('image/jpeg',.7).split(',')[1];
-        if(ws.current&&ws.current.readyState===1)
-          ws.current.send(JSON.stringify({cmd:'vision_frame',data:b64}));
-      },200);setOn(true);
-    }catch(e){alert('Camera denied: '+e.message);}
+        var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
+        wsSend({cmd:'vision_frame',data:b64});
+      },500);
+      camRef.current={interval,canvas:cv2,ctx:c2,stream:st};
+    }catch(e){alert('Camera denied: '+e.message);setMode('off');}
   };
-  const stopCam=function(){
-    clearInterval(tRef.current);
-    if(vRef.current&&vRef.current.srcObject)
-      vRef.current.srcObject.getTracks().forEach(function(t){t.stop();});
-    setOn(false);
+
+  var startSynth=function(clipId){
+    /* Draw a simple synthetic cabin on canvas + loop audio */
+    var cv2=document.createElement('canvas');cv2.width=320;cv2.height=240;
+    var c2=cv2.getContext('2d');
+    var draw=function(){
+      c2.fillStyle='#0c1420';c2.fillRect(0,0,320,240);
+      /* seats outline */
+      [[80,80],[240,80],[80,160],[240,160]].forEach(function(p,i){
+        c2.strokeStyle='#1c2740';c2.lineWidth=2;
+        c2.strokeRect(p[0]-35,p[1]-35,70,70);
+        if(i===2){/* rear-left: baby */
+          c2.fillStyle='rgba(0,212,176,.15)';c2.fillRect(p[0]-35,p[1]-35,70,70);
+          c2.font='32px serif';c2.textAlign='center';c2.fillStyle='#fff';
+          var icons={baby_crying:'😢',baby_talking:'👶',baby_happy:'😊'};
+          c2.fillText(icons[clipId]||'👶',p[0],p[1]+12);
+        }
+      });
+      c2.fillStyle='rgba(0,212,176,.6)';c2.font='10px monospace';
+      c2.textAlign='left';c2.fillText('SYNTHETIC FEED — '+clipId,8,230);
+    };
+    draw();
+    var interval=setInterval(function(){
+      draw();
+      var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
+      wsSend({cmd:'vision_frame',data:b64});
+    },1000); /* 1 fps for synthetic — Qwen doesn't need fast updates */
+
+    /* Signal backend which audio clip is playing */
+    wsSend({cmd:'synthetic_audio',clip:clipId});
+
+    /* Play audio via <audio> element + Web Audio chain for BabyNet */
+    var audio=new Audio('/static/audio/'+clipId+'.mp3');
+    audio.loop=true;
+    audio.play().catch(function(){});
+
+    synthRef.current={interval,audio};
+
+    /* Show the synthetic canvas in the video box */
+    if(vRef.current){
+      try{var s=cv2.captureStream(1);vRef.current.srcObject=s;vRef.current.play().catch(function(){});}
+      catch(e){/* captureStream not supported — just skip video preview */}
+    }
   };
+
+  var handleMode=function(newMode){
+    stopAll();
+    setMode(newMode);
+    if(newMode==='live')startLive();
+    else if(newMode.startsWith('baby_'))startSynth(newMode);
+  };
+
+  useEffect(function(){return stopAll;},[]);
+
   var vd=visionDriver||{};
+  var isSynth=mode.startsWith('baby_');
   return (
     <div className="panel">
       <div className="ph">
         <span className="pt">Cabin Video Feed</span>
-        {liveVision&&<button className="btn" style={{padding:'2px 8px'}}
-          onClick={on?stopCam:startCam}>{on?'⏹ Stop':'📷 Camera'}</button>}
+        <select value={mode} onChange={function(e){handleMode(e.target.value);}
+        } style={{background:'rgba(0,0,0,.5)',border:'1px solid rgba(255,255,255,.15)',
+          color:'rgba(255,255,255,.85)',borderRadius:4,padding:'2px 6px',fontSize:10,cursor:'pointer'}}>
+          {SYNTH_CLIPS.filter(function(c){return c.id!=='live'||liveVision;}).map(function(c){
+            return <option key={c.id} value={c.id}>{c.label}</option>;
+          })}
+        </select>
       </div>
       <div className="vid-box" style={{position:'relative'}}>
-        {!on&&!liveVision&&<span>No camera · synthetic</span>}
-        {!on&&liveVision&&<span style={{color:'rgba(255,255,255,.8)'}}>Camera off</span>}
+        {mode==='off'&&<span style={{color:'rgba(255,255,255,.5)'}}>Select feed above</span>}
         <video ref={vRef} muted playsInline
           style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:5,
-            display:on?'block':'none'}}/>
-        {on&&<button onClick={stopCam} style={{position:'absolute',top:5,right:5,fontSize:9,
-          padding:'2px 6px',background:'rgba(252,129,129,.12)',border:'1px solid #fc8181',
-          borderRadius:3,color:'#fc8181'}}>⏹</button>}
+            display:(mode!=='off')?'block':'none'}}/>
+        {isSynth&&(
+          <div style={{position:'absolute',bottom:6,left:6,fontSize:9,
+            color:'#00d4b0',background:'rgba(0,0,0,.6)',padding:'2px 6px',borderRadius:3}}>
+            SYNTHETIC
+          </div>
+        )}
       </div>
       {vd.face_detected&&(
         <div style={{display:'flex',gap:10,marginTop:5,fontSize:10,flexShrink:0}}>
-          <span style={{color:'rgba(255,255,255,.8)'}}>Emotion:</span>
+          <span style={{color:'rgba(255,255,255,.8)'}}>Driver emotion:</span>
           <span style={{color:vd.drowsy?'#fc8181':'#00d4b0',fontWeight:600}}>
             {vd.emotion}{vd.drowsy?' ⚠ Drowsy':''}
           </span>
-          <span style={{color:'rgba(255,255,255,.8)',marginLeft:'auto'}}>EAR {vd.ear}</span>
         </div>
       )}
     </div>
@@ -971,7 +1061,7 @@ function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat})
   return (
     <div className="sv">
       {/* Row 1 */}
-      <VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver}/>
+      <VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver} send={send}/>
       <AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio}/>
       <SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat}/>
       {/* Row 2 */}

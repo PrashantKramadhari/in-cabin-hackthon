@@ -118,12 +118,16 @@ def _run_yolo(bgr: np.ndarray) -> list[dict]:
 
 
 def _process(b64: str) -> tuple[dict, list[dict]]:
-    data = base64.b64decode(b64)
-    arr  = np.frombuffer(data, np.uint8)
-    bgr  = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    if bgr is None:
+    try:
+        data = base64.b64decode(b64)
+        arr  = np.frombuffer(data, np.uint8)
+        bgr  = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if bgr is None:
+            return {"face_detected": False}, []
+        return _run_face(bgr), _run_yolo(bgr)
+    except Exception as exc:
+        print(f"[vision] process error: {exc}")
         return {"face_detected": False}, []
-    return _run_face(bgr), _run_yolo(bgr)
 
 
 async def run() -> None:
@@ -132,6 +136,14 @@ async def run() -> None:
 
     while True:
         b64 = await frame_queue.get()
-        face, objs = await loop.run_in_executor(None, _process, b64)
+        try:
+            face, objs = await loop.run_in_executor(None, _process, b64)
+        except Exception as exc:
+            print(f"[vision] run error: {exc}")
+            face, objs = {"face_detected": False}, []
+        # Ensure all values are JSON-serialisable Python types
+        face = {k: (bool(v) if isinstance(v, (bool,)) else
+                    float(v) if hasattr(v, '__float__') else v)
+                for k, v in face.items()}
         await bus.publish("vision_driver",  {"ts": time.time(), **face})
         await bus.publish("vision_objects", {"ts": time.time(), "detections": objs})

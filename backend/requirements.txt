@@ -1,10 +1,13 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 numpy
-# PyTorch CPU (install via: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu)
 torch
 torchaudio
-transformers          # AST audio classifier (AudioSet 527 classes, replaces YAMNet)
-# Day-2 vision node:
-# mediapipe           # face / driver state
-# ultralytics         # YOLOv8n seatbelt / object detection
+transformers          # AST fallback + Qwen2-VL-2B
+bitsandbytes          # 4-bit quantisation for Qwen2-VL
+accelerate            # device_map support
+qwen-vl-utils         # Qwen2-VL image preprocessing
+Pillow                # image handling for Qwen
+# MediaPipe / YOLO fallback vision (optional):
+# mediapipe
+# ultralytics

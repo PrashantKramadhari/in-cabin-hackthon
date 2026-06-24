@@ -21,7 +21,7 @@ from world import world
 _latest: dict[str, dict] = {
     "radar": {}, "audio": {}, "vehicle": {},
     "vision_driver": {}, "vision_objects": {},
-    "vibration": {},
+    "vibration": {}, "vision_all_seats": {},
 }
 
 # mitigation registry: id -> {..., status}
@@ -289,13 +289,39 @@ def dismiss(mitigation_id: str) -> None:
         _mitigations[mitigation_id]["status"] = "dismissed"
 
 
+def _build_seat_configs() -> dict:
+    """Merge world seat state with Qwen per-seat vision data."""
+    vs = _latest.get("vision_all_seats", {})
+    configs = {}
+    for sid, occ in world.seats.items():
+        cfg = {
+            "occupied":         occ.occupied,
+            "kind":             occ.kind,
+            "buckled":          occ.buckled,
+            "distress":         round(occ.distress, 2),
+            "audio_event":      occ.audio_event,
+            "heart_rate_bpm":   occ.heart_rate_bpm,
+            "respiration_rpm":  occ.respiration_rpm,
+            "emotion":          occ.emotion,
+        }
+        seat_v = vs.get(sid)
+        if isinstance(seat_v, dict) and seat_v.get("occupied"):
+            # Qwen sees someone here — enrich emotion + kind if unknown
+            cfg["emotion"] = seat_v.get("emotion", cfg["emotion"])
+            if cfg["kind"] == "unknown" and seat_v.get("kind"):
+                cfg["kind"] = seat_v["kind"]
+        configs[sid] = cfg
+    return configs
+
+
 async def _consume(topic: str) -> None:
     async for frame in bus.stream(topic):
         _latest[topic] = frame
 
 
 async def run() -> None:
-    for t in ("radar", "audio", "vehicle", "vibration", "vision_driver", "vision_objects"):
+    for t in ("radar", "audio", "vehicle", "vibration",
+              "vision_driver", "vision_objects", "vision_all_seats"):
         asyncio.create_task(_consume(t))
     while True:
         t0 = time.perf_counter()
@@ -315,20 +341,9 @@ async def run() -> None:
             vibration=_latest["vibration"],
             mitigations=mitigations,
             latency_ms=round((time.perf_counter() - t0) * 1000, 2),
-            # World-level config exposed so the HMI can reflect / edit it
-            seat_configs={
-                sid: {
-                    "occupied": occ.occupied,
-                    "kind": occ.kind,
-                    "buckled": occ.buckled,
-                    "distress": round(occ.distress, 2),
-                    "audio_event": occ.audio_event,
-                    "heart_rate_bpm": occ.heart_rate_bpm,
-                    "respiration_rpm": occ.respiration_rpm,
-                    "emotion": occ.emotion,
-                }
-                for sid, occ in world.seats.items()
-            },
+            # World-level config exposed so the HMI can reflect / edit it.
+            # Qwen vision_all_seats overlays per-seat emotion when available.
+            seat_configs=_build_seat_configs(),
             driver_emotion=world.driver_emotion,
             vib_override=world.vib_override,
             vib_road_quality=world.vib_road_quality,

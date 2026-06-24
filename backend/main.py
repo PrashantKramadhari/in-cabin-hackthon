@@ -16,19 +16,37 @@ import scenarios
 from bus import bus
 from sensors import radar, audio, vehicle, vibration
 
-# Try to load the live audio node; fall back to synthetic if deps absent
+# BabyNet takes priority over AST; fall back gracefully
 try:
-    from sensors import audio_yamnet as _audio_live
+    from sensors import baby_net as _audio_live
     _USE_LIVE_AUDIO = True
-except Exception:
-    _USE_LIVE_AUDIO = False
+    _AUDIO_NODE_NAME = "baby_net"
+except Exception as _e:
+    print(f"[main] BabyNet unavailable ({_e}), trying AST …")
+    try:
+        from sensors import audio_yamnet as _audio_live  # type: ignore[assignment]
+        _USE_LIVE_AUDIO = True
+        _AUDIO_NODE_NAME = "ast"
+    except Exception:
+        _USE_LIVE_AUDIO = False
+        _AUDIO_NODE_NAME = "synthetic"
 
-# Try to load the vision node; graceful fallback if mediapipe/ultralytics absent
+# Qwen2-VL vision takes priority; fall back to MediaPipe/YOLO then nothing
+_USE_QWEN_VISION = False
+_USE_VISION      = False
 try:
-    from sensors import vision as _vision
-    _USE_VISION = True
-except Exception:
-    _USE_VISION = False
+    from sensors import qwen_vision as _vision  # type: ignore[assignment]
+    _USE_QWEN_VISION = True
+    _USE_VISION      = True
+    _VISION_NODE_NAME = "qwen2vl"
+except Exception as _e:
+    print(f"[main] QwenVision unavailable ({_e}), trying MediaPipe …")
+    try:
+        from sensors import vision as _vision  # type: ignore[assignment]
+        _USE_VISION = True
+        _VISION_NODE_NAME = "mediapipe"
+    except Exception:
+        _VISION_NODE_NAME = "none"
 
 app = FastAPI(title="CabinSense")
 
@@ -98,7 +116,13 @@ async def _startup() -> None:
 
 @app.get("/api/caps")
 async def caps() -> dict:
-    return {"live_audio": _USE_LIVE_AUDIO, "live_vision": _USE_VISION}
+    return {
+        "live_audio":    _USE_LIVE_AUDIO,
+        "live_vision":   _USE_VISION,
+        "qwen_vision":   _USE_QWEN_VISION,
+        "audio_node":    _AUDIO_NODE_NAME,
+        "vision_node":   _VISION_NODE_NAME,
+    }
 
 
 @app.get("/api/audio-mode")
@@ -152,7 +176,13 @@ async def ws(sock: WebSocket) -> None:
 
     async def pump() -> None:
         while True:
-            await sock.send_text(json.dumps(await q.get()))
+            data = await q.get()
+            try:
+                await sock.send_text(json.dumps(data))
+            except (TypeError, ValueError) as exc:
+                # Non-serialisable value slipped through — log and skip
+                import traceback
+                print(f"[pump] JSON error: {exc}\n{traceback.format_exc()}")
 
     pump_task = asyncio.create_task(pump())
     try:
@@ -224,6 +254,16 @@ async def ws(sock: WebSocket) -> None:
                 b64 = msg.get("data", "")
                 if b64 and not _vision.frame_queue.full():
                     await _vision.frame_queue.put(b64)
+            elif cmd == "synthetic_audio" and _USE_LIVE_AUDIO:
+                # Synthetic feed: browser signals which clip is playing
+                clip = msg.get("clip", "")
+                scenario_map = {
+                    "baby_crying": "child_crying_rear",
+                    "baby_talking": "child_crying_rear",
+                    "baby_happy": "idle",
+                }
+                if clip in scenario_map:
+                    scenarios.apply(scenario_map[clip])
     except WebSocketDisconnect:
         pass
     finally:
