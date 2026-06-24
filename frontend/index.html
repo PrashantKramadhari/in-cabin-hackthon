@@ -15,90 +15,107 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 
 /* ─── Shell ─── */
 .hmi{display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.hmi-hdr{height:44px;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;
-  background:#0c1018;border-bottom:1px solid #1c2740}
-.logo{font-size:18px;font-weight:700;letter-spacing:-.5px}
-.logo span{color:#00d4b0}
-.tagline{font-size:9px;color:#2a3a50;letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
+.hmi-hdr{height:34px;display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;
+  background:#040810;border-bottom:1px solid rgba(255,255,255,.05)}
 .sp{flex:1}
-.view-lbl{font-size:10px;color:#3d5070;font-weight:500;letter-spacing:.5px}
-.hmi-clock{font-size:11px;color:#4a6580;font-variant-numeric:tabular-nums}
-.dot{width:7px;height:7px;border-radius:50%;background:#1c2740;transition:background .4s}
-.dot.on{background:#00d4b0;box-shadow:0 0 8px rgba(0,212,176,.5)}
-.lat{font-size:9px;color:#2a3a50;font-variant-numeric:tabular-nums}
+.hmi-clock{font-size:10px;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums}
+.dot{width:6px;height:6px;border-radius:50%;background:#1c2740;transition:background .4s}
+.dot.on{background:#00d4b0;box-shadow:0 0 8px rgba(0,212,176,.6)}
+.lat{font-size:9px;color:rgba(255,255,255,.2);font-variant-numeric:tabular-nums}
 .hmi-content{flex:1;overflow:hidden;position:relative}
 .view{position:absolute;inset:0;overflow:hidden}
-.hmi-tabs{height:48px;display:flex;background:#0c1018;border-top:1px solid #1c2740;flex-shrink:0}
+.hmi-tabs{height:42px;display:flex;background:#040810;border-top:1px solid rgba(255,255,255,.05);flex-shrink:0}
 .tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;font-size:11px;
-  font-weight:500;color:#2a3a50;cursor:pointer;border:none;background:none;
+  font-weight:500;color:rgba(255,255,255,.3);cursor:pointer;border:none;background:none;
   border-top:2px solid transparent;transition:all .25s;letter-spacing:.3px}
 .tab.on{color:#00d4b0;border-top-color:#00d4b0;background:rgba(0,212,176,.04)}
+
+/* ─── Brand Bar ─── */
+.brand-bar{display:flex;align-items:center;justify-content:space-between;
+  width:54vw;min-width:600px;padding:0 6px;margin-bottom:12px}
+.jag-side{display:flex;align-items:center;gap:12px}
+.jag-name{font-size:17px;font-weight:200;letter-spacing:7px;color:#ffffff;
+  text-transform:uppercase;line-height:1}
+.jag-sub{font-size:6.5px;letter-spacing:4px;color:rgba(255,255,255,.35);
+  text-transform:uppercase;margin-top:3px}
+.brand-sep{flex:1;height:1px;margin:0 20px;
+  background:linear-gradient(to right,rgba(255,255,255,.04),rgba(0,212,176,.25),rgba(255,255,255,.04))}
+.cs-side{text-align:right}
+.cs-name{font-size:19px;font-weight:700;letter-spacing:-.5px;color:#ffffff;line-height:1}
+.cs-name em{color:#00d4b0;font-style:normal}
+.cs-sub{font-size:6.5px;letter-spacing:3px;color:rgba(255,255,255,.35);
+  text-transform:uppercase;margin-top:3px}
 
 /* ─── Sensor View Grid ─── */
 .sv{display:grid;grid-template-columns:repeat(3,1fr);
   grid-template-rows:1fr 1fr 44px;gap:6px;padding:6px;
   width:54vw;height:54vh;min-width:600px;min-height:320px;
-  border-radius:14px;overflow:hidden;border:1.5px solid #1c2740;
-  box-shadow:0 0 60px rgba(0,0,0,.7),0 0 0 1px rgba(0,212,176,.06)}
+  border-radius:14px;overflow:hidden;
+  border:1px solid rgba(0,212,176,.2);
+  background:linear-gradient(150deg,#0c1420 0%,#080d18 100%);
+  box-shadow:0 0 0 1px rgba(0,212,176,.06),0 30px 80px rgba(0,0,0,.95),
+    0 0 60px rgba(0,212,176,.04),inset 0 1px 0 rgba(255,255,255,.04)}
 .sv-timeline{grid-column:1/-1}
 
 /* ─── Panels ─── */
-.panel{background:#0d1520;border:1px solid #1c2740;border-radius:7px;
+.panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;
   padding:7px 9px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0}
 .pt{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
-.ps{font-size:9px;color:#2a3a50}
+.ps{font-size:9px;color:rgba(255,255,255,.38)}
 .pb{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:6px}
 
 /* ─── Shared controls ─── */
 .row{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.lbl{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:#2a3a50;flex-shrink:0}
-.val{font-size:11px;font-weight:600;color:#d4dce8;min-width:42px;text-align:right;flex-shrink:0}
+.lbl{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.45);flex-shrink:0}
+.val{font-size:11px;font-weight:600;color:#ffffff;min-width:42px;text-align:right;flex-shrink:0}
 .btn-row{display:flex;flex-wrap:wrap;gap:4px}
-.btn{padding:3px 9px;border-radius:4px;font-size:9px;border:1px solid #1c2740;
-  background:#060d16;color:#3d5070;cursor:pointer;transition:all .15s;font-family:inherit}
+.btn{padding:3px 9px;border-radius:4px;font-size:9px;border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s;font-family:inherit}
 .btn:hover{border-color:#00d4b0;color:#00d4b0}
 .btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
 .btn.warn{background:rgba(246,173,85,.08);border-color:#f6ad55;color:#f6ad55}
 .btn.crit{background:rgba(252,129,129,.08);border-color:#fc8181;color:#fc8181}
 input[type=range]{-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
-  background:#1a2535;outline:none;flex:1;cursor:pointer;border:none;min-width:0}
+  background:rgba(255,255,255,.12);outline:none;flex:1;cursor:pointer;border:none;min-width:0}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
   border-radius:50%;background:#00d4b0;cursor:pointer;border:2px solid #090d12}
 input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
-.divider{height:1px;background:#1c2740;flex-shrink:0;margin:2px 0}
+.divider{height:1px;background:rgba(255,255,255,.07);flex-shrink:0;margin:2px 0}
 
 /* ─── Video ─── */
-.vid-box{background:#060c14;border-radius:5px;flex:1;display:flex;align-items:center;
-  justify-content:center;color:#1c2740;font-size:11px;overflow:hidden;min-height:0}
+.vid-box{background:rgba(0,0,0,.4);border-radius:5px;flex:1;display:flex;align-items:center;
+  justify-content:center;color:rgba(255,255,255,.2);font-size:11px;overflow:hidden;min-height:0;
+  border:1px solid rgba(255,255,255,.07)}
 .vid-box video{width:100%;height:100%;object-fit:cover;border-radius:5px}
 
 /* ─── Audio widget ─── */
 .db-big{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
-.db-unit{font-size:11px;color:#2a3a50;margin-left:3px}
+.db-unit{font-size:11px;color:rgba(255,255,255,.4);margin-left:3px}
 .vad-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;
-  background:#1c2740;transition:background .2s}
+  background:rgba(255,255,255,.12);transition:background .2s}
 .vad-dot.on{background:#00d4b0;box-shadow:0 0 6px rgba(0,212,176,.6)}
-.noise-bar{height:5px;background:#1a2535;border-radius:3px;overflow:hidden;flex:1}
+.noise-bar{height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;flex:1}
 .noise-fill{height:100%;border-radius:3px;transition:width .15s,background .3s}
 .mic-btn{padding:4px 12px;border-radius:5px;font-size:10px;font-weight:600;
   font-family:inherit;cursor:pointer;transition:all .2s}
 .mic-start{background:rgba(0,212,176,.1);border:1px solid #00d4b0;color:#00d4b0}
 .mic-stop{background:rgba(252,129,129,.1);border:1px solid #fc8181;color:#fc8181}
-.canvas-wrap{border-radius:4px;overflow:hidden;background:#060d16;flex-shrink:0}
+.canvas-wrap{border-radius:4px;overflow:hidden;background:rgba(0,0,0,.5);flex-shrink:0;
+  border:1px solid rgba(255,255,255,.05)}
 .det-badge{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(246,173,85,.12);
   border:1px solid rgba(246,173,85,.3);color:#f6ad55;flex-shrink:0;align-self:flex-start}
 
 /* ─── Seats widget ─── */
 .seat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1}
-.seat-cell{border-radius:6px;border:1px solid #1c2740;background:#060d16;
+.seat-cell{border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.25);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;cursor:pointer;padding:5px;transition:all .3s;position:relative}
-.seat-cell.occ{border-color:#2a3f5a;background:#0d1a28}
-.seat-cell.warn{border-color:rgba(246,173,85,.5);background:rgba(246,173,85,.05)}
-.seat-cell.crit{border-color:rgba(252,129,129,.5);background:rgba(252,129,129,.05)}
+.seat-cell.occ{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.04)}
+.seat-cell.warn{border-color:rgba(246,173,85,.5);background:rgba(246,173,85,.06)}
+.seat-cell.crit{border-color:rgba(252,129,129,.5);background:rgba(252,129,129,.06)}
 .seat-icon{font-size:16px}
-.seat-name{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:#2a3a50}
+.seat-name{font-size:8px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.4)}
 .seat-tag{font-size:8px;color:#f6ad55;margin-top:1px}
 .seat-belt{position:absolute;top:4px;right:5px;font-size:9px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -113,9 +130,9 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 .timeline{display:flex;align-items:center;gap:8px;height:100%;overflow:hidden}
 .sc-scroll{display:flex;gap:4px;flex:1;overflow-x:auto;align-items:center}
 .sc-scroll::-webkit-scrollbar{height:2px}
-.sc-scroll::-webkit-scrollbar-thumb{background:#1c2740;border-radius:2px}
-.sc-btn{padding:4px 10px;border-radius:4px;font-size:9px;border:1px solid #1c2740;
-  background:#060d16;color:#3d5070;cursor:pointer;white-space:nowrap;flex-shrink:0;
+.sc-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+.sc-btn{padding:4px 10px;border-radius:4px;font-size:9px;border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);color:rgba(255,255,255,.4);cursor:pointer;white-space:nowrap;flex-shrink:0;
   transition:all .15s;font-family:inherit}
 .sc-btn:hover{border-color:#00d4b0;color:#00d4b0}
 .sc-btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
@@ -129,27 +146,31 @@ input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:13px;height:13px}
 /* ─── Overlay ─── */
 .overlay{position:fixed;inset:0;background:rgba(0,4,12,.8);display:flex;
   align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
-.ov-box{background:#0d1520;border:1px solid #00d4b0;border-radius:12px;
-  padding:20px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.ov-box{background:#0c1420;border:1px solid rgba(0,212,176,.3);border-radius:12px;
+  padding:20px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.8)}
 .ov-title{font-size:13px;font-weight:600;color:#00d4b0;margin-bottom:16px;
   display:flex;justify-content:space-between;align-items:center}
 .cfg-sec{margin-bottom:13px}
-.cfg-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#2a3a50;margin-bottom:6px}
+.cfg-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5);margin-bottom:6px}
 .btn-grp{display:flex;flex-wrap:wrap;gap:5px}
 .cfg-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.rval{font-size:11px;color:#d4dce8;font-weight:600;min-width:52px;text-align:right}
-.xbtn{padding:4px 10px;border-radius:4px;font-size:10px;border:1px solid #1c2740;
-  background:#060d16;color:#3d5070;transition:all .15s;cursor:pointer;font-family:inherit}
+.rval{font-size:11px;color:#ffffff;font-weight:600;min-width:52px;text-align:right}
+.xbtn{padding:4px 10px;border-radius:4px;font-size:10px;border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);color:rgba(255,255,255,.45);transition:all .15s;cursor:pointer;font-family:inherit}
 .xbtn.sel{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
-.close-btn{background:none;border:1px solid #1c2740;color:#3d5070;border-radius:5px;
+.close-btn{background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);border-radius:5px;
   padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit}
 
 /* ─── Infotainment View — half-size centered panel ─── */
-.iv-shell{height:100%;display:flex;align-items:center;justify-content:center;
-  background:#060a0f}
+.iv-shell{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 42%,#0c1828 0%,#040810 65%)}
 .iv{display:flex;flex-direction:row;width:54vw;height:54vh;min-width:600px;min-height:320px;
-  border-radius:14px;overflow:hidden;border:1.5px solid #1c2740;
-  box-shadow:0 0 60px rgba(0,0,0,.7),0 0 0 1px rgba(0,212,176,.06)}
+  border-radius:14px;overflow:hidden;
+  border:1px solid rgba(0,212,176,.2);
+  background:linear-gradient(150deg,#0c1420 0%,#080d18 100%);
+  box-shadow:0 0 0 1px rgba(0,212,176,.06),0 30px 80px rgba(0,0,0,.95),
+    0 0 60px rgba(0,212,176,.04),inset 0 1px 0 rgba(255,255,255,.04)}
 .iv-col{flex:1;display:flex;flex-direction:column;justify-content:center;
   padding:18px 16px;overflow:hidden;border-right:1px solid #1c2740}
 .iv-col:last-child{border-right:none}
@@ -423,7 +444,7 @@ function AudioWidget({ws,liveAudio,audio}){
         </span>
         <span style={{fontSize:22,fontWeight:700,color:dbCol,marginLeft:8,minWidth:56,
           fontVariantNumeric:'tabular-nums',lineHeight:1}}>{db}</span>
-        <span style={{fontSize:10,color:'#2a3a50',alignSelf:'flex-end',marginBottom:2}}>dB</span>
+        <span style={{fontSize:10,color:'rgba(255,255,255,.42)',alignSelf:'flex-end',marginBottom:2}}>dB</span>
       </div>
       {/* Waveform */}
       <div className="canvas-wrap" style={{marginBottom:4}}>
@@ -478,7 +499,7 @@ function VideoWidget({ws,liveVision,visionDriver}){
       </div>
       <div className="vid-box" style={{position:'relative'}}>
         {!on&&!liveVision&&<span>No camera · synthetic</span>}
-        {!on&&liveVision&&<span style={{color:'#2a3a50'}}>Camera off</span>}
+        {!on&&liveVision&&<span style={{color:'rgba(255,255,255,.42)'}}>Camera off</span>}
         <video ref={vRef} muted playsInline
           style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:5,
             display:on?'block':'none'}}/>
@@ -488,11 +509,11 @@ function VideoWidget({ws,liveVision,visionDriver}){
       </div>
       {vd.face_detected&&(
         <div style={{display:'flex',gap:10,marginTop:5,fontSize:10,flexShrink:0}}>
-          <span style={{color:'#2a3a50'}}>Emotion:</span>
+          <span style={{color:'rgba(255,255,255,.42)'}}>Emotion:</span>
           <span style={{color:vd.drowsy?'#fc8181':'#00d4b0',fontWeight:600}}>
             {vd.emotion}{vd.drowsy?' ⚠ Drowsy':''}
           </span>
-          <span style={{color:'#2a3a50',marginLeft:'auto'}}>EAR {vd.ear}</span>
+          <span style={{color:'rgba(255,255,255,.42)',marginLeft:'auto'}}>EAR {vd.ear}</span>
         </div>
       )}
     </div>
@@ -523,7 +544,7 @@ function SeatWidget({seatConfigs,onSelect}){
               <span className="seat-icon">{c.occupied?(ICONS[c.kind]||'👤'):'·'}</span>
               <span className="seat-name">{SEAT_LABELS[sid]}</span>
               {au&&<span className="seat-tag">{AICONS[c.audio_event]} {c.audio_event}</span>}
-              {c.occupied&&!au&&<span style={{fontSize:8,color:'#2a3a50'}}>{c.emotion||'calm'}</span>}
+              {c.occupied&&!au&&<span style={{fontSize:8,color:'rgba(255,255,255,.42)'}}>{c.emotion||'calm'}</span>}
             </div>
           );
         })}
@@ -649,7 +670,7 @@ function IMUWidget({vibState,send}){
             ['Z (Vertical)',az,setAz,8,12]].map(function(r){
             return (
               <div key={r[0]} className="row" style={{marginBottom:4}}>
-                <span style={{fontSize:9,color:'#2a3a50',width:72,flexShrink:0}}>{r[0]}</span>
+                <span style={{fontSize:9,color:'rgba(255,255,255,.42)',width:72,flexShrink:0}}>{r[0]}</span>
                 <input type="range" min={r[3]} max={r[4]} step="0.1"
                   value={r[1]}
                   onChange={function(e){
@@ -673,7 +694,7 @@ function IMUWidget({vibState,send}){
           {[['Roll',roll,setRoll,-45,45],['Pitch',pitch,setPitch,-30,30],['Yaw',yaw,setYaw,-180,180]].map(function(r){
             return (
               <div key={r[0]} className="row" style={{marginBottom:4}}>
-                <span style={{fontSize:9,color:'#2a3a50',width:32,flexShrink:0}}>{r[0]}</span>
+                <span style={{fontSize:9,color:'rgba(255,255,255,.42)',width:32,flexShrink:0}}>{r[0]}</span>
                 <input type="range" min={r[3]} max={r[4]} step="1" value={r[1]}
                   onChange={function(e){r[2](parseInt(e.target.value));}}/>
                 <span className="val" style={{minWidth:36}}>{r[1]}°</span>
@@ -763,7 +784,7 @@ function RoadQualityWidget({vib,send}){
       </div>
       {/* Wheel vibration heatmap */}
       <div style={{flexShrink:0,marginBottom:6}}>
-        <div style={{fontSize:9,color:'#2a3a50',marginBottom:4,textTransform:'uppercase',letterSpacing:'.7px'}}>Wheel Vibration</div>
+        <div style={{fontSize:9,color:'rgba(255,255,255,.42)',marginBottom:4,textTransform:'uppercase',letterSpacing:'.7px'}}>Wheel Vibration</div>
         <div className="wheel-map">
           {[['FL',wheels.fl],['FR',wheels.fr],['RL',wheels.rl],['RR',wheels.rr]].map(function(w){
             return <div key={w[0]} className="wheel"
@@ -815,7 +836,7 @@ function RoadQualityWidget({vib,send}){
 function TimelineBar({scenarios,current,demoRunning,send}){
   return (
     <div className="panel sv-timeline" style={{flexDirection:'row',padding:'8px 12px'}}>
-      <span style={{fontSize:9,color:'#2a3a50',textTransform:'uppercase',letterSpacing:'1px',
+      <span style={{fontSize:9,color:'rgba(255,255,255,.42)',textTransform:'uppercase',letterSpacing:'1px',
         flexShrink:0,alignSelf:'center',marginRight:10}}>Events</span>
       <div className="sc-scroll">
         {(scenarios||[]).map(function(s){
@@ -929,7 +950,7 @@ function SeatConfigOverlay({seatId,config,send,onClose}){
                 width:Math.round(((c.weight_kg||70)/120)*100)+'%',
                 background:loadCol(Math.round(((c.weight_kg||70)/120)*100))}}/>
             </div>
-            <div style={{fontSize:9,color:'#2a3a50',marginTop:3}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,.42)',marginTop:3}}>
               {Math.round(((c.weight_kg||70)/120)*100)}% — {c.weight_kg||70} kg
             </div>
           </div>
@@ -1191,6 +1212,54 @@ function InfotainmentView({state,send}){
   );
 }
 
+/* ── BrandBar ── */
+function BrandBar(){
+  return (
+    <div className="brand-bar">
+      {/* Jaguar side */}
+      <div className="jag-side">
+        {/* Leaping Jaguar SVG */}
+        <svg width="52" height="30" viewBox="0 0 52 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill="white" fillOpacity="0.92" d="
+            M 38 4
+            C 40 1 44 0 46 3
+            L 44 7
+            C 47 9 48 14 46 18
+            C 44 22 39 25 34 23
+            C 30 21 26 22 22 25
+            L 17 27
+            C 14 29 11 27 13 24
+            C 15 21 19 21 22 23
+            C 24 24 28 23 31 20
+            C 29 18 27 14 28 10
+            C 29 6 33 3 38 4 Z
+          "/>
+          <path fill="white" fillOpacity="0.92" d="
+            M 38 4 C 36 2 34 2 33 4 C 32 6 33 9 35 10 C 34 7 35 5 38 4 Z
+          "/>
+          <path fill="white" fillOpacity="0.92" d="
+            M 13 24 C 10 22 8 19 9 16 C 10 13 12 12 13 13 C 11 15 11 19 13 22 Z
+          "/>
+          <path fill="white" fillOpacity="0.5" d="
+            M 17 27 C 15 27 13 26 13 24 L 15 25 Z
+          "/>
+        </svg>
+        <div>
+          <div className="jag-name">Jaguar</div>
+          <div className="jag-sub">Land Rover</div>
+        </div>
+      </div>
+      {/* Separator */}
+      <div className="brand-sep"/>
+      {/* CabinSense side */}
+      <div className="cs-side">
+        <div className="cs-name"><em>Cabin</em>Sense</div>
+        <div className="cs-sub">In-Cabin Intelligence</div>
+      </div>
+    </div>
+  );
+}
+
 /* ── App ── */
 function App(){
   const INIT={
@@ -1233,17 +1302,10 @@ function App(){
     if(ws.current&&ws.current.readyState===1)ws.current.send(JSON.stringify(msg));
   },[]);
 
-  var tabNames={sensor:'Sensor Simulation & Replay',info:'Infotainment View'};
-
   return (
     <div className="hmi">
+      {/* Slim utility bar — just clock + conn */}
       <div className="hmi-hdr">
-        <div>
-          <div className="logo"><span>Cabin</span>Sense</div>
-          <div className="tagline">In-Cabin Disturbance Intelligence</div>
-        </div>
-        <div className="sp"/>
-        <span className="view-lbl">{tabNames[tab]}</span>
         <div className="sp"/>
         <Clock/>
         <div className={'dot'+(conn?' on':'')}/>
@@ -1252,6 +1314,7 @@ function App(){
       <div className="hmi-content">
         {tab==='sensor'&&(
           <div className="view iv-shell">
+            <BrandBar/>
             <SensorView state={state} send={send} ws={ws}
               liveAudio={liveAudio} liveVision={liveVision}
               scenarios={scenarios} onSelectSeat={setSelSeat}/>
@@ -1259,16 +1322,17 @@ function App(){
         )}
         {tab==='info'&&(
           <div className="view iv-shell">
+            <BrandBar/>
             <InfotainmentView state={state} send={send}/>
           </div>
         )}
       </div>
       <div className="hmi-tabs">
         <button className={'tab'+(tab==='sensor'?' on':'')} onClick={function(){setTab('sensor');}}>
-          🔬 Sensor Simulation &amp; Replay View
+          Sensor Simulation &amp; Replay
         </button>
         <button className={'tab'+(tab==='info'?' on':'')} onClick={function(){setTab('info');}}>
-          🚗 Infotainment View
+          Infotainment View
         </button>
       </div>
       {selSeat&&(
