@@ -44,7 +44,7 @@ body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFo
 
 /* ─── Sensor View Grid ─── */
 .sv{display:grid;grid-template-columns:repeat(3,1fr);
-  grid-template-rows:1fr 1fr 52px;gap:8px;padding:8px;
+  grid-template-rows:1fr 1fr 72px;gap:8px;padding:8px;
   width:81vw;height:81vh;min-width:900px;min-height:480px;
   border-radius:14px;overflow:auto;resize:both;
   border:1px solid rgba(0,212,176,.2);
@@ -393,7 +393,7 @@ var AUDIO_KIND_OPTS=[{id:'child',label:'Baby'},{id:'pet',label:'Pet'}];
 var _AUDIO_EVENT_MAP={baby_crying:'crying',baby_talking:'talking',baby_happy:'happy'};
 var _AUDIO_DISTRESS={baby_crying:0.85,baby_talking:0.35,baby_happy:0.1};
 
-function AudioWidget({ws,liveAudio,audio,send}){
+function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger}){
   const [audioMode,setAudioMode]=useState('off');
   const [seatTarget,setSeatTarget]=useState('none');
   const [kindTarget,setKindTarget]=useState('child');
@@ -403,7 +403,10 @@ function AudioWidget({ws,liveAudio,audio,send}){
   const ctxRef=useRef(null);
   const analyserRef=useRef(null);
   const dbTimerRef=useRef(null);
-  const prevCfgRef=useRef(null); /* tracks last configure_seat sent */
+  const prevCfgRef=useRef(null);
+  const audioModeRef=useRef('off');
+  const seatTargetRef=useRef('none');
+  const kindTargetRef=useRef('child');
   const SR=16000;
 
   /* reset the previously configured seat */
@@ -488,28 +491,39 @@ function AudioWidget({ws,liveAudio,audio,send}){
   var handleMode=function(newMode){
     _clearSeat();
     stopAudio();
-    setAudioMode(newMode);
+    setAudioMode(newMode);audioModeRef.current=newMode;
     if(newMode==='mic')startMic();
     else if(newMode!=='off'){
       startFile(newMode);
-      _applySeat(seatTarget,kindTarget,newMode);
+      _applySeat(seatTargetRef.current,kindTargetRef.current,newMode);
     }
   };
 
   var handleSeat=function(newSeat){
     _clearSeat();
-    setSeatTarget(newSeat);
-    if(audioMode!=='off'&&audioMode!=='mic')
-      _applySeat(newSeat,kindTarget,audioMode);
+    setSeatTarget(newSeat);seatTargetRef.current=newSeat;
+    if(audioModeRef.current!=='off'&&audioModeRef.current!=='mic')
+      _applySeat(newSeat,kindTargetRef.current,audioModeRef.current);
   };
 
   var handleKind=function(newKind){
-    setKindTarget(newKind);
-    if(audioMode!=='off'&&audioMode!=='mic'&&seatTarget!=='none')
-      _applySeat(seatTarget,newKind,audioMode);
+    setKindTarget(newKind);kindTargetRef.current=newKind;
+    if(audioModeRef.current!=='off'&&audioModeRef.current!=='mic'&&seatTargetRef.current!=='none')
+      _applySeat(seatTargetRef.current,newKind,audioModeRef.current);
   };
 
   useEffect(function(){return function(){_clearSeat();stopAudio();};},[]);
+  useEffect(function(){
+    if((playTrigger||0)>0){
+      var m=audioModeRef.current;
+      if(m&&m!=='off'){
+        stopAudio();
+        if(m==='mic')startMic();
+        else{startFile(m);_applySeat(seatTargetRef.current,kindTargetRef.current,m);}
+      }
+    }
+  },[playTrigger]);
+  useEffect(function(){if((stopTrigger||0)>0){_clearSeat();stopAudio();}},[stopTrigger]);
 
   var aud=audio||{};
   var audActive=aud.label&&aud.label!=='none';
@@ -608,11 +622,12 @@ var SYNTH_CLIPS=[
   {id:'baby_happy',  label:'Synthetic: Baby Happy'}
 ];
 
-function VideoWidget({ws,liveVision,visionDriver,send}){
+function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
   const [mode,setMode]=useState('off');
   const vRef=useRef(null);
   const camRef=useRef(null);  /* {interval, canvas, ctx, stream} */
   const synthRef=useRef(null); /* {audio, interval} */
+  const modeRef=useRef('off');
 
   /* ── helpers ── */
   var wsSend=function(msg){
@@ -727,15 +742,21 @@ function VideoWidget({ws,liveVision,visionDriver,send}){
 
   var handleMode=function(newMode){
     stopAll();
-    /* clear src when leaving default_video so browser releases file */
     if(vRef.current)vRef.current.src='';
-    setMode(newMode);
+    setMode(newMode);modeRef.current=newMode;
     if(newMode==='live')startLive();
     else if(newMode==='default_video')startDefaultVideo();
     else if(newMode.startsWith('baby_'))startSynth(newMode);
   };
 
   useEffect(function(){return stopAll;},[]);
+  useEffect(function(){
+    if((playTrigger||0)>0){
+      var m=modeRef.current;
+      if(m&&m!=='off'){stopAll();if(m==='live')startLive();else if(m==='default_video')startDefaultVideo();else if(m.startsWith('baby_'))startSynth(m);}
+    }
+  },[playTrigger]);
+  useEffect(function(){if((stopTrigger||0)>0)stopAll();},[stopTrigger]);
 
   var vd=visionDriver||{};
   var isSynth=mode.startsWith('baby_');
@@ -1095,29 +1116,57 @@ function RoadQualityWidget({vib,send}){
 }
 
 /* ── TimelineBar ── */
-function TimelineBar({scenarios,current,demoRunning,send}){
+function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,
+                      showVideo,showAudio,showSeats,
+                      onToggleVideo,onToggleAudio,onToggleSeats}){
+  var chipStyle=function(on){return {
+    padding:'2px 9px',fontSize:9,borderRadius:3,cursor:'pointer',border:'none',
+    background:on?'rgba(0,212,176,.18)':'rgba(255,255,255,.06)',
+    color:on?'#00d4b0':'rgba(255,255,255,.38)',
+    outline:on?'1px solid rgba(0,212,176,.5)':'1px solid rgba(255,255,255,.1)'
+  };};
   return (
-    <div className="panel sv-timeline" style={{flexDirection:'row',padding:'8px 12px'}}>
-      <span style={{fontSize:9,color:'rgba(255,255,255,.8)',textTransform:'uppercase',letterSpacing:'1px',
-        flexShrink:0,alignSelf:'center',marginRight:10}}>Events</span>
-      <div className="sc-scroll">
-        {(scenarios||[]).map(function(s){
-          var nm=s.replace(/_/g,' ');
-          return <button key={s} className={'sc-btn'+(current===s&&!demoRunning?' on':'')}
-            onClick={function(){send({cmd:'scenario',name:s});}}>
-            {nm}
-          </button>;
-        })}
+    <div className="panel sv-timeline" style={{flexDirection:'column',padding:'8px 12px',gap:7}}>
+      {/* Panel toggles row */}
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontSize:9,color:'rgba(255,255,255,.35)',textTransform:'uppercase',
+          letterSpacing:'1px',marginRight:2,flexShrink:0}}>Panels:</span>
+        <button style={chipStyle(showVideo)} onClick={onToggleVideo}>Video</button>
+        <button style={chipStyle(showAudio)} onClick={onToggleAudio}>Audio</button>
+        <button style={chipStyle(showSeats)} onClick={onToggleSeats}>Seats</button>
+        <span style={{flex:1}}/>
+        <span style={{fontSize:9,color:'rgba(255,255,255,.25)'}}>
+          Select audio/video above, then Run Demo →
+        </span>
       </div>
-      <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center',marginLeft:10}}>
-        <button className={demoRunning?'demo-btn demo-stop':'demo-btn demo-run'}
-          onClick={function(){
-            if(demoRunning)fetch('/api/demo/stop',{method:'POST'});
-            else fetch('/api/demo/play',{method:'POST'});
-          }}>
-          {demoRunning?'⏹ Stop Demo':'▶ Run Demo'}
-        </button>
-        {demoRunning&&<span className="demo-ind">● running</span>}
+      {/* Scenarios + Run Demo row */}
+      <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <span style={{fontSize:9,color:'rgba(255,255,255,.8)',textTransform:'uppercase',
+          letterSpacing:'1px',flexShrink:0}}>Events</span>
+        <div className="sc-scroll">
+          {(scenarios||[]).map(function(s){
+            var nm=s.replace(/_/g,' ');
+            return <button key={s} className={'sc-btn'+(current===s&&!demoRunning?' on':'')}
+              onClick={function(){send({cmd:'scenario',name:s});}}>
+              {nm}
+            </button>;
+          })}
+        </div>
+        <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center',marginLeft:4}}>
+          <button className={demoRunning?'demo-btn demo-stop':'demo-btn demo-run'}
+            onClick={function(){
+              if(demoRunning){
+                fetch('/api/demo/stop',{method:'POST'});
+                if(onDemoToggle)onDemoToggle(false);
+              } else {
+                fetch('/api/demo/play',{method:'POST'});
+                if(onDemoToggle)onDemoToggle(true);
+              }
+            }}>
+            {demoRunning?'⏹ Stop Demo':'▶ Run Demo'}
+          </button>
+          {demoRunning&&<span className="demo-ind">● running</span>}
+        </div>
       </div>
     </div>
   );
@@ -1223,20 +1272,36 @@ function SeatConfigOverlay({seatId,config,send,onClose}){
 }
 
 /* ── SensorView (Tab 1) ── */
-function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat}){
+function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat,
+                     playTrigger,stopTrigger,onDemoToggle}){
+  const [showVideo,setShowVideo]=useState(true);
+  const [showAudio,setShowAudio]=useState(true);
+  const [showSeats,setShowSeats]=useState(true);
   return (
     <div className="sv">
-      {/* Row 1 */}
-      <VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver} send={send}/>
-      <AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio} send={send}/>
-      <SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat}/>
+      {/* Row 1 — optional panels (display:none removes from grid flow) */}
+      {showVideo
+        ? <VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver}
+            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>
+        : null}
+      {showAudio
+        ? <AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio}
+            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>
+        : null}
+      {showSeats
+        ? <SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat}/>
+        : null}
       {/* Row 2 */}
       <VehicleWidget speed={state.world_speed_kmh} visibility={state.world_visibility} send={send}/>
       <IMUWidget vibState={state.vibration} send={send}/>
       <RoadQualityWidget vib={state.vibration} send={send}/>
-      {/* Row 3: Timeline */}
+      {/* Row 3: Timeline + panel toggles */}
       <TimelineBar scenarios={scenarios} current={state.scenario}
-        demoRunning={state.demo_running} send={send}/>
+        demoRunning={state.demo_running} send={send} onDemoToggle={onDemoToggle}
+        showVideo={showVideo} showAudio={showAudio} showSeats={showSeats}
+        onToggleVideo={function(){setShowVideo(function(v){return !v;});}}
+        onToggleAudio={function(){setShowAudio(function(v){return !v;});}}
+        onToggleSeats={function(){setShowSeats(function(v){return !v;});}}/>
     </div>
   );
 }
@@ -1531,7 +1596,18 @@ function App(){
   const [liveVision,setLiveVision]=useState(false);
   const [tab,setTab]=useState('sensor');
   const [selSeat,setSelSeat]=useState(null);
+  const [demoTrigger,setDemoTrigger]=useState(0);
+  const [demoStopTrigger,setDemoStopTrigger]=useState(0);
   const ws=useRef(null);
+
+  var onDemoToggle=useCallback(function(running){
+    if(running){
+      setDemoTrigger(function(t){return t+1;});
+      setTab('info');
+    } else {
+      setDemoStopTrigger(function(t){return t+1;});
+    }
+  },[]);
 
   useEffect(function(){
     fetch('/api/scenarios').then(function(r){return r.json();})
@@ -1566,7 +1642,9 @@ function App(){
             <BrandBar/>
             <SensorView state={state} send={send} ws={ws}
               liveAudio={liveAudio} liveVision={liveVision}
-              scenarios={scenarios} onSelectSeat={setSelSeat}/>
+              scenarios={scenarios} onSelectSeat={setSelSeat}
+              playTrigger={demoTrigger} stopTrigger={demoStopTrigger}
+              onDemoToggle={onDemoToggle}/>
           </div>
         )}
         {tab==='info'&&(
