@@ -35,7 +35,8 @@ SR      = 16_000
 CHUNK   = 15_360          # 0.96 s @ 16 kHz  (matches browser AudioWorklet)
 N_MELS  = 64
 CLASSES = ["none", "crying", "talking", "happy"]
-_THRESH = 0.60            # min BabyNet confidence to skip AST fallback
+from config import audio as acfg
+_THRESH = acfg.babynet_conf_threshold
 
 chunk_queue: asyncio.Queue[list[float]] = asyncio.Queue(maxsize=8)
 
@@ -191,7 +192,7 @@ _AST_MAP  = {22: "crying", 21: "crying", 80: "animal", 74: "animal",
              73: "animal", 468: "rattle", 0: "speech"}
 _AST_LOCAL = Path(__file__).resolve().parent.parent / "models" / "ast-audioset"
 _AST_ID    = str(_AST_LOCAL) if _AST_LOCAL.exists() else "MIT/ast-finetuned-audioset-10-10-0.4593"
-_AST_THRESH = 0.15
+_AST_THRESH = acfg.ast_fallback_threshold
 
 
 def _load_ast() -> None:

@@ -1,0 +1,106 @@
+# CabinSense — Tunable Thresholds & Weights
+# Edit this file to adjust cognitive load scoring and mitigation behaviour.
+# No code changes needed — the server reads this on every startup.
+
+# ── Fusion engine ────────────────────────────────────────────────────────────
+fusion:
+  hz: 10                  # fusion loop rate (ticks per second)
+  grace_period_s: 6.0     # seconds to keep confirmed/dismissed mitigations after condition clears
+
+  # ── Cognitive Load score contributions ─────────────────────────────────────
+  score:
+
+    # Driver vitals (radar micro-Doppler)
+    driver_hr_default: 72           # assumed HR when radar has no data
+    driver_resp_default: 14         # assumed resp rate when radar has no data
+    driver_hr_high_thresh: 95       # bpm above which elevated-HR scoring begins
+    driver_hr_high_multiplier: 1.5  # (HR - thresh) * multiplier → score
+    driver_hr_high_max: 30          # cap on elevated-HR score contribution
+    driver_resp_high_thresh: 20     # rpm above which rapid-breathing scoring begins
+    driver_resp_high_multiplier: 2.0
+    driver_resp_high_max: 15
+    driver_hr_low_thresh: 60        # bpm below which low-arousal/fatigue scoring begins
+    driver_hr_low_score: 12
+
+    # Driver emotion (vision / world state)
+    driver_stressed_score: 10
+    driver_fatigued_score: 8
+
+    # Audio events
+    audio_conf_threshold: 0.25      # minimum confidence for audio label to count
+    audio_crying_score: 25          # crying / barking / animal
+    audio_shouting_score: 20
+    audio_rattle_score: 10
+    audio_talking_child_score: 10   # baby babbling (child/pet seat present)
+    audio_talking_score: 5          # generic speech
+    audio_happy_score: 2
+
+    # Vehicle context
+    visibility_low_score: 12        # low / rain / fog
+    speed_high_thresh: 100          # km/h above which speed scoring begins
+    speed_high_score: 8
+
+    # Child / pet welfare (world.seats — instant, no radar lag)
+    child_presence_score: 5         # baseline per child/pet seat
+    distress_threshold: 0.05        # minimum distress value to start scoring
+    distress_multiplier: 40.0       # distress * multiplier → score
+    distress_max: 30                # cap on distress score contribution
+    child_hr_thresh: 115            # bpm above which child elevated-HR fires
+    pet_hr_thresh: 125              # bpm above which pet elevated-HR fires
+    child_hr_multiplier: 1.5        # (HR - thresh) * multiplier → score
+    child_hr_max: 40                # cap on child/pet HR score contribution
+    child_hr_critical_offset: 20    # bpm above threshold that escalates to critical severity
+
+    # Rear occupant vitals from radar (motion not in world.seats)
+    radar_child_hr_multiplier: 0.8
+    radar_child_hr_max: 20
+    radar_resp_high_thresh: 28      # rpm above which rapid-breathing scoring begins
+    radar_resp_multiplier: 0.5
+    radar_resp_max: 10
+    radar_motion_thresh: 0.4        # motion value above which agitation fires
+    radar_motion_score: 10
+
+    # Road quality (IMU)
+    pothole_score: 18
+    rough_road_score: 8
+    pothole_ahead_score: 5
+    pothole_ahead_warn_m: 80        # distance (m) at which ahead-warning adds to score
+
+    # Vision — driver state
+    drowsy_score: 15
+    stressed_expression_score: 10
+
+    # Vision — loose objects (YOLOv8n + Qwen)
+    yolo_object_score: 6            # flat score per loose YOLO-detected object
+    qwen_object_score_per_item: 4   # score per item in Qwen objects[] list
+    qwen_object_max_score: 10       # cap on Qwen object score contribution
+
+  # ── Mitigation triggers ───────────────────────────────────────────────────
+  mitigations:
+    pothole_warning_distance_m: 120   # trigger object-securing warning when pothole < this far
+
+# ── Audio classification ─────────────────────────────────────────────────────
+audio:
+  bus_conf_threshold: 0.25          # min confidence for fusion to act on audio label
+  ast_conf_threshold: 0.15          # min confidence for AST model output to be accepted
+  babynet_conf_threshold: 0.60      # min confidence for BabyNet to skip AST fallback
+  ast_fallback_threshold: 0.15      # same as ast_conf_threshold (used in baby_net.py)
+
+# ── Vision ───────────────────────────────────────────────────────────────────
+vision:
+  ear_drowsy_thresh: 0.20           # EAR below this → driver marked drowsy
+  ear_happy_thresh: 0.32            # EAR above this → driver marked happy
+  mouth_stressed_thresh: 0.50       # mouth ratio above this → driver marked stressed
+  yolo_conf_thresh: 0.35            # minimum YOLO detection confidence
+
+# ── IMU / Vibration ──────────────────────────────────────────────────────────
+vibration:
+  hz: 50                            # IMU sampling rate
+  rms_rough: 0.18                   # z-axis RMS threshold for "rough" road
+  rms_pothole: 0.55                 # z-axis RMS threshold for "pothole"
+  pothole_warn_m: 100.0             # distance (m) ahead to start warning
+
+# ── Sensor loop rates ─────────────────────────────────────────────────────────
+sensors:
+  radar_hz: 10
+  vehicle_hz: 5
