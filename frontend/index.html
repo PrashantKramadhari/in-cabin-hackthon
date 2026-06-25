@@ -8,210 +8,356 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.12.17/babel.min.js"></script>
 <style>
+/* ─── Theme tokens (web-standard typography + semantic colors) ─── */
+:root,[data-theme="dark"]{
+  color-scheme:dark;
+  --font-base:16px;
+  --font-sm:0.875rem;
+  --font-xs:0.75rem;
+  --font-lg:1.125rem;
+  --font-xl:1.25rem;
+  --font-2xl:1.5rem;
+  --line-height:1.5;
+  --bg-page:#0f172a;
+  --bg-shell:#020617;
+  --bg-surface:rgba(255,255,255,.04);
+  --bg-panel:rgba(255,255,255,.03);
+  --bg-elevated:#1e293b;
+  --bg-input:rgba(0,0,0,.35);
+  --bg-video:rgba(0,0,0,.4);
+  --bg-subtle:rgba(255,255,255,.04);
+  --bg-chip:rgba(255,255,255,.06);
+  --bg-chip-active:rgba(13,148,136,.14);
+  --bg-overlay:rgba(2,6,23,.82);
+  --text-primary:#f8fafc;
+  --text-secondary:#cbd5e1;
+  --text-muted:#94a3b8;
+  --text-faint:#64748b;
+  --border-default:rgba(255,255,255,.1);
+  --border-subtle:rgba(255,255,255,.07);
+  --border-strong:rgba(255,255,255,.14);
+  --accent:#14b8a6;
+  --accent-hover:#2dd4bf;
+  --accent-muted:rgba(20,184,166,.12);
+  --accent-border:rgba(20,184,166,.35);
+  --warn:#f59e0b;
+  --warn-muted:rgba(245,158,11,.12);
+  --crit:#ef4444;
+  --crit-muted:rgba(239,68,68,.12);
+  --info:#60a5fa;
+  --shadow-lg:0 24px 64px rgba(0,0,0,.55);
+  --shadow-panel:0 30px 80px rgba(0,0,0,.75);
+  --grid-bg:linear-gradient(150deg,#0f172a 0%,#020617 100%);
+  --grid-border:rgba(20,184,166,.22);
+  --grid-glow:rgba(20,184,166,.05);
+  --canvas-bg:#0c1220;
+  --radar-grid:rgba(20,184,166,.22);
+  --radar-dot:rgba(20,184,166,.55);
+  --radar-label:#94a3b8;
+  --range-track:rgba(255,255,255,.14);
+  --range-thumb-border:#0f172a;
+  --tab-active-bg:rgba(20,184,166,.08);
+  --logo-filter:invert(1);
+  --logo-blend:screen;
+  --transition-theme:background .2s,color .2s,border-color .2s;
+}
+[data-theme="light"]{
+  color-scheme:light;
+  --bg-page:#f1f5f9;
+  --bg-shell:#ffffff;
+  --bg-surface:#ffffff;
+  --bg-panel:#ffffff;
+  --bg-elevated:#f8fafc;
+  --bg-input:#ffffff;
+  --bg-video:#e2e8f0;
+  --bg-subtle:#f1f5f9;
+  --bg-chip:#f1f5f9;
+  --bg-chip-active:rgba(13,148,136,.12);
+  --bg-overlay:rgba(15,23,42,.45);
+  --text-primary:#0f172a;
+  --text-secondary:#334155;
+  --text-muted:#64748b;
+  --text-faint:#94a3b8;
+  --border-default:#e2e8f0;
+  --border-subtle:#f1f5f9;
+  --border-strong:#cbd5e1;
+  --accent:#0d9488;
+  --accent-hover:#0f766e;
+  --accent-muted:rgba(13,148,136,.1);
+  --accent-border:rgba(13,148,136,.35);
+  --warn:#d97706;
+  --warn-muted:rgba(217,119,6,.1);
+  --crit:#dc2626;
+  --crit-muted:rgba(220,38,38,.1);
+  --info:#2563eb;
+  --shadow-lg:0 20px 48px rgba(15,23,42,.12);
+  --shadow-panel:0 16px 40px rgba(15,23,42,.1);
+  --grid-bg:linear-gradient(150deg,#ffffff 0%,#f8fafc 100%);
+  --grid-border:rgba(13,148,136,.25);
+  --grid-glow:rgba(13,148,136,.06);
+  --canvas-bg:#e2e8f0;
+  --radar-grid:rgba(13,148,136,.4);
+  --radar-dot:rgba(13,148,136,.75);
+  --radar-label:#475569;
+  --range-track:#cbd5e1;
+  --range-thumb-border:#ffffff;
+  --tab-active-bg:rgba(13,148,136,.08);
+  --logo-filter:none;
+  --logo-blend:normal;
+}
+
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
-body{background:#090d12;color:#d4dce8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  font-size:12px;-webkit-font-smoothing:antialiased}
+body{background:var(--bg-page);color:var(--text-secondary);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  font-size:var(--font-base);line-height:var(--line-height);-webkit-font-smoothing:antialiased;
+  transition:var(--transition-theme)}
 
 /* ─── Shell ─── */
-.hmi{display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.hmi-hdr{height:34px;display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;
-  background:#040810;border-bottom:1px solid rgba(255,255,255,.05)}
+.hmi{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg-page)}
+.hmi-hdr{height:48px;display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;
+  background:var(--bg-shell);border-bottom:1px solid var(--border-default);transition:var(--transition-theme)}
 .sp{flex:1}
-.hmi-clock{font-size:10px;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums}
-.dot{width:6px;height:6px;border-radius:50%;background:#1c2740;transition:background .4s}
-.dot.on{background:#00d4b0;box-shadow:0 0 8px rgba(0,212,176,.6)}
-.lat{font-size:9px;color:rgba(255,255,255,.2);font-variant-numeric:tabular-nums}
+.hmi-clock{font-size:var(--font-sm);color:var(--text-muted);font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border-strong);transition:background .4s}
+.dot.on{background:var(--accent);box-shadow:0 0 8px var(--accent-border)}
+.lat{font-size:var(--font-xs);color:var(--text-faint);font-variant-numeric:tabular-nums}
+.theme-toggle{display:flex;align-items:center;gap:2px;padding:3px;border-radius:8px;
+  background:var(--bg-chip);border:1px solid var(--border-default)}
+.theme-toggle button{padding:5px 12px;border-radius:6px;font-size:var(--font-xs);font-weight:600;
+  font-family:inherit;cursor:pointer;border:none;background:transparent;color:var(--text-muted);
+  transition:all .15s;line-height:1.2}
+.theme-toggle button:hover{color:var(--text-secondary)}
+.theme-toggle button.on{background:var(--bg-surface);color:var(--accent);
+  box-shadow:0 1px 2px rgba(15,23,42,.08)}
 .hmi-content{flex:1;overflow:hidden;position:relative}
 .view{position:absolute;inset:0;overflow:hidden}
-.hmi-tabs{height:42px;display:flex;background:#040810;border-top:1px solid rgba(255,255,255,.05);flex-shrink:0}
-.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;font-size:11px;
-  font-weight:500;color:rgba(255,255,255,.65);cursor:pointer;border:none;background:none;
-  border-top:2px solid transparent;transition:all .25s;letter-spacing:.3px}
-.tab.on{color:#00d4b0;border-top-color:#00d4b0;background:rgba(0,212,176,.06);font-weight:600}
+.hmi-tabs{height:48px;display:flex;background:var(--bg-shell);border-top:1px solid var(--border-default);flex-shrink:0}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;font-size:var(--font-sm);
+  font-weight:500;color:var(--text-muted);cursor:pointer;border:none;background:none;
+  border-top:2px solid transparent;transition:all .2s}
+.tab.on{color:var(--accent);border-top-color:var(--accent);background:var(--tab-active-bg);font-weight:600}
 
 /* ─── Brand Bar ─── */
 .brand-bar{display:flex;align-items:center;justify-content:space-between;
   width:81vw;min-width:900px;padding:0 6px;margin-bottom:12px}
 .jag-side{display:flex;align-items:center;gap:12px}
 .brand-sep{flex:1;height:1px;margin:0 20px;
-  background:linear-gradient(to right,rgba(255,255,255,.04),rgba(0,212,176,.25),rgba(255,255,255,.04))}
+  background:linear-gradient(to right,var(--border-subtle),var(--accent-border),var(--border-subtle))}
 .cs-side{text-align:right}
-.cs-name{font-size:19px;font-weight:700;letter-spacing:-.5px;color:#ffffff;line-height:1}
-.cs-name em{color:#00d4b0;font-style:normal}
-.cs-sub{font-size:6.5px;letter-spacing:3px;color:rgba(255,255,255,.35);
-  text-transform:uppercase;margin-top:3px}
+.cs-name{font-size:var(--font-2xl);font-weight:700;letter-spacing:-.5px;color:var(--text-primary);line-height:1.2}
+.cs-name em{color:var(--accent);font-style:normal}
+.cs-sub{font-size:var(--font-xs);letter-spacing:2px;color:var(--text-muted);
+  text-transform:uppercase;margin-top:4px;font-weight:500}
 
-/* ─── Sensor View Grid ─── */
-.sv{display:grid;grid-template-columns:1fr 1fr 1.3fr;
-  grid-template-rows:1fr 1fr 72px;gap:8px;padding:8px;
-  width:81vw;height:81vh;min-width:900px;min-height:480px;
-  border-radius:14px;overflow:auto;resize:both;
-  border:1px solid rgba(0,212,176,.2);
-  background:linear-gradient(150deg,#0c1420 0%,#080d18 100%);
-  box-shadow:0 0 0 1px rgba(0,212,176,.06),0 30px 80px rgba(0,0,0,.95),
-    0 0 60px rgba(0,212,176,.04),inset 0 1px 0 rgba(255,255,255,.04)}
-.sv-timeline{grid-column:1/-1}
+/* ─── Sensor View — free-form draggable panels ─── */
+.sv-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;
+  width:100%;min-height:0;padding:0 12px 12px}
+.sv{position:relative;
+  width:81vw;height:81vh;min-width:900px;min-height:520px;
+  max-width:98vw;max-height:calc(100vh - 140px);
+  border-radius:14px;overflow:hidden;
+  border:1px solid var(--grid-border);background:var(--grid-bg);
+  box-shadow:0 0 0 1px var(--grid-glow),var(--shadow-panel),inset 0 1px 0 var(--border-subtle);
+  transition:var(--transition-theme);
+  resize:both;flex-shrink:0}
+.sv::after{content:'';position:absolute;right:3px;bottom:3px;width:18px;height:18px;
+  pointer-events:none;z-index:50;border-radius:0 0 12px 0;opacity:.65;
+  background:linear-gradient(135deg,transparent 45%,var(--accent) 45%,var(--accent) 55%,transparent 55%),
+    linear-gradient(135deg,transparent 58%,var(--accent) 58%,var(--accent) 66%,transparent 66%)}
+.sv:hover::after{opacity:1}
+.iv-shell.sensor-shell{justify-content:flex-start;overflow:auto;min-height:0;padding:10px 0;gap:10px}
+.panel-slot{position:absolute;box-sizing:border-box;padding:0;min-width:140px;min-height:90px;
+  display:flex;flex-direction:column}
+.panel-drag-bar{height:10px;cursor:grab;border-radius:10px 10px 0 0;flex-shrink:0;
+  background:var(--border-subtle);display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border-default);border-bottom:none;user-select:none}
+.panel-drag-bar:active{cursor:grabbing;background:var(--accent-muted)}
+.panel-grip{font-size:11px;color:var(--text-faint);letter-spacing:3px;line-height:1;pointer-events:none}
+.panel-slot-body{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.panel-slot-body>.panel{flex:1;height:100%;min-height:0;border-radius:0 0 10px 10px;margin:0}
+.panel-resize-handle{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;
+  z-index:2;border-radius:0 0 10px 0;
+  background:linear-gradient(135deg,transparent 45%,var(--accent) 45%,var(--accent) 55%,transparent 55%),
+    linear-gradient(135deg,transparent 60%,var(--accent) 60%,var(--accent) 68%,transparent 68%);
+  opacity:.55}
+.panel-resize-handle:hover{opacity:1}
+.row-lbl{font-size:var(--font-sm);color:var(--text-secondary);flex-shrink:0}
+.row-lbl.wide{width:88px}
+.row-lbl.narrow{width:40px}
 
 /* ─── Panels ─── */
-.panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;
-  padding:11px 13px;display:flex;flex-direction:column;overflow:auto;
-  min-height:80px;min-width:120px}
-.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0}
-.pt{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:#00d4b0;font-weight:600}
-.ps{font-size:11px;color:rgba(255,255,255,.7)}
+.panel{background:var(--bg-panel);border:1px solid var(--border-default);border-radius:10px;
+  padding:14px 16px;display:flex;flex-direction:column;overflow:auto;
+  min-height:80px;min-width:120px;transition:var(--transition-theme)}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0}
+.pt{font-size:var(--font-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:600}
+.ps{font-size:var(--font-sm);color:var(--text-secondary)}
 .pb{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column;
   gap:0;justify-content:space-evenly}
 
 /* ─── Shared controls ─── */
-.row{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.75);flex-shrink:0}
-.val{font-size:13px;font-weight:600;color:#ffffff;min-width:48px;text-align:right;flex-shrink:0}
-.btn-row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-.btn{padding:6px 14px;border-radius:5px;font-size:11px;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);color:rgba(255,255,255,.75);cursor:pointer;transition:all .15s;font-family:inherit}
-.btn:hover{border-color:#00d4b0;color:#00d4b0}
-.btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
-.btn.warn{background:rgba(246,173,85,.08);border-color:#f6ad55;color:#f6ad55}
-.btn.crit{background:rgba(252,129,129,.08);border-color:#fc8181;color:#fc8181}
-input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
-  background:rgba(255,255,255,.12);outline:none;flex:1;cursor:pointer;border:none;min-width:0}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
-  border-radius:50%;background:#00d4b0;cursor:pointer;border:2px solid #090d12}
-input[type=checkbox]{accent-color:#00d4b0;cursor:pointer;width:15px;height:15px}
-.divider{height:1px;background:rgba(255,255,255,.07);flex-shrink:0;margin:0}
+.row{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.lbl{font-size:var(--font-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);flex-shrink:0;font-weight:600}
+.val{font-size:var(--font-base);font-weight:600;color:var(--text-primary);min-width:52px;text-align:right;flex-shrink:0}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.btn{padding:8px 16px;border-radius:6px;font-size:var(--font-sm);border:1px solid var(--border-default);
+  background:var(--bg-subtle);color:var(--text-secondary);cursor:pointer;transition:all .15s;font-family:inherit;font-weight:500}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.on{background:var(--accent-muted);border-color:var(--accent);color:var(--accent)}
+.btn.warn{background:var(--warn-muted);border-color:var(--warn);color:var(--warn)}
+.btn.crit{background:var(--crit-muted);border-color:var(--crit);color:var(--crit)}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;
+  background:var(--range-track);outline:none;flex:1;cursor:pointer;border:none;min-width:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--range-thumb-border)}
+input[type=checkbox]{accent-color:var(--accent);cursor:pointer;width:16px;height:16px}
+.divider{height:1px;background:var(--border-default);flex-shrink:0;margin:0}
+.select-input{background:var(--bg-input);border:1px solid var(--border-default);
+  color:var(--text-primary);border-radius:6px;padding:4px 8px;font-size:var(--font-sm);cursor:pointer;max-width:180px}
 
 /* ─── Video ─── */
-.vid-box{background:rgba(0,0,0,.4);border-radius:5px;flex:1;display:flex;align-items:center;
-  justify-content:center;color:rgba(255,255,255,.2);font-size:11px;overflow:hidden;min-height:0;
-  border:1px solid rgba(255,255,255,.07)}
-.vid-box video{width:100%;height:100%;object-fit:cover;border-radius:5px}
+.vid-box{background:var(--bg-video);border-radius:8px;flex:1;display:flex;align-items:center;
+  justify-content:center;color:var(--text-faint);font-size:var(--font-sm);overflow:hidden;min-height:0;
+  border:1px solid var(--border-default)}
+.vid-box video{width:100%;height:100%;object-fit:cover;border-radius:8px}
 
 /* ─── Audio widget ─── */
-.db-big{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
-.db-unit{font-size:11px;color:rgba(255,255,255,.4);margin-left:3px}
-.vad-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;
-  background:rgba(255,255,255,.12);transition:background .2s}
-.vad-dot.on{background:#00d4b0;box-shadow:0 0 6px rgba(0,212,176,.6)}
-.noise-bar{height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;flex:1}
+.db-big{font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.db-unit{font-size:var(--font-sm);color:var(--text-muted);margin-left:4px}
+.vad-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;
+  background:var(--border-strong);transition:background .2s}
+.vad-dot.on{background:var(--accent);box-shadow:0 0 6px var(--accent-border)}
+.noise-bar{height:6px;background:var(--range-track);border-radius:3px;overflow:hidden;flex:1}
 .noise-fill{height:100%;border-radius:3px;transition:width .15s,background .3s}
-.mic-btn{padding:6px 14px;border-radius:5px;font-size:12px;font-weight:600;
+.mic-btn{padding:8px 16px;border-radius:6px;font-size:var(--font-sm);font-weight:600;
   font-family:inherit;cursor:pointer;transition:all .2s}
-.mic-start{background:rgba(0,212,176,.1);border:1px solid #00d4b0;color:#00d4b0}
-.mic-stop{background:rgba(252,129,129,.1);border:1px solid #fc8181;color:#fc8181}
-.canvas-wrap{border-radius:4px;overflow:hidden;background:rgba(0,0,0,.5);
-  border:1px solid rgba(255,255,255,.05)}
-.det-badge{font-size:12px;padding:4px 10px;border-radius:10px;background:rgba(246,173,85,.12);
-  border:1px solid rgba(246,173,85,.3);color:#f6ad55;flex-shrink:0;align-self:flex-start}
+.mic-start{background:var(--accent-muted);border:1px solid var(--accent);color:var(--accent)}
+.mic-stop{background:var(--crit-muted);border:1px solid var(--crit);color:var(--crit)}
+.canvas-wrap{border-radius:6px;overflow:hidden;background:var(--canvas-bg);
+  border:1px solid var(--border-default)}
+.det-badge{font-size:var(--font-sm);padding:5px 12px;border-radius:10px;background:var(--warn-muted);
+  border:1px solid var(--warn);color:var(--warn);flex-shrink:0;align-self:flex-start;font-weight:500}
 
 /* ─── Seats widget ─── */
-.seat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1}
-.seat-cell{border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.25);
+.seat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:1}
+.seat-cell{border-radius:8px;border:1px solid var(--border-default);background:var(--bg-subtle);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:2px;cursor:pointer;padding:5px;transition:all .3s;position:relative}
-.seat-cell.occ{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.04)}
-.seat-cell.warn{border-color:rgba(246,173,85,.5);background:rgba(246,173,85,.06)}
-.seat-cell.crit{border-color:rgba(252,129,129,.5);background:rgba(252,129,129,.06)}
-.seat-icon{font-size:22px}
-.seat-name{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.6)}
-.seat-tag{font-size:10px;color:#f6ad55;margin-top:2px}
-.seat-belt{position:absolute;top:5px;right:7px;font-size:11px}
+  gap:3px;cursor:pointer;padding:8px;transition:all .3s;position:relative}
+.seat-cell.occ{border-color:var(--border-strong);background:var(--bg-chip)}
+.seat-cell.warn{border-color:var(--warn);background:var(--warn-muted)}
+.seat-cell.crit{border-color:var(--crit);background:var(--crit-muted)}
+.seat-icon{font-size:24px}
+.seat-name{font-size:var(--font-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);font-weight:600}
+.seat-tag{font-size:var(--font-xs);color:var(--warn);margin-top:2px}
+.seat-belt{position:absolute;top:6px;right:8px;font-size:var(--font-sm)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .seat-cell.warn .seat-icon,.seat-cell.crit .seat-icon{animation:pulse 1.4s infinite}
 
 /* ─── Road Quality ─── */
 .wheel-map{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0}
-.wheel{border-radius:4px;height:24px;display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:600;transition:background .3s,color .3s}
+.wheel{border-radius:6px;height:28px;display:flex;align-items:center;justify-content:center;
+  font-size:var(--font-sm);font-weight:600;transition:background .3s,color .3s}
 
 /* ─── Timeline ─── */
-.timeline{display:flex;align-items:center;gap:8px;height:100%;overflow:hidden}
-.sc-scroll{display:flex;gap:4px;flex:1;overflow-x:auto;align-items:center}
-.sc-scroll::-webkit-scrollbar{height:2px}
-.sc-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
-.sc-btn{padding:6px 14px;border-radius:5px;font-size:11px;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);color:rgba(255,255,255,.75);cursor:pointer;white-space:nowrap;flex-shrink:0;
-  transition:all .15s;font-family:inherit}
-.sc-btn:hover{border-color:#00d4b0;color:#00d4b0}
-.sc-btn.on{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
-.demo-btn{padding:7px 18px;border-radius:5px;font-size:12px;font-weight:600;
+.timeline{display:flex;align-items:center;gap:10px;height:100%;overflow:hidden}
+.sc-scroll{display:flex;gap:6px;flex:1;overflow-x:auto;align-items:center}
+.sc-scroll::-webkit-scrollbar{height:4px}
+.sc-scroll::-webkit-scrollbar-thumb{background:var(--border-default);border-radius:2px}
+.sc-btn{padding:8px 16px;border-radius:6px;font-size:var(--font-sm);border:1px solid var(--border-default);
+  background:var(--bg-subtle);color:var(--text-secondary);cursor:pointer;white-space:nowrap;flex-shrink:0;
+  transition:all .15s;font-family:inherit;font-weight:500}
+.sc-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sc-btn.on{background:var(--accent-muted);border-color:var(--accent);color:var(--accent)}
+.demo-btn{padding:8px 20px;border-radius:6px;font-size:var(--font-sm);font-weight:600;
   white-space:nowrap;flex-shrink:0;font-family:inherit;cursor:pointer}
-.demo-run{background:rgba(0,212,176,.08);border:1px solid #00d4b0;color:#00d4b0}
-.demo-stop{background:rgba(252,129,129,.08);border:1px solid #fc8181;color:#fc8181}
+.demo-run{background:var(--accent-muted);border:1px solid var(--accent);color:var(--accent)}
+.demo-stop{background:var(--crit-muted);border:1px solid var(--crit);color:var(--crit)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-.demo-ind{font-size:9px;color:#f6ad55;animation:blink 1s infinite;flex-shrink:0}
+.demo-ind{font-size:var(--font-xs);color:var(--warn);animation:blink 1s infinite;flex-shrink:0}
 
 /* ─── Overlay ─── */
-.overlay{position:fixed;inset:0;background:rgba(0,4,12,.8);display:flex;
+.overlay{position:fixed;inset:0;background:var(--bg-overlay);display:flex;
   align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
-.ov-box{background:#0c1420;border:1px solid rgba(0,212,176,.3);border-radius:12px;
-  padding:20px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto;
-  box-shadow:0 20px 60px rgba(0,0,0,.8)}
-.ov-title{font-size:13px;font-weight:600;color:#00d4b0;margin-bottom:16px;
+.ov-box{background:var(--bg-elevated);border:1px solid var(--accent-border);border-radius:12px;
+  padding:24px;width:460px;max-width:95vw;max-height:90vh;overflow-y:auto;
+  box-shadow:var(--shadow-lg)}
+.ov-title{font-size:var(--font-base);font-weight:600;color:var(--accent);margin-bottom:16px;
   display:flex;justify-content:space-between;align-items:center}
-.cfg-sec{margin-bottom:13px}
-.cfg-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5);margin-bottom:6px}
-.btn-grp{display:flex;flex-wrap:wrap;gap:5px}
-.cfg-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.rval{font-size:11px;color:#ffffff;font-weight:600;min-width:52px;text-align:right}
-.xbtn{padding:4px 10px;border-radius:4px;font-size:10px;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);color:rgba(255,255,255,.75);transition:all .15s;cursor:pointer;font-family:inherit}
-.xbtn.sel{background:rgba(0,212,176,.1);border-color:#00d4b0;color:#00d4b0}
-.close-btn{background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);border-radius:5px;
-  padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit}
+.cfg-sec{margin-bottom:14px}
+.cfg-lbl{font-size:var(--font-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px;font-weight:600}
+.btn-grp{display:flex;flex-wrap:wrap;gap:6px}
+.cfg-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.rval{font-size:var(--font-sm);color:var(--text-primary);font-weight:600;min-width:52px;text-align:right}
+.xbtn{padding:6px 12px;border-radius:6px;font-size:var(--font-sm);border:1px solid var(--border-default);
+  background:var(--bg-subtle);color:var(--text-secondary);transition:all .15s;cursor:pointer;font-family:inherit}
+.xbtn.sel{background:var(--accent-muted);border-color:var(--accent);color:var(--accent)}
+.close-btn{background:none;border:1px solid var(--border-default);color:var(--text-muted);border-radius:6px;
+  padding:6px 14px;font-size:var(--font-sm);cursor:pointer;font-family:inherit}
+.close-btn:hover{color:var(--text-secondary);border-color:var(--border-strong)}
 
-/* ─── Infotainment View — half-size centered panel ─── */
+/* ─── Infotainment View ─── */
 .iv-shell{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:radial-gradient(ellipse at 50% 42%,#0c1828 0%,#040810 65%)}
+  background:var(--bg-page);transition:var(--transition-theme)}
 .iv{display:flex;flex-direction:row;width:81vw;height:81vh;min-width:900px;min-height:480px;
   border-radius:14px;overflow:auto;resize:both;
-  border:1px solid rgba(0,212,176,.2);
-  background:linear-gradient(150deg,#0c1420 0%,#080d18 100%);
-  box-shadow:0 0 0 1px rgba(0,212,176,.06),0 30px 80px rgba(0,0,0,.95),
-    0 0 60px rgba(0,212,176,.04),inset 0 1px 0 rgba(255,255,255,.04)}
+  border:1px solid var(--grid-border);background:var(--grid-bg);
+  box-shadow:0 0 0 1px var(--grid-glow),var(--shadow-panel),inset 0 1px 0 var(--border-subtle);
+  transition:var(--transition-theme)}
 .iv-col{flex:1;display:flex;flex-direction:column;justify-content:center;
-  padding:18px 16px;overflow:hidden;border-right:1px solid #1c2740}
+  padding:20px 18px;overflow:hidden;border-right:1px solid var(--border-default)}
 .iv-col:last-child{border-right:none}
-.iv-cabin{background:#090d12;align-items:center;justify-content:center}
-.iv-issue{background:#0c1520}
-.iv-gauge{background:#090d12;align-items:center;justify-content:center;gap:0}
-.iv-rec{background:#0c1520}
+.iv-cabin,.iv-gauge{background:var(--bg-panel);align-items:center;justify-content:center}
+.iv-issue,.iv-rec{background:var(--bg-elevated)}
 
-/* infotainment text — white */
-.iss-lbl{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:8px}
-.iss-name{font-size:16px;font-weight:700;color:#ffffff;line-height:1.25;margin-bottom:10px}
-.iss-conf{font-size:36px;font-weight:700;line-height:1;margin-bottom:2px}
-.iss-clbl{font-size:8px;color:rgba(255,255,255,.55);margin-bottom:12px}
+/* infotainment text */
+.iss-lbl{font-size:var(--font-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;margin-bottom:8px}
+.iss-name{font-size:var(--font-lg);font-weight:700;color:var(--text-primary);line-height:1.3;margin-bottom:10px}
+.iss-conf{font-size:2.25rem;font-weight:700;line-height:1;margin-bottom:4px}
+.iss-clbl{font-size:var(--font-xs);color:var(--text-muted);margin-bottom:12px}
 .iss-meta{display:flex;flex-direction:column;gap:0}
-.iss-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:10px}
+.iss-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-default);font-size:var(--font-sm)}
 .iss-row:last-child{border-bottom:none}
-.iss-k{color:rgba(255,255,255,.55)}
-.iss-v{color:#ffffff;font-weight:600;font-variant-numeric:tabular-nums}
+.iss-k{color:var(--text-muted)}
+.iss-v{color:var(--text-primary);font-weight:600;font-variant-numeric:tabular-nums}
 
 /* gauge */
 .gauge-sec{text-align:center;width:100%}
-.gauge-ttl{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:12px}
-.gauge-lbl{font-size:16px;font-weight:700;margin-top:10px;color:#ffffff}
+.gauge-ttl{font-size:var(--font-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;margin-bottom:12px}
+.gauge-lbl{font-size:var(--font-lg);font-weight:700;margin-top:10px;color:var(--text-primary)}
 
 /* rec panel */
-.rec-ttl{font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:#ffffff;font-weight:600;margin-bottom:14px}
-.rec-list{display:flex;flex-direction:column;gap:11px;margin-bottom:16px}
-.rec-item{display:flex;gap:10px;align-items:flex-start}
-.rec-num{width:20px;height:20px;border-radius:50%;background:rgba(0,212,176,.1);
-  border:1px solid rgba(0,212,176,.3);display:flex;align-items:center;justify-content:center;
-  font-size:10px;font-weight:700;color:#00d4b0;flex-shrink:0;margin-top:1px}
-.rec-text{font-size:14px;color:#ffffff;line-height:1.35}
-.rec-detail{font-size:10px;color:rgba(255,255,255,.5);margin-top:2px}
-.rec-empty{font-size:14px;color:rgba(255,255,255,.45);padding:4px 0}
-.apply-btn{display:block;width:100%;padding:9px;border-radius:7px;font-size:12px;font-weight:700;
-  background:rgba(0,212,176,.14);border:1px solid #00d4b0;color:#00d4b0;
+.rec-ttl{font-size:var(--font-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;margin-bottom:14px}
+.rec-list{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.rec-item{display:flex;gap:12px;align-items:flex-start}
+.rec-num{width:24px;height:24px;border-radius:50%;background:var(--accent-muted);
+  border:1px solid var(--accent-border);display:flex;align-items:center;justify-content:center;
+  font-size:var(--font-xs);font-weight:700;color:var(--accent);flex-shrink:0;margin-top:1px}
+.rec-text{font-size:var(--font-base);color:var(--text-primary);line-height:1.4}
+.rec-detail{font-size:var(--font-sm);color:var(--text-muted);margin-top:2px}
+.rec-empty{font-size:var(--font-base);color:var(--text-muted);padding:4px 0}
+.apply-btn{display:block;width:100%;padding:10px;border-radius:8px;font-size:var(--font-sm);font-weight:700;
+  background:var(--accent-muted);border:1px solid var(--accent);color:var(--accent);
   cursor:pointer;transition:all .2s;font-family:inherit;text-align:center}
-.apply-btn:hover{background:rgba(0,212,176,.26)}
-.apply-btn:disabled{opacity:.3;cursor:not-allowed}
-.dismiss-btn{display:block;width:100%;padding:6px;border-radius:5px;font-size:10px;margin-top:6px;
-  background:transparent;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.3);
+.apply-btn:hover{background:var(--accent);color:#fff}
+.apply-btn:disabled{opacity:.35;cursor:not-allowed}
+.dismiss-btn{display:block;width:100%;padding:8px;border-radius:6px;font-size:var(--font-sm);margin-top:8px;
+  background:transparent;border:1px solid var(--border-default);color:var(--text-muted);
   cursor:pointer;font-family:inherit}
+.dismiss-btn:hover{color:var(--text-secondary);border-color:var(--border-strong)}
+.chip-btn{padding:4px 10px;font-size:var(--font-xs);border-radius:6px;cursor:pointer;border:1px solid var(--border-default);
+  background:var(--bg-chip);color:var(--text-muted);font-family:inherit;font-weight:500;transition:all .15s}
+.chip-btn.on{background:var(--accent-muted);color:var(--accent);border-color:var(--accent-border)}
+.hint-text{font-size:var(--font-xs);color:var(--text-muted)}
+.meta-text{font-size:var(--font-sm);color:var(--text-secondary)}
+.brand-logo{height:36px;object-fit:contain;filter:var(--logo-filter);mix-blend-mode:var(--logo-blend);opacity:.95}
 </style>
+<script>
+(function(){
+  var t=localStorage.getItem('cabinsense-theme');
+  if(!t&&window.matchMedia('(prefers-color-scheme:light)').matches)t='light';
+  document.documentElement.setAttribute('data-theme',t||'dark');
+})();
+</script>
 </head>
 <body>
 <div id="root"></div>
@@ -253,9 +399,12 @@ const SEAT_IDS=['driver','front_passenger','rear_left','rear_right'];
 const SEAT_LABELS={driver:'Driver',front_passenger:'Front Pass.',rear_left:'Rear Left',rear_right:'Rear Right'};
 const ICONS={adult:'👤',child:'🧒',infant:'🧒',pet:'🐾',unknown:'👤'};
 const AICONS={none:'—',talking:'💬',shouting:'📢',crying:'😢',happy:'😊',barking:'🐕'};
-const loadCol=function(v){return v<33?'#00d4b0':v<66?'#f6ad55':'#fc8181';};
+const loadCol=function(v){return v<33?'#14b8a6':v<66?'#f59e0b':'#ef4444';};
 const loadLbl=function(v){return v<20?'Nominal':v<40?'Low':v<66?'Medium':v<85?'High':'Critical';};
 const fmt2=function(n){return n<10?'0'+n:''+n;};
+const cssVar=function(name,fallback){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||fallback;
+};
 
 /* human-readable issue names for infotainment */
 var ISSUE_MAP={
@@ -327,6 +476,17 @@ function Clock(){
   return <span className="hmi-clock">{t}</span>;
 }
 
+function ThemeToggle({theme,setTheme}){
+  return (
+    <div className="theme-toggle" role="group" aria-label="Color theme">
+      <button type="button" className={theme==='light'?'on':''}
+        onClick={function(){setTheme('light');}}>Light</button>
+      <button type="button" className={theme==='dark'?'on':''}
+        onClick={function(){setTheme('dark');}}>Dark</button>
+    </div>
+  );
+}
+
 /* ── WaveformCanvas: oscilloscope ── */
 function WaveformCanvas({analyserRef}){
   const cvRef=useRef(null);
@@ -337,10 +497,10 @@ function WaveformCanvas({analyserRef}){
       var W=cv.clientWidth||340;var H=cv.clientHeight||44;
       if(W<2||H<2){id=requestAnimationFrame(draw);return;}
       if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
-      ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
+      ctx.fillStyle=cssVar('--canvas-bg','#0c1220');ctx.fillRect(0,0,W,H);
       var buf=new Uint8Array(analyserRef.current?analyserRef.current.fftSize:256);
       if(analyserRef.current)analyserRef.current.getByteTimeDomainData(buf);
-      ctx.beginPath();ctx.strokeStyle='#00d4b0';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.strokeStyle=cssVar('--accent','#14b8a6');ctx.lineWidth=1.5;
       var sl=W/buf.length;
       for(var i=0;i<buf.length;i++){
         var x=i*sl,y=((buf[i]/128)-1)*(H/2)+H/2;
@@ -365,7 +525,7 @@ function SpectrogramCanvas({analyserRef}){
       if(W<2||H<2){id=requestAnimationFrame(draw);return;}
       if(cv.width!==W||cv.height!==H){
         cv.width=W;cv.height=H;
-        ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
+        ctx.fillStyle=cssVar('--canvas-bg','#0c1220');ctx.fillRect(0,0,W,H);
       }
       var img=ctx.getImageData(1,0,W-1,H);ctx.putImageData(img,0,0);
       var data=new Uint8Array(128);
@@ -542,17 +702,14 @@ function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger}){
   var audActive=aud.label&&aud.label!=='none';
   var isFile=audioMode!=='off'&&audioMode!=='mic';
   var dbPct=Math.min(100,((db-28)/82)*100);
-  var dbCol=db>75?'#fc8181':db>55?'#f6ad55':'#00d4b0';
+  var dbCol=db>75?'#ef4444':db>55?'#f59e0b':'#14b8a6';
 
   return (
     <div className="panel" style={{gap:0}}>
       {/* Header row: title + file dropdown */}
       <div className="ph">
         <span className="pt">Audio Input</span>
-        <select value={audioMode} onChange={function(e){handleMode(e.target.value);}}
-          style={{background:'rgba(0,0,0,.5)',border:'1px solid rgba(255,255,255,.15)',
-            color:'rgba(255,255,255,.85)',borderRadius:4,padding:'2px 6px',
-            fontSize:10,cursor:'pointer',maxWidth:160}}>
+        <select value={audioMode} onChange={function(e){handleMode(e.target.value);}} className="select-input">
           {AUDIO_FILES.filter(function(f){return f.id!=='mic'||liveAudio;}).map(function(f){
             return <option key={f.id} value={f.id}>{f.label}</option>;
           })}
@@ -561,28 +718,28 @@ function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger}){
       {/* Seat + type selector — only when a file is playing */}
       {isFile&&(
         <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:6,flexShrink:0,alignItems:'center'}}>
-          <span style={{fontSize:9,color:'rgba(255,255,255,.5)'}}>Seat:</span>
+          <span className="hint-text">Seat:</span>
           {AUDIO_SEAT_OPTS.map(function(o){
             var active=seatTarget===o.id;
             return (
               <button key={o.id} onClick={function(){handleSeat(o.id);}}
-                style={{padding:'2px 7px',fontSize:9,borderRadius:3,cursor:'pointer',border:'none',
-                  background:active?'rgba(0,212,176,.25)':'rgba(255,255,255,.07)',
-                  color:active?'#00d4b0':'rgba(255,255,255,.65)',
-                  outline:active?'1px solid #00d4b0':'none'}}>
+                style={{padding:'2px 7px',fontSize:'var(--font-xs)',borderRadius:3,cursor:'pointer',border:'none',
+                  background:active?'var(--accent-muted)':'var(--bg-subtle)',
+                  color:active?'var(--accent)':'var(--text-secondary)',
+                  outline:active?'1px solid var(--accent)':'none'}}>
                 {o.label}
               </button>
             );
           })}
-          <span style={{fontSize:9,color:'rgba(255,255,255,.5)',marginLeft:4}}>As:</span>
+          <span className="hint-text" style={{marginLeft:4}}>As:</span>
           {AUDIO_KIND_OPTS.map(function(o){
             var active=kindTarget===o.id;
             return (
               <button key={o.id} onClick={function(){handleKind(o.id);}}
-                style={{padding:'2px 7px',fontSize:9,borderRadius:3,cursor:'pointer',border:'none',
-                  background:active?'rgba(246,173,85,.25)':'rgba(255,255,255,.07)',
-                  color:active?'#f6ad55':'rgba(255,255,255,.65)',
-                  outline:active?'1px solid #f6ad55':'none'}}>
+                style={{padding:'2px 7px',fontSize:'var(--font-xs)',borderRadius:3,cursor:'pointer',border:'none',
+                  background:active?'var(--warn-muted)':'var(--bg-subtle)',
+                  color:active?'var(--warn)':'var(--text-secondary)',
+                  outline:active?'1px solid var(--warn)':'none'}}>
                 {o.label}
               </button>
             );
@@ -591,17 +748,17 @@ function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger}){
       )}
       {/* dB meter */}
       <div className="row" style={{marginBottom:6,flexShrink:0}}>
-        <span className="vad-dot" style={{background:vad?'#00d4b0':'#1c2740',
-          boxShadow:vad?'0 0 6px rgba(0,212,176,.6)':'none'}}/>
-        <span style={{fontSize:9,color:vad?'#00d4b0':'#2a3a50',marginRight:6}}>
+        <span className="vad-dot" style={{background:vad?'var(--accent)':'var(--border-strong)',
+          boxShadow:vad?'0 0 6px var(--accent-border)':'none'}}/>
+        <span className="hint-text" style={{color:vad?'var(--accent)':'var(--text-faint)',marginRight:6}}>
           {vad?'Voice Active':'Quiet'}
         </span>
         <span className="noise-bar" style={{flex:1}}>
           <span className="noise-fill" style={{display:'block',width:dbPct+'%',background:dbCol}}/>
         </span>
-        <span style={{fontSize:22,fontWeight:700,color:dbCol,marginLeft:8,minWidth:56,
+        <span style={{fontSize:'1.375rem',fontWeight:700,color:dbCol,marginLeft:8,minWidth:56,
           fontVariantNumeric:'tabular-nums',lineHeight:1}}>{db}</span>
-        <span style={{fontSize:10,color:'rgba(255,255,255,.8)',alignSelf:'flex-end',marginBottom:2}}>dB</span>
+        <span className="hint-text" style={{alignSelf:'flex-end',marginBottom:2}}>dB</span>
       </div>
       {/* Waveform 25% / Spectrogram 75% */}
       <div className="canvas-wrap" style={{flex:1,minHeight:0,marginBottom:4}}>
@@ -612,7 +769,7 @@ function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger}){
       </div>
       {/* Status + detection */}
       {isFile&&seatTarget!=='none'&&(
-        <div style={{fontSize:9,color:'#f6ad55',marginTop:4,flexShrink:0}}>
+        <div className="hint-text" style={{color:'var(--warn)',marginTop:4,flexShrink:0}}>
           {ICONS[kindTarget]||'👤'} {kindTarget==='child'?'Baby':'Pet'} in {seatTarget.replace(/_/g,' ')} — {audioMode.replace('baby_','')}.mp3
         </div>
       )}
@@ -781,30 +938,28 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
     <div className="panel">
       <div className="ph">
         <span className="pt">Cabin Video Feed</span>
-        <select value={mode} onChange={function(e){handleMode(e.target.value);}
-        } style={{background:'rgba(0,0,0,.5)',border:'1px solid rgba(255,255,255,.15)',
-          color:'rgba(255,255,255,.85)',borderRadius:4,padding:'2px 6px',fontSize:10,cursor:'pointer'}}>
+        <select value={mode} onChange={function(e){handleMode(e.target.value);}} className="select-input">
           {SYNTH_CLIPS.filter(function(c){return c.id!=='live'||liveVision;}).map(function(c){
             return <option key={c.id} value={c.id}>{c.label}</option>;
           })}
         </select>
       </div>
       <div className="vid-box" style={{position:'relative'}}>
-        {mode==='off'&&<span style={{color:'rgba(255,255,255,.5)'}}>Select feed above</span>}
+        {mode==='off'&&<span className="meta-text">Select feed above</span>}
         <video ref={vRef} muted playsInline
           style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:5,
             display:(mode!=='off')?'block':'none'}}/>
         {isDefault&&(
-          <div style={{position:'absolute',bottom:6,left:6,fontSize:9,
-            color:'#f6ad55',background:'rgba(0,0,0,.6)',padding:'2px 6px',borderRadius:3}}>
+          <div style={{position:'absolute',bottom:6,left:6,fontSize:'var(--font-xs)',
+            color:'var(--warn)',background:'var(--bg-overlay)',padding:'2px 6px',borderRadius:3}}>
             DEFAULT VIDEO
           </div>
         )}
       </div>
       {vd.face_detected&&(
         <div style={{display:'flex',gap:10,marginTop:5,fontSize:10,flexShrink:0}}>
-          <span style={{color:'rgba(255,255,255,.8)'}}>Driver emotion:</span>
-          <span style={{color:vd.drowsy?'#fc8181':'#00d4b0',fontWeight:600}}>
+          <span className="meta-text">Driver emotion:</span>
+          <span style={{color:vd.drowsy?'var(--crit)':'var(--accent)',fontWeight:600}}>
             {vd.emotion}{vd.drowsy?' ⚠ Drowsy':''}
           </span>
         </div>
@@ -833,7 +988,7 @@ function SeatWidget({seatConfigs,onSelect,compact}){
               onClick={function(){onSelect(sid);}}>
               {c.occupied&&(
                 <span className="seat-belt"
-                  style={{color:c.buckled?'#00d4b0':'#fc8181',
+                  style={{color:c.buckled?'var(--accent)':'var(--crit)',
                     fontSize:compact?8:11,top:compact?3:5,right:compact?4:7}}>
                   {c.buckled?'✓':'✗'}
                 </span>
@@ -844,7 +999,7 @@ function SeatWidget({seatConfigs,onSelect,compact}){
                 style={compact?{fontSize:8,letterSpacing:0}:{}}>{SEAT_LABELS[sid]}</span>
               {au&&<span className="seat-tag"
                 style={compact?{fontSize:8,marginTop:0}:{}}>{AICONS[c.audio_event]} {c.audio_event}</span>}
-              {c.occupied&&!au&&<span style={{fontSize:compact?7:8,color:'rgba(255,255,255,.8)'}}>{c.emotion||'calm'}</span>}
+              {c.occupied&&!au&&<span className="hint-text">{c.emotion||'calm'}</span>}
             </div>
           );
         })}
@@ -880,7 +1035,7 @@ function VehicleWidget({speed,visibility,send}){
           <div className="row">
             <input type="range" min="0" max="160" step="5" value={Math.round(speed||60)}
               onChange={function(e){send({cmd:'configure_vehicle',speed_kmh:parseInt(e.target.value)});}}/>
-            <span className="val" style={{color:speed>100?'#f6ad55':'#d4dce8'}}>{Math.round(speed||0)} km/h</span>
+            <span className="val" style={{color:speed>100?'var(--warn)':'var(--text-secondary)'}}>{Math.round(speed||0)} km/h</span>
           </div>
         </div>
         <div className="divider"/>
@@ -960,7 +1115,7 @@ function IMUWidget({vibState,send}){
   return (
     <div className="panel">
       <div className="ph"><span className="pt">IMU Signals</span>
-        {vibState&&vibState.override&&<span className="ps" style={{color:'#f6ad55'}}>override</span>}
+        {vibState&&vibState.override&&<span className="ps" style={{color:'var(--warn)'}}>override</span>}
       </div>
       <div className="pb" style={{overflowY:'auto'}}>
         {/* Acceleration */}
@@ -970,7 +1125,7 @@ function IMUWidget({vibState,send}){
             ['Z (Vertical)',az,setAz,8,12]].map(function(r){
             return (
               <div key={r[0]} className="row" style={{marginBottom:4}}>
-                <span style={{fontSize:9,color:'rgba(255,255,255,.8)',width:72,flexShrink:0}}>{r[0]}</span>
+                <span className="row-lbl wide">{r[0]}</span>
                 <input type="range" min={r[3]} max={r[4]} step="0.1"
                   value={r[1]}
                   onChange={function(e){
@@ -994,7 +1149,7 @@ function IMUWidget({vibState,send}){
           {[['Roll',roll,setRoll,-45,45],['Pitch',pitch,setPitch,-30,30],['Yaw',yaw,setYaw,-180,180]].map(function(r){
             return (
               <div key={r[0]} className="row" style={{marginBottom:4}}>
-                <span style={{fontSize:9,color:'rgba(255,255,255,.8)',width:32,flexShrink:0}}>{r[0]}</span>
+                <span className="row-lbl narrow">{r[0]}</span>
                 <input type="range" min={r[3]} max={r[4]} step="1" value={r[1]}
                   onChange={function(e){r[2](parseInt(e.target.value));}}/>
                 <span className="val" style={{minWidth:36}}>{r[1]}°</span>
@@ -1047,10 +1202,10 @@ function RoadQualityWidget({vib,send}){
     var cv=cvRef.current;if(!cv)return;
     var ctx=cv.getContext('2d');var W=cv.width,H=cv.height,id;
     var draw=function(){
-      ctx.fillStyle='#040a10';ctx.fillRect(0,0,W,H);
+      ctx.fillStyle=cssVar('--canvas-bg','#0c1220');ctx.fillRect(0,0,W,H);
       var h=histRef.current;
       if(h.length>1){
-        ctx.beginPath();ctx.strokeStyle='#00d4b0';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.strokeStyle=cssVar('--accent','#14b8a6');ctx.lineWidth=1.5;
         for(var i=0;i<h.length;i++){
           var x=(i/(h.length-1))*W,y=H-(h[i]/0.9)*(H-4)-2;
           if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
@@ -1066,17 +1221,18 @@ function RoadQualityWidget({vib,send}){
   },[]);
 
   var q=(vib&&vib.road_quality)||'smooth';
-  var qCol={smooth:'#00d4b0',rough:'#f6ad55',pothole:'#fc8181'};
+  var qCol={smooth:'#14b8a6',rough:'#f59e0b',pothole:'#ef4444'};
   var rms=(vib&&vib.rms_z)||0;
   var wPct=Math.min(100,(rms/0.9)*100);
   /* wheel heatmap: 4 wheels, z-axis affects all, x lateral affects LR, y longitudinal affects front/rear */
   var wheels={fl:wPct,fr:wPct,rl:wPct*0.9,rr:wPct*0.9};
-  var wCol=function(p){return p>65?'#fc8181':p>30?'#f6ad55':'#2a3f5a';};
+  var wCol=function(p){return p>65?'var(--crit)':p>30?'var(--warn)':'var(--text-secondary)';};
+  var wBg=function(p){return p>65?'var(--crit-muted)':p>30?'var(--warn-muted)':'var(--bg-chip)';};
   return (
     <div className="panel">
       <div className="ph">
         <span className="pt">Road Quality</span>
-        <span style={{fontSize:13,fontWeight:700,color:qCol[q]||'#d4dce8'}}>{q}</span>
+        <span style={{fontSize:'var(--font-base)',fontWeight:700,color:qCol[q]||'var(--text-primary)'}}>{q}</span>
       </div>
       {/* RMS chart */}
       <div className="canvas-wrap" style={{marginBottom:6}}>
@@ -1084,11 +1240,11 @@ function RoadQualityWidget({vib,send}){
       </div>
       {/* Wheel vibration heatmap */}
       <div style={{flexShrink:0,marginBottom:6}}>
-        <div style={{fontSize:9,color:'rgba(255,255,255,.8)',marginBottom:4,textTransform:'uppercase',letterSpacing:'.7px'}}>Wheel Vibration</div>
+        <div className="lbl" style={{marginBottom:4}}>Wheel Vibration</div>
         <div className="wheel-map">
           {[['FL',wheels.fl],['FR',wheels.fr],['RL',wheels.rl],['RR',wheels.rr]].map(function(w){
             return <div key={w[0]} className="wheel"
-              style={{background:wCol(w[1])+'22',border:'1px solid '+wCol(w[1]),color:wCol(w[1])}}>
+              style={{background:wBg(w[1]),border:'1px solid '+wCol(w[1]),color:wCol(w[1])}}>
               {w[0]} {Math.round(w[1])}%
             </div>;
           })}
@@ -1184,11 +1340,18 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
 
     function draw(){
       ctx.clearRect(0,0,W,H);
-      ctx.strokeStyle='rgba(0,212,176,.12)';ctx.lineWidth=1;
+      var gridCol=cssVar('--radar-grid','rgba(20,184,166,.22)');
+      var labelCol=cssVar('--radar-label','#94a3b8');
+      var dotCol=cssVar('--radar-dot','rgba(20,184,166,.55)');
+      var seatEmpty=cssVar('--bg-chip','rgba(255,255,255,.06)');
+      var seatBorder=cssVar('--border-default','rgba(255,255,255,.1)');
+      ctx.strokeStyle=gridCol;ctx.lineWidth=1;
       ctx.beginPath();ctx.roundRect(8*SX,3*SY,144*SX,109*SY,8);ctx.stroke();
-      ctx.strokeStyle='rgba(0,212,176,.07)';
+      ctx.strokeStyle=gridCol;ctx.globalAlpha=0.6;
       ctx.beginPath();ctx.roundRect(18*SX,4*SY,124*SX,18*SY,6);ctx.stroke();
-      ctx.fillStyle='rgba(0,212,176,.03)';ctx.fillRect(72*SX,10*SY,16*SX,80*SY);
+      ctx.globalAlpha=1;
+      ctx.fillStyle=cssVar('--accent-muted','rgba(20,184,166,.08)');
+      ctx.fillRect(72*SX,10*SY,16*SX,80*SY);
 
       var sc=scRef.current||{};
       var seatIds=['driver','front_passenger','rear_left','rear_right'];
@@ -1197,16 +1360,14 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
         var cfg=sc[sid]||{};
         var kind=cfg.occupied?(cfg.kind||'adult'):'none';
         var isOcc=kind!=='none';
-        var kc={adult:'rgba(0,212,176,',child:'rgba(246,173,85,',pet:'rgba(167,139,250,',none:'rgba(255,255,255,'};
-        var baseCol=kc[kind]||kc['none'];
+        var strokeCol=isOcc?(kind==='child'?'#f59e0b':kind==='pet'?'#a78bfa':cssVar('--accent','#14b8a6')):cssVar('--border-strong','#64748b');
         ctx.beginPath();ctx.arc(pos.x*SX,pos.y*SY,18*SX,0,Math.PI*2);
-        ctx.fillStyle=isOcc?baseCol+'.07)':'rgba(255,255,255,.02)';ctx.fill();
-        ctx.strokeStyle=isOcc?baseCol+'.35)':'rgba(255,255,255,.08)';
-        ctx.lineWidth=1;ctx.stroke();
-        ctx.fillStyle=isOcc?baseCol+'.7)':'rgba(255,255,255,.18)';
-        ctx.font='bold '+(9*SX)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle=isOcc?cssVar('--accent-muted','rgba(20,184,166,.12)'):seatEmpty;ctx.fill();
+        ctx.strokeStyle=strokeCol;ctx.lineWidth=isOcc?1.5:1;ctx.stroke();
+        ctx.fillStyle=isOcc?cssVar('--text-primary','#f8fafc'):cssVar('--text-muted','#94a3b8');
+        ctx.font='bold '+(10*SX)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText(isOcc?(ICONS[kind]||'?'):'·',pos.x*SX,pos.y*SY);
-        ctx.fillStyle='rgba(255,255,255,.25)';ctx.font=(6.5*SX)+'px sans-serif';
+        ctx.fillStyle=labelCol;ctx.font='600 '+(7*SX)+'px sans-serif';
         var sh=sid==='driver'?'DRV':sid==='front_passenger'?'F.P':sid==='rear_left'?'R.L':'R.R';
         ctx.fillText(sh,pos.x*SX,(pos.y+14)*SY);
       });
@@ -1218,8 +1379,9 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
         if(pos){var dx=d.x-pos.x*SX,dy=d.y-pos.y*SY;
           if(Math.sqrt(dx*dx+dy*dy)>16*Math.min(SX,SY)){d.vx=-d.vx*.7;d.vy=-d.vy*.7;}}
         if(d.life<=0){dots.splice(i,1);continue;}
-        ctx.beginPath();ctx.arc(d.x,d.y,1.2,0,Math.PI*2);
-        ctx.fillStyle='rgba(0,212,176,'+(d.life/d.maxLife*.7)+')';ctx.fill();
+        ctx.beginPath();ctx.arc(d.x,d.y,1.4,0,Math.PI*2);
+        ctx.fillStyle=dotCol;ctx.globalAlpha=d.life/d.maxLife*.85;ctx.fill();
+        ctx.globalAlpha=1;
       }
       animRef.current=requestAnimationFrame(draw);
     }
@@ -1235,7 +1397,7 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
     <div className="panel" style={{gap:0}}>
       <div className="ph" style={{marginBottom:6}}>
         <span className="pt">mmWave Radar</span>
-        <span style={{fontSize:9,color:'#00d4b0'}}>{pts} pts</span>
+        <span className="hint-text" style={{color:'var(--accent)',fontWeight:600}}>{pts} pts</span>
       </div>
 
       <canvas ref={cvRef} width="160" height="115"
@@ -1249,9 +1411,9 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
           {id:'rear_right',     label:'R.R'},
         ];
         var _kinds=[
-          {k:'none',   icon:'—',   col:'rgba(255,255,255,.22)'},
-          {k:'adult',  icon:'👤',  col:'#00d4b0'},
-          {k:'child',  icon:'🧒',  col:'#f6ad55'},
+          {k:'none',   icon:'—',   col:'var(--text-muted)'},
+          {k:'adult',  icon:'👤',  col:'var(--accent)'},
+          {k:'child',  icon:'🧒',  col:'var(--warn)'},
           {k:'pet',    icon:'🐾',  col:'#a78bfa'},
         ];
         var _setKind=function(sid,k){
@@ -1270,20 +1432,20 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
               var curKind=c.occupied?(c.kind||'adult'):'none';
               var hr=c.heart_rate_bpm||72;
               var hrNorm=c.kind==='child'?115:c.kind==='pet'?125:95;
-              var hrCol=hr>hrNorm?'#fc8181':hr>(hrNorm-20)?'#f6ad55':'#00d4b0';
+              var hrCol=hr>hrNorm?'var(--crit)':hr>(hrNorm-20)?'var(--warn)':'var(--accent)';
               return (
                 <div key={s.id} style={{display:'flex',flexDirection:'column',gap:3}}>
                   {/* Kind row */}
                   <div style={{display:'flex',alignItems:'center',gap:4}}>
-                    <span style={{fontSize:10,color:'rgba(255,255,255,.4)',width:26,flexShrink:0,textAlign:'right',fontWeight:600}}>{s.label}</span>
+                    <span className="row-lbl narrow" style={{textAlign:'right',fontWeight:600}}>{s.label}</span>
                     {_kinds.map(function(kd){
                       var sel=curKind===kd.k;
                       return (
                         <button key={kd.k} onClick={function(){_setKind(s.id,kd.k);}}
                           style={{flex:1,padding:'7px 0',fontSize:14,borderRadius:5,cursor:'pointer',border:'none',
-                            background:sel?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)',
-                            color:sel?kd.col:'rgba(255,255,255,.25)',
-                            outline:sel?('1.5px solid '+kd.col):'1px solid rgba(255,255,255,.08)',
+                            background:sel?'var(--accent-muted)':'var(--bg-subtle)',
+                            color:sel?kd.col:'var(--text-muted)',
+                            outline:sel?('1.5px solid '+kd.col):'1px solid var(--border-default)',
                             transition:'all .15s'}}>
                           {kd.icon}
                         </button>
@@ -1293,11 +1455,11 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
                   {/* HR row — only when occupied */}
                   {c.occupied&&(
                     <div style={{display:'flex',alignItems:'center',gap:6,paddingLeft:30}}>
-                      <span style={{fontSize:9,color:'rgba(255,255,255,.3)',flexShrink:0}}>HR</span>
+                      <span className="hint-text" style={{flexShrink:0}}>HR</span>
                       <input type="range" min="40" max="180" step="1" value={hr}
                         onChange={function(e){_setHR(s.id,e.target.value);}}
                         style={{flex:1,accentColor:hrCol,height:3,cursor:'pointer'}}/>
-                      <span style={{fontSize:10,fontWeight:600,color:hrCol,minWidth:36,textAlign:'right'}}>{hr} bpm</span>
+                      <span className="meta-text" style={{fontWeight:600,color:hrCol,minWidth:36,textAlign:'right'}}>{hr} bpm</span>
                     </div>
                   )}
                 </div>
@@ -1310,34 +1472,34 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
       {/* Live vitals — scrollable remainder */}
       <div style={{flex:1,overflowY:'auto',minHeight:0}}>
         {occ.length===0
-          ? <div style={{fontSize:8,color:'rgba(255,255,255,.15)',textAlign:'center',paddingTop:4}}>no radar returns</div>
+          ? <div className="hint-text" style={{textAlign:'center',paddingTop:4}}>no radar returns</div>
           : <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 8px'}}>
             {occ.map(function(s){
               var hr=s.heart_rate_bpm||0,resp=s.respiration_rpm||0;
-              var hrCol=hr>115?'#fc8181':hr>95?'#f6ad55':'#00d4b0';
+              var hrCol=hr>115?'var(--crit)':hr>95?'var(--warn)':'var(--accent)';
               return (
                 <div key={s.seat} style={{minWidth:0}}>
-                  <div style={{fontSize:7,color:'rgba(255,255,255,.5)',marginBottom:2,display:'flex',gap:3,alignItems:'center'}}>
+                  <div className="hint-text" style={{marginBottom:2,display:'flex',gap:3,alignItems:'center'}}>
                     <span>{ICONS[s.occupant]||'👤'}</span>
-                    <span style={{color:'rgba(255,255,255,.3)'}}>{_RADAR_SHORT[s.seat]}</span>
-                    {(s.motion||0)>0.4&&<span style={{color:'#fc8181',marginLeft:'auto',fontSize:6}}>agit</span>}
+                    <span style={{color:'var(--text-faint)'}}>{_RADAR_SHORT[s.seat]}</span>
+                    {(s.motion||0)>0.4&&<span style={{color:'var(--crit)',marginLeft:'auto'}}>agit</span>}
                   </div>
                   {hr>0&&(
                     <div style={{display:'flex',alignItems:'center',gap:2,marginBottom:2}}>
-                      <span style={{fontSize:6,color:'rgba(255,255,255,.25)',width:12,flexShrink:0}}>HR</span>
-                      <div style={{flex:1,height:2,background:'rgba(255,255,255,.06)',borderRadius:1}}>
+                      <span className="hint-text" style={{width:14,flexShrink:0}}>HR</span>
+                      <div style={{flex:1,height:3,background:'var(--range-track)',borderRadius:1}}>
                         <div style={{width:Math.min(100,(hr/160)*100)+'%',height:'100%',background:hrCol,borderRadius:1,transition:'width .4s'}}/>
                       </div>
-                      <span style={{fontSize:7,color:hrCol,minWidth:20,textAlign:'right'}}>{Math.round(hr)}</span>
+                      <span className="hint-text" style={{color:hrCol,minWidth:22,textAlign:'right',fontWeight:600}}>{Math.round(hr)}</span>
                     </div>
                   )}
                   {resp>0&&(
                     <div style={{display:'flex',alignItems:'center',gap:2}}>
-                      <span style={{fontSize:6,color:'rgba(255,255,255,.25)',width:12,flexShrink:0}}>BR</span>
-                      <div style={{flex:1,height:2,background:'rgba(255,255,255,.06)',borderRadius:1}}>
-                        <div style={{width:Math.min(100,(resp/40)*100)+'%',height:'100%',background:'rgba(130,180,255,.6)',borderRadius:1,transition:'width .4s'}}/>
+                      <span className="hint-text" style={{width:14,flexShrink:0}}>BR</span>
+                      <div style={{flex:1,height:3,background:'var(--range-track)',borderRadius:1}}>
+                        <div style={{width:Math.min(100,(resp/40)*100)+'%',height:'100%',background:'var(--info)',borderRadius:1,transition:'width .4s'}}/>
                       </div>
-                      <span style={{fontSize:7,color:'rgba(130,180,255,.8)',minWidth:20,textAlign:'right'}}>{Math.round(resp)}</span>
+                      <span className="hint-text" style={{color:'var(--info)',minWidth:22,textAlign:'right',fontWeight:600}}>{Math.round(resp)}</span>
                     </div>
                   )}
                 </div>
@@ -1354,12 +1516,7 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
 function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,onScenarioSelect,
                       showVideo,showAudio,showSeats,liveAudio,liveVision,
                       onToggleVideo,onToggleAudio,onToggleSeats}){
-  var chipStyle=function(on){return {
-    padding:'2px 9px',fontSize:9,borderRadius:3,cursor:'pointer',border:'none',
-    background:on?'rgba(0,212,176,.18)':'rgba(255,255,255,.06)',
-    color:on?'#00d4b0':'rgba(255,255,255,.38)',
-    outline:on?'1px solid rgba(0,212,176,.5)':'1px solid rgba(255,255,255,.1)'
-  };};
+  var chipCls=function(on){return 'chip-btn'+(on?' on':'');};
   var pickScenario=function(name){
     send({cmd:'scenario',name:name});
     if(onScenarioSelect)onScenarioSelect();
@@ -1370,34 +1527,31 @@ function TimelineBar({scenarios,current,demoRunning,send,onDemoToggle,onScenario
   var modeLabel=scenarioActive
     ? ('Scenario: '+current.replace(/_/g,' '))
     : (liveAudio||liveVision)?'Live A/V':'Manual';
-  var modeCol=scenarioActive?'#f6ad55':(liveAudio||liveVision)?'#00d4b0':'#82b4ff';
+  var modeCol=scenarioActive?'var(--warn)':(liveAudio||liveVision)?'var(--accent)':'var(--info)';
 
   return (
-    <div className="panel sv-timeline" style={{flexDirection:'column',padding:'8px 12px',gap:6}}>
+    <div className="panel" style={{flexDirection:'column',padding:'8px 12px',gap:6,height:'100%'}}>
       {/* Mode indicator row */}
       <div style={{display:'flex',alignItems:'center',gap:8}}>
-        <span style={{fontSize:9,color:'rgba(255,255,255,.35)',textTransform:'uppercase',
-          letterSpacing:'1px',flexShrink:0}}>Mode:</span>
-        <span style={{fontSize:10,fontWeight:600,color:modeCol,letterSpacing:.3}}>{modeLabel}</span>
-        {scenarioActive&&<span style={{fontSize:8,color:'rgba(246,173,85,.6)',
-          border:'1px solid rgba(246,173,85,.3)',borderRadius:3,padding:'1px 5px',flexShrink:0}}>
+        <span className="hint-text" style={{textTransform:'uppercase',letterSpacing:'1px',flexShrink:0}}>Mode:</span>
+        <span className="meta-text" style={{fontWeight:600,color:modeCol}}>{modeLabel}</span>
+        {scenarioActive&&<span className="hint-text" style={{color:'var(--warn)',
+          border:'1px solid var(--warn-muted)',borderRadius:4,padding:'2px 6px',flexShrink:0}}>
           overrides manual
         </span>}
-        {!scenarioActive&&<span style={{fontSize:8,color:'rgba(255,255,255,.2)',flexShrink:0}}>
+        {!scenarioActive&&<span className="hint-text" style={{flexShrink:0}}>
           {scenarioActive?'':(liveAudio&&liveVision)?'audio+vision active'
             :liveAudio?'audio active':liveVision?'vision active':'configure via Seat Status or Radar'}
         </span>}
         <span style={{flex:1}}/>
-        {/* Panel toggles inline */}
-        <span style={{fontSize:9,color:'rgba(255,255,255,.25)',flexShrink:0}}>Panels:</span>
-        <button style={chipStyle(showVideo)} onClick={onToggleVideo}>Video</button>
-        <button style={chipStyle(showAudio)} onClick={onToggleAudio}>Audio</button>
-        <button style={chipStyle(showSeats)} onClick={onToggleSeats}>Seats</button>
+        <span className="hint-text" style={{flexShrink:0}}>Panels:</span>
+        <button className={chipCls(showVideo)} onClick={onToggleVideo}>Video</button>
+        <button className={chipCls(showAudio)} onClick={onToggleAudio}>Audio</button>
+        <button className={chipCls(showSeats)} onClick={onToggleSeats}>Seats</button>
       </div>
       {/* Events + Run row */}
       <div style={{display:'flex',alignItems:'center',gap:8}}>
-        <span style={{fontSize:9,color:'rgba(255,255,255,.8)',textTransform:'uppercase',
-          letterSpacing:'1px',flexShrink:0}}>Events</span>
+        <span className="hint-text" style={{textTransform:'uppercase',letterSpacing:'1px',flexShrink:0}}>Events</span>
         <div className="sc-scroll">
           <button className={'sc-btn'+(current==='idle'&&!demoRunning?' on':'')}
             onClick={function(){pickScenario('idle');}}>
@@ -1475,7 +1629,7 @@ function SeatConfigOverlay({seatId,config,send,onClose,scenario}){
             <div className="cfg-row">
               <input type="checkbox" checked={!!c.buckled}
                 onChange={function(e){field('buckled',e.target.checked);}}/>
-              <span style={{fontSize:11,color:c.buckled?'#00d4b0':'#fc8181',marginLeft:4}}>
+              <span style={{fontSize:'var(--font-sm)',color:c.buckled?'var(--accent)':'var(--crit)',marginLeft:4}}>
                 {c.buckled?'Seatbelt Buckled':'Seatbelt Unbuckled'}
               </span>
             </div>
@@ -1520,44 +1674,246 @@ function SeatConfigOverlay({seatId,config,send,onClose,scenario}){
   );
 }
 
+/* ── Draggable / resizable panel shell ── */
+var DEFAULT_LAYOUT={
+  video:   {x:1,  y:1,  w:32, h:38},
+  audio:   {x:34, y:1,  w:32, h:38},
+  radar:   {x:67, y:1,  w:32, h:76},
+  vehicle: {x:1,  y:40, w:32, h:18},
+  road:    {x:1,  y:59, w:32, h:18},
+  seats:   {x:34, y:40, w:32, h:18},
+  imu:     {x:34, y:59, w:32, h:18},
+  timeline:{x:1,  y:78, w:98, h:21}
+};
+var UI_STATE_KEY='cabinsense-ui-state';
+var _uiSaveTimer=null;
+
+function mergePanels(saved){
+  var merged={};
+  Object.keys(DEFAULT_LAYOUT).forEach(function(id){
+    var base=DEFAULT_LAYOUT[id];
+    var patch=(saved&&saved[id])||{};
+    merged[id]={x:patch.x!=null?patch.x:base.x,y:patch.y!=null?patch.y:base.y,
+      w:patch.w!=null?patch.w:base.w,h:patch.h!=null?patch.h:base.h};
+  });
+  return merged;
+}
+
+function defaultUiState(){
+  return {
+    panels:mergePanels(null),
+    container:null,
+    visibility:{video:true,audio:true,seats:true},
+    zOrder:['video','audio','radar','vehicle','road','seats','imu','timeline']
+  };
+}
+
+function loadUiStateLocal(){
+  var state=defaultUiState();
+  try{
+    var raw=localStorage.getItem(UI_STATE_KEY);
+    if(raw){
+      var parsed=JSON.parse(raw);
+      if(parsed.panels)state.panels=mergePanels(parsed.panels);
+      if(parsed.container)state.container=parsed.container;
+      if(parsed.visibility)state.visibility=Object.assign({},state.visibility,parsed.visibility);
+      if(parsed.zOrder)state.zOrder=parsed.zOrder;
+    }
+    /* migrate legacy keys */
+    var leg=localStorage.getItem('cabinsense-layout');
+    if(leg)state.panels=mergePanels(JSON.parse(leg));
+    var legSz=localStorage.getItem('cabinsense-container-size');
+    if(legSz)state.container=JSON.parse(legSz);
+  }catch(e){}
+  return state;
+}
+
+function saveUiState(state){
+  try{localStorage.setItem(UI_STATE_KEY,JSON.stringify(state));}catch(e){}
+  clearTimeout(_uiSaveTimer);
+  _uiSaveTimer=setTimeout(function(){
+    fetch('/api/ui-layout',{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(state)}).catch(function(){});
+  },350);
+}
+
+function applyContainerSize(el,sz){
+  if(!el||!sz)return;
+  if(sz.w)el.style.width=sz.w+'px';
+  if(sz.h)el.style.height=sz.h+'px';
+}
+
+function PanelShell({id,rect,onRectChange,onFocus,zIndex,hidden,children}){
+  var shellRef=useRef(null);
+  if(hidden||!rect)return null;
+
+  var startDrag=function(e){
+    e.preventDefault();onFocus(id);
+    var startX=e.clientX,startY=e.clientY;
+    var orig={x:rect.x,y:rect.y,w:rect.w,h:rect.h};
+    var parent=shellRef.current.parentElement;
+    function move(ev){
+      var cr=parent.getBoundingClientRect();
+      var nx=orig.x+(ev.clientX-startX)/cr.width*100;
+      var ny=orig.y+(ev.clientY-startY)/cr.height*100;
+      onRectChange(id,{x:Math.max(0,Math.min(100-orig.w,nx)),y:Math.max(0,Math.min(100-orig.h,ny)),w:orig.w,h:orig.h});
+    }
+    function up(){document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);}
+    document.addEventListener('mousemove',move);document.addEventListener('mouseup',up);
+  };
+
+  var startResize=function(e){
+    e.preventDefault();e.stopPropagation();onFocus(id);
+    var startX=e.clientX,startY=e.clientY;
+    var orig={x:rect.x,y:rect.y,w:rect.w,h:rect.h};
+    var parent=shellRef.current.parentElement;
+    function move(ev){
+      var cr=parent.getBoundingClientRect();
+      var nw=Math.max(12,orig.w+(ev.clientX-startX)/cr.width*100);
+      var nh=Math.max(10,orig.h+(ev.clientY-startY)/cr.height*100);
+      nw=Math.min(100-orig.x,nw);nh=Math.min(100-orig.y,nh);
+      onRectChange(id,{x:orig.x,y:orig.y,w:nw,h:nh});
+    }
+    function up(){document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);}
+    document.addEventListener('mousemove',move);document.addEventListener('mouseup',up);
+  };
+
+  return (
+    <div ref={shellRef} className="panel-slot"
+      style={{left:rect.x+'%',top:rect.y+'%',width:rect.w+'%',height:rect.h+'%',zIndex:zIndex||1}}
+      onMouseDown={function(){onFocus(id);}}>
+      <div className="panel-drag-bar" onMouseDown={startDrag} title="Drag to move">
+        <span className="panel-grip">···</span>
+      </div>
+      <div className="panel-slot-body">{children}</div>
+      <div className="panel-resize-handle" onMouseDown={startResize} title="Drag to resize"/>
+    </div>
+  );
+}
+
 /* ── SensorView (Tab 1) ── */
 function SensorView({state,send,ws,liveAudio,liveVision,scenarios,onSelectSeat,
                      playTrigger,stopTrigger,onDemoToggle,localDemoRunning}){
-  const [showVideo,setShowVideo]=useState(true);
-  const [showAudio,setShowAudio]=useState(true);
-  const [showSeats,setShowSeats]=useState(true);
+  var _init=loadUiStateLocal();
+  const [showVideo,setShowVideo]=useState(_init.visibility.video!==false);
+  const [showAudio,setShowAudio]=useState(_init.visibility.audio!==false);
+  const [showSeats,setShowSeats]=useState(_init.visibility.seats!==false);
+  const [layout,setLayout]=useState(mergePanels(_init.panels));
+  const [zOrder,setZOrder]=useState(_init.zOrder);
+  const svRef=useRef(null);
+  const containerRef=useRef(_init.container);
+  const layoutRef=useRef(layout);
+  const zOrderRef=useRef(zOrder);
+  const visRef=useRef({video:showVideo,audio:showAudio,seats:showSeats});
+
+  layoutRef.current=layout;
+  zOrderRef.current=zOrder;
+  visRef.current={video:showVideo,audio:showAudio,seats:showSeats};
+
+  var flushUiState=function(){
+    var payload={
+      panels:mergePanels(layoutRef.current),
+      container:containerRef.current,
+      visibility:visRef.current,
+      zOrder:zOrderRef.current
+    };
+    saveUiState(payload);
+  };
+
+  useEffect(function(){
+    fetch('/api/ui-layout').then(function(r){return r.json();}).then(function(data){
+      if(!data||!data.panels)return;
+      setLayout(mergePanels(data.panels));
+      if(data.zOrder)setZOrder(data.zOrder);
+      if(data.visibility){
+        setShowVideo(data.visibility.video!==false);
+        setShowAudio(data.visibility.audio!==false);
+        setShowSeats(data.visibility.seats!==false);
+      }
+      if(data.container){
+        containerRef.current=data.container;
+        applyContainerSize(svRef.current,data.container);
+      }
+      try{localStorage.setItem(UI_STATE_KEY,JSON.stringify(data));}catch(e){}
+    }).catch(function(){});
+  },[]);
+
+  useEffect(function(){flushUiState();},[layout,showVideo,showAudio,showSeats,zOrder]);
+
+  useEffect(function(){
+    var el=svRef.current;if(!el)return;
+    applyContainerSize(el,containerRef.current);
+    var ro=new ResizeObserver(function(entries){
+      var cr=entries[0].contentRect;
+      if(cr.width<100||cr.height<100)return;
+      containerRef.current={w:Math.round(cr.width),h:Math.round(cr.height)};
+      flushUiState();
+    });
+    ro.observe(el);
+    return function(){ro.disconnect();};
+  },[]);
+
+  var updateRect=function(id,rect){
+    setLayout(function(prev){
+      var n=mergePanels(prev);
+      n[id]=rect;
+      return n;
+    });
+  };
+  var focusPanel=function(id){
+    setZOrder(function(prev){
+      var n=prev.filter(function(p){return p!==id;});
+      n.push(id);return n;
+    });
+  };
+  var zIndex=function(id){return zOrder.indexOf(id)+1;};
+
   return (
-    <div className="sv">
-      {/* Explicit grid slots — positions never shift on conditional render */}
-      <div style={{gridColumn:1,gridRow:1,minHeight:0,overflow:'hidden'}}>
-        {showVideo&&<VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver}
-            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>}
-      </div>
-      <div style={{gridColumn:2,gridRow:1,minHeight:0,overflow:'hidden'}}>
-        {showAudio&&<AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio}
-            send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>}
-      </div>
-      <div style={{gridColumn:3,gridRow:'1 / 3',minHeight:0,overflow:'hidden'}}>
+    <div className="sv-wrap">
+    <div ref={svRef} className="sv" title="Drag corner to resize dashboard">
+      <PanelShell id="video" rect={layout.video} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('video')} hidden={!showVideo}>
+        <VideoWidget ws={ws} liveVision={liveVision} visionDriver={state.vision_driver}
+          send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>
+      </PanelShell>
+      <PanelShell id="audio" rect={layout.audio} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('audio')} hidden={!showAudio}>
+        <AudioWidget ws={ws} liveAudio={liveAudio} audio={state.audio}
+          send={send} playTrigger={playTrigger} stopTrigger={stopTrigger}/>
+      </PanelShell>
+      <PanelShell id="radar" rect={layout.radar} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('radar')}>
         <RadarWidget radar={state.radar} seatConfigs={state.seat_configs}
           onSelectSeat={onSelectSeat} send={send} scenario={state.scenario}/>
-      </div>
-      <div style={{gridColumn:1,gridRow:2,display:'flex',flexDirection:'column',gap:8,minHeight:0}}>
+      </PanelShell>
+      <PanelShell id="vehicle" rect={layout.vehicle} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('vehicle')}>
         <VehicleWidget speed={state.world_speed_kmh} visibility={state.world_visibility} send={send}/>
+      </PanelShell>
+      <PanelShell id="road" rect={layout.road} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('road')}>
         <RoadQualityWidget vib={state.vibration} send={send}/>
-      </div>
-      <div style={{gridColumn:2,gridRow:2,display:'flex',flexDirection:'column',gap:8,minHeight:0}}>
-        {showSeats&&<SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat} compact/>}
+      </PanelShell>
+      <PanelShell id="seats" rect={layout.seats} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('seats')} hidden={!showSeats}>
+        <SeatWidget seatConfigs={state.seat_configs} onSelect={onSelectSeat} compact/>
+      </PanelShell>
+      <PanelShell id="imu" rect={layout.imu} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('imu')}>
         <IMUWidget vibState={state.vibration} send={send}/>
-      </div>
-
-      <TimelineBar scenarios={scenarios} current={state.scenario}
-        demoRunning={localDemoRunning} send={send} onDemoToggle={onDemoToggle}
-        onScenarioSelect={function(){if(onDemoToggle)onDemoToggle(false);}}
-        showVideo={showVideo} showAudio={showAudio} showSeats={showSeats}
-        liveAudio={liveAudio} liveVision={liveVision}
-        onToggleVideo={function(){setShowVideo(function(v){return !v;});}}
-        onToggleAudio={function(){setShowAudio(function(v){return !v;});}}
-        onToggleSeats={function(){setShowSeats(function(v){return !v;});}}/>
+      </PanelShell>
+      <PanelShell id="timeline" rect={layout.timeline} onRectChange={updateRect} onFocus={focusPanel}
+        zIndex={zIndex('timeline')}>
+        <TimelineBar scenarios={scenarios} current={state.scenario}
+          demoRunning={localDemoRunning} send={send} onDemoToggle={onDemoToggle}
+          onScenarioSelect={function(){if(onDemoToggle)onDemoToggle(false);}}
+          showVideo={showVideo} showAudio={showAudio} showSeats={showSeats}
+          liveAudio={liveAudio} liveVision={liveVision}
+          onToggleVideo={function(){setShowVideo(function(v){return !v;});}}
+          onToggleAudio={function(){setShowAudio(function(v){return !v;});}}
+          onToggleSeats={function(){setShowSeats(function(v){return !v;});}}/>
+      </PanelShell>
+    </div>
     </div>
   );
 }
@@ -1573,17 +1929,17 @@ function CabinSVG({seatConfigs,factors}){
   return (
     <svg viewBox="0 0 160 220" style={{width:'96%',height:'auto',display:'block',margin:'0 auto',flexShrink:0}}>
       {/* Car body */}
-      <rect x="10" y="12" width="140" height="196" rx="22" fill="#0d1520" stroke="#1c2740" strokeWidth="1.5"/>
+      <rect x="10" y="12" width="140" height="196" rx="22" fill="var(--bg-panel)" stroke="var(--border-default)" strokeWidth="1.5"/>
       {/* Windshield */}
-      <rect x="20" y="14" width="120" height="42" rx="14" fill="#111f35" stroke="#1c2740" strokeWidth="1"/>
+      <rect x="20" y="14" width="120" height="42" rx="14" fill="var(--bg-elevated)" stroke="var(--border-default)" strokeWidth="1"/>
       {/* Rear window */}
-      <rect x="20" y="164" width="120" height="40" rx="10" fill="#111f35" stroke="#1c2740" strokeWidth="1"/>
+      <rect x="20" y="164" width="120" height="40" rx="10" fill="var(--bg-elevated)" stroke="var(--border-default)" strokeWidth="1"/>
       {/* Center console */}
-      <rect x="72" y="30" width="16" height="140" rx="5" fill="#0a111e" stroke="#1c2740" strokeWidth="1"/>
+      <rect x="72" y="30" width="16" height="140" rx="5" fill="var(--bg-subtle)" stroke="var(--border-default)" strokeWidth="1"/>
       {/* Steering wheel */}
-      <circle cx="42" cy="95" r="13" fill="none" stroke="#1c2740" strokeWidth="1.5"/>
-      <line x1="30" y1="95" x2="54" y2="95" stroke="#1c2740" strokeWidth="1"/>
-      <line x1="42" y1="83" x2="42" y2="107" stroke="#1c2740" strokeWidth="1"/>
+      <circle cx="42" cy="95" r="13" fill="none" stroke="var(--border-default)" strokeWidth="1.5"/>
+      <line x1="30" y1="95" x2="54" y2="95" stroke="var(--border-default)" strokeWidth="1"/>
+      <line x1="42" y1="83" x2="42" y2="107" stroke="var(--border-default)" strokeWidth="1"/>
       {/* Seats */}
       {[
         {id:'driver',          x:42,  y:62 },
@@ -1593,8 +1949,8 @@ function CabinSVG({seatConfigs,factors}){
       ].map(function(s){
         var c=(seatConfigs&&seatConfigs[s.id])||{};
         var d=c.distress||0;
-        var fill=!c.occupied?'rgba(13,21,32,.5)':d>0.7?'rgba(252,129,129,.18)':d>0.35?'rgba(246,173,85,.18)':'rgba(0,212,176,.1)';
-        var stroke=!c.occupied?'#1c2740':d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
+        var fill=!c.occupied?'var(--bg-subtle)':d>0.7?'var(--crit-muted)':d>0.35?'var(--warn-muted)':'var(--accent-muted)';
+        var stroke=!c.occupied?'var(--border-default)':d>0.7?'var(--crit)':d>0.35?'var(--warn)':'var(--accent)';
         return (
           <g key={s.id}>
             <circle cx={s.x} cy={s.y} r="28" fill={fill} stroke={stroke} strokeWidth="2"/>
@@ -1667,7 +2023,7 @@ function CircularGauge({value}){
     <div className="gauge-sec">
       <div className="gauge-ttl">Cognitive Load Score</div>
       <svg width="150" height="150" viewBox="0 0 220 220" style={{maxWidth:'100%',maxHeight:'25vh'}}>
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#1a2535" strokeWidth="14"/>
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border-default)" strokeWidth="14"/>
         <circle cx={CX} cy={CY} r={R} fill="none" stroke={col} strokeWidth="14"
           strokeDasharray={filled+' '+circ} strokeLinecap="round"
           transform={'rotate(-90 '+CX+' '+CY+')'}/>
@@ -1676,7 +2032,7 @@ function CircularGauge({value}){
         <text x={CX} y={CY+34} textAnchor="middle" fill={col}
           fontSize="13" fontFamily="inherit" opacity="0.7">/ 100</text>
       </svg>
-      <div className="gauge-lbl" style={{color:col,fontSize:18}}>{loadLbl(value)}</div>
+      <div className="gauge-lbl" style={{color:col}}>{loadLbl(value)}</div>
     </div>
   );
 }
@@ -1750,7 +2106,7 @@ function OccupantList({seatConfigs}){
     var c=(seatConfigs&&seatConfigs[sid])||{};return c.occupied;
   });
   if(occupied.length===0)
-    return <div style={{fontSize:10,color:'rgba(255,255,255,.35)',textAlign:'center',marginTop:8}}>No occupants</div>;
+    return <div className="meta-text" style={{textAlign:'center',marginTop:8}}>No occupants</div>;
   return (
     <div style={{display:'flex',flexDirection:'column',gap:5,width:'100%',marginTop:10}}>
       {occupied.map(function(sid){
@@ -1758,19 +2114,19 @@ function OccupantList({seatConfigs}){
         var d=c.distress||0;
         var col=d>0.7?'#fc8181':d>0.35?'#f6ad55':'#00d4b0';
         return (
-          <div key={sid} style={{display:'flex',alignItems:'center',gap:7,
-            background:'rgba(255,255,255,.04)',borderRadius:5,padding:'5px 8px',
-            border:'1px solid rgba(255,255,255,.08)'}}>
-            <span style={{color:col,fontSize:13}}>{ICONS[c.kind]||'👤'}</span>
+          <div key={sid} style={{display:'flex',alignItems:'center',gap:8,
+            background:'var(--bg-subtle)',borderRadius:6,padding:'6px 10px',
+            border:'1px solid var(--border-default)'}}>
+            <span style={{color:col,fontSize:'1.125rem'}}>{ICONS[c.kind]||'👤'}</span>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:8,color:'rgba(255,255,255,.6)',textTransform:'uppercase',letterSpacing:'.5px'}}>{SEAT_LABELS[sid]}</div>
-              <div style={{fontSize:10,color:col,fontWeight:600,marginTop:1}}>
+              <div className="hint-text" style={{textTransform:'uppercase',letterSpacing:'.04em'}}>{SEAT_LABELS[sid]}</div>
+              <div className="meta-text" style={{color:col,fontWeight:600,marginTop:2}}>
                 {c.audio_event&&c.audio_event!=='none'
                   ?(AICONS[c.audio_event]+' '+c.audio_event)
                   :(c.emotion||'calm')}
               </div>
             </div>
-            <span style={{fontSize:11,color:c.buckled?'#00d4b0':'#fc8181',fontWeight:700,flexShrink:0}}>
+            <span style={{fontSize:'var(--font-sm)',color:c.buckled?'var(--accent)':'var(--crit)',fontWeight:700,flexShrink:0}}>
               {c.buckled?'✓':'✗'}
             </span>
           </div>
@@ -1793,11 +2149,10 @@ function InfotainmentView({state,send}){
       {/* Col 1: Vehicle Cabin — centered */}
       <div className="iv-col iv-cabin">
         <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginBottom:6}}>
-          <span style={{fontSize:7,textTransform:'uppercase',letterSpacing:'1.5px',
-            color:'#ffffff',fontWeight:600}}>Vehicle Cabin</span>
-          <span style={{fontSize:7,color:'#00d4b0',border:'1px solid rgba(0,212,176,.4)',
-            borderRadius:3,padding:'1px 5px',letterSpacing:.5}}>● LIVE</span>
-          <span style={{fontSize:7,color:'rgba(255,255,255,.3)'}}>{modeTag}</span>
+          <span className="hint-text" style={{textTransform:'uppercase',letterSpacing:'1.5px',fontWeight:600}}>Vehicle Cabin</span>
+          <span className="hint-text" style={{color:'var(--accent)',border:'1px solid var(--accent-border)',
+            borderRadius:4,padding:'2px 6px'}}>● LIVE</span>
+          <span className="hint-text">{modeTag}</span>
         </div>
         <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
         {/* Qwen vision debug strip */}
@@ -1807,12 +2162,12 @@ function InfotainmentView({state,send}){
             return e[0]!=='ts'&&e[1]&&e[1].occupied;
           });
           if(!found.length)return(
-            <div style={{fontSize:8,color:'rgba(255,255,255,.25)',textAlign:'center',marginTop:4}}>
+            <div className="hint-text" style={{textAlign:'center',marginTop:4}}>
               Vision: no occupants detected
             </div>
           );
           return(
-            <div style={{fontSize:8,color:'#00d4b0',textAlign:'center',marginTop:4}}>
+            <div className="hint-text" style={{color:'var(--accent)',textAlign:'center',marginTop:4}}>
               Vision: {found.map(function(e){
                 return e[0].replace(/_/g,' ')+' '+ICONS[e[1].kind]||e[1].kind;
               }).join(' · ')}
@@ -1829,8 +2184,8 @@ function InfotainmentView({state,send}){
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:'100%'}}>
           <CircularGauge value={load}/>
           <div style={{width:'100%',marginTop:12}}>
-            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'1.2px',
-              color:'#ffffff',fontWeight:600,marginBottom:8,textAlign:'center'}}>Cabin Status</div>
+            <div style={{fontSize:'var(--font-xs)',textTransform:'uppercase',letterSpacing:'1.2px',
+              color:'var(--text-muted)',fontWeight:600,marginBottom:8,textAlign:'center'}}>Cabin Status</div>
             <OccupantList seatConfigs={state.seat_configs}/>
           </div>
         </div>
@@ -1849,8 +2204,7 @@ function BrandBar(){
     <div className="brand-bar">
       {/* JLR logo */}
       <div className="jag-side">
-        <img src="/static/jlr.png" alt="Jaguar Land Rover"
-          style={{height:36,objectFit:'contain',filter:'invert(1)',mixBlendMode:'screen',opacity:.95}}/>
+        <img src="/static/jlr.png" alt="Jaguar Land Rover" className="brand-logo"/>
       </div>
       {/* Separator */}
       <div className="brand-sep"/>
@@ -1888,7 +2242,15 @@ function App(){
   const [demoTrigger,setDemoTrigger]=useState(0);
   const [demoStopTrigger,setDemoStopTrigger]=useState(0);
   const [localDemoRunning,setLocalDemoRunning]=useState(false);
+  const [theme,setTheme]=useState(function(){
+    return document.documentElement.getAttribute('data-theme')||'dark';
+  });
   const ws=useRef(null);
+
+  useEffect(function(){
+    document.documentElement.setAttribute('data-theme',theme);
+    localStorage.setItem('cabinsense-theme',theme);
+  },[theme]);
 
   var _wsSend=function(msg){
     if(ws.current&&ws.current.readyState===1)ws.current.send(JSON.stringify(msg));
@@ -1927,6 +2289,7 @@ function App(){
     <div className="hmi">
       {/* Slim utility bar — just clock + conn */}
       <div className="hmi-hdr">
+        <ThemeToggle theme={theme} setTheme={setTheme}/>
         <div className="sp"/>
         <Clock/>
         <div className={'dot'+(conn?' on':'')}/>
@@ -1934,7 +2297,7 @@ function App(){
       </div>
       <div className="hmi-content">
         {/* Both views stay mounted — display:none keeps audio/video running across tab switches */}
-        <div className="view iv-shell" style={{display:tab==='sensor'?undefined:'none'}}>
+        <div className="view iv-shell sensor-shell" style={{display:tab==='sensor'?undefined:'none'}}>
           <BrandBar/>
           <SensorView state={state} send={send} ws={ws}
             liveAudio={liveAudio} liveVision={liveVision}

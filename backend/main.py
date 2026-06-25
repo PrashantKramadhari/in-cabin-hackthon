@@ -130,6 +130,28 @@ async def audio_mode() -> dict:
     return {"live_yamnet": _USE_LIVE_AUDIO}
 
 
+_UI_LAYOUT_PATH = Path(__file__).resolve().parent / "data" / "ui_layout.json"
+
+
+@app.get("/api/ui-layout")
+async def get_ui_layout() -> dict:
+    """Return saved HMI panel layout (positions, sizes, visibility)."""
+    if _UI_LAYOUT_PATH.is_file():
+        try:
+            return json.loads(_UI_LAYOUT_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+@app.put("/api/ui-layout")
+async def put_ui_layout(body: dict) -> dict:
+    """Persist HMI panel layout across server restarts and browsers."""
+    _UI_LAYOUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _UI_LAYOUT_PATH.write_text(json.dumps(body, indent=2), encoding="utf-8")
+    return {"status": "saved"}
+
+
 @app.get("/api/scenarios")
 async def list_scenarios() -> dict:
     return {"scenarios": scenarios.SCENARIOS, "current": scenarios.world.scenario}

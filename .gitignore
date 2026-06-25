@@ -16,6 +16,7 @@ backend/yolov8n.pt
 # Data outputs / logs
 *.log
 /tmp/
+backend/data/ui_layout.json
 
 # Bundled JS libs (downloaded by setup script)
 frontend/lib/
