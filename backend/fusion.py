@@ -15,6 +15,7 @@ import asyncio
 import time
 
 from bus import bus
+from config import fusion as cfg
 from world import world
 
 # latest frame per modality
@@ -27,7 +28,10 @@ _latest: dict[str, dict] = {
 # mitigation registry: id -> {..., status}
 _mitigations: dict[str, dict] = {}
 
-HZ = 10
+HZ = cfg.hz
+_GRACE = cfg.grace_period_s
+S = cfg.score   # shorthand
+M = cfg.mitigations
 
 
 def _driver_seat() -> dict | None:
@@ -65,63 +69,65 @@ def _cognitive_load() -> tuple[int, list[str]]:
     # ── Driver vitals (radar micro-doppler) ──────────────────────────────
     d = _driver_seat()
     if d and d.get("occupied"):
-        hr = d.get("heart_rate_bpm") or 72
-        resp = d.get("respiration_rpm") or 14
-        if hr > 95:
-            score += min(30, (hr - 95) * 1.5); factors.append("elevated heart rate")
-        if resp > 20:
-            score += min(15, (resp - 20) * 2); factors.append("rapid breathing")
-        if hr < 60:
-            score += 12; factors.append("low arousal / fatigue")
+        hr = d.get("heart_rate_bpm") or S.driver_hr_default
+        resp = d.get("respiration_rpm") or S.driver_resp_default
+        if hr > S.driver_hr_high_thresh:
+            score += min(S.driver_hr_high_max, (hr - S.driver_hr_high_thresh) * S.driver_hr_high_multiplier)
+            factors.append("elevated heart rate")
+        if resp > S.driver_resp_high_thresh:
+            score += min(S.driver_resp_high_max, (resp - S.driver_resp_high_thresh) * S.driver_resp_high_multiplier)
+            factors.append("rapid breathing")
+        if hr < S.driver_hr_low_thresh:
+            score += S.driver_hr_low_score; factors.append("low arousal / fatigue")
 
     # ── Driver emotion (world state / seat config) ────────────────────────
     if world.driver_emotion == "stressed":
-        score += 10; factors.append("driver stressed")
+        score += S.driver_stressed_score; factors.append("driver stressed")
     elif world.driver_emotion == "tired":
-        score += 8; factors.append("driver fatigued")
+        score += S.driver_fatigued_score; factors.append("driver fatigued")
 
     # ── Audio anomaly (sensor or seat-config fallback) ───────────────────
     audio_label, audio_conf = _effective_audio()
     _child_pet_seats = [s for s in _latest["radar"].get("seats", [])
                         if s.get("occupant") in ("child", "pet") and s.get("occupied")]
     _child_pet_seats = _child_pet_seats + _vision_child_pet_seats()
-    if audio_label in ("crying", "barking", "animal") and audio_conf > 0.25:
-        score += 25; factors.append(audio_label + " in cabin")
-    elif audio_label == "shouting" and audio_conf > 0.25:
-        score += 20; factors.append("shouting in cabin")
-    elif audio_label == "rattle" and audio_conf > 0.25:
-        score += 10; factors.append("rattling object")
-    elif audio_label == "talking" and audio_conf > 0.25:
+    if audio_label in ("crying", "barking", "animal") and audio_conf > S.audio_conf_threshold:
+        score += S.audio_crying_score; factors.append(audio_label + " in cabin")
+    elif audio_label == "shouting" and audio_conf > S.audio_conf_threshold:
+        score += S.audio_shouting_score; factors.append("shouting in cabin")
+    elif audio_label == "rattle" and audio_conf > S.audio_conf_threshold:
+        score += S.audio_rattle_score; factors.append("rattling object")
+    elif audio_label == "talking" and audio_conf > S.audio_conf_threshold:
         if _child_pet_seats:
-            score += 10; factors.append("baby babbling in cabin")
+            score += S.audio_talking_child_score; factors.append("baby babbling in cabin")
         else:
-            score += 5; factors.append("speech activity")
-    elif audio_label == "happy" and audio_conf > 0.25:
-        score += 2; factors.append("baby happy in cabin")
+            score += S.audio_talking_score; factors.append("speech activity")
+    elif audio_label == "happy" and audio_conf > S.audio_conf_threshold:
+        score += S.audio_happy_score; factors.append("baby happy in cabin")
 
     # ── Vehicle context ──────────────────────────────────────────────────
     veh = _latest["vehicle"]
     if veh.get("visibility") in ("low", "rain", "fog"):
-        score += 12; factors.append("reduced visibility")
-    if veh.get("speed_kmh", 0) > 100:
-        score += 8; factors.append("high speed")
+        score += S.visibility_low_score; factors.append("reduced visibility")
+    if veh.get("speed_kmh", 0) > S.speed_high_thresh:
+        score += S.speed_high_score; factors.append("high speed")
 
     # ── Child/pet: presence + distress + HR (world.seats — instant, no radar lag) ──
     _scored_hr_seats: set[str] = set()
     for sid, occ in world.seats.items():
         if sid == "driver" or not occ.occupied or occ.kind not in ("child", "pet"):
             continue
-        score += 5
+        score += S.child_presence_score
         factors.append(occ.kind + " in cabin (" + sid.replace("_", " ") + ")")
-        if occ.distress > 0.05:
-            score += min(30, occ.distress * 40)
+        if occ.distress > S.distress_threshold:
+            score += min(S.distress_max, occ.distress * S.distress_multiplier)
             factors.append(occ.kind + " distress " + str(int(occ.distress * 100)) + "%")
         # HR — use manual override if set, otherwise auto-derived default
-        hr_thresh = 115 if occ.kind == "child" else 125
+        hr_thresh = S.child_hr_thresh if occ.kind == "child" else S.pet_hr_thresh
         hr = occ.heart_rate_bpm  # None = auto (radar.py derives it)
         if hr is not None and hr > hr_thresh:
             over = hr - hr_thresh
-            score += min(40, over * 1.5)   # more aggressive: 150bpm child → +52.5 → capped 40
+            score += min(S.child_hr_max, over * S.child_hr_multiplier)
             factors.append(occ.kind + " elevated HR (" + str(int(hr)) + " bpm)")
             _scored_hr_seats.add(sid)
 
@@ -136,44 +142,44 @@ def _cognitive_load() -> tuple[int, list[str]]:
         occ_resp = s.get("respiration_rpm") or 0
         motion   = s.get("motion") or 0
         kind     = s["occupant"]
-        hr_thresh = 115 if kind == "child" else 125
+        hr_thresh = S.child_hr_thresh if kind == "child" else S.pet_hr_thresh
         # Only score HR from radar if world.seats didn't already score it
         if seat_id not in _scored_hr_seats and occ_hr > hr_thresh:
-            score += min(20, (occ_hr - hr_thresh) * 0.8)
+            score += min(S.radar_child_hr_max, (occ_hr - hr_thresh) * S.radar_child_hr_multiplier)
             factors.append(kind + " elevated HR (" + str(int(occ_hr)) + " bpm)")
-        if occ_resp > 28:
-            score += min(10, (occ_resp - 28) * 0.5)
+        if occ_resp > S.radar_resp_high_thresh:
+            score += min(S.radar_resp_max, (occ_resp - S.radar_resp_high_thresh) * S.radar_resp_multiplier)
             factors.append(kind + " rapid breathing")
-        if motion > 0.4:
-            score += 10; factors.append("agitated " + kind)
+        if motion > S.radar_motion_thresh:
+            score += S.radar_motion_score; factors.append("agitated " + kind)
 
     # ── Road quality (IMU) ───────────────────────────────────────────────
     vib = _latest["vibration"]
     if vib.get("road_quality") == "pothole":
-        score += 18; factors.append("pothole / road shock (IMU)")
+        score += S.pothole_score; factors.append("pothole / road shock (IMU)")
     elif vib.get("road_quality") == "rough":
-        score += 8; factors.append("rough road (IMU)")
-    if vib.get("pothole_ahead_m") is not None and vib["pothole_ahead_m"] < 80:
-        score += 5; factors.append("rough road ahead (IMU)")
+        score += S.rough_road_score; factors.append("rough road (IMU)")
+    if vib.get("pothole_ahead_m") is not None and vib["pothole_ahead_m"] < S.pothole_ahead_warn_m:
+        score += S.pothole_ahead_score; factors.append("rough road ahead (IMU)")
 
     # ── Vision: drowsiness / stress ──────────────────────────────────────
     vd = _latest["vision_driver"]
     if vd.get("face_detected"):
         if vd.get("drowsy"):
-            score += 15; factors.append("drowsy eyes (camera)")
+            score += S.drowsy_score; factors.append("drowsy eyes (camera)")
         elif vd.get("emotion") == "stressed":
-            score += 10; factors.append("stress expression (camera)")
+            score += S.stressed_expression_score; factors.append("stress expression (camera)")
 
     # ── Vision: loose object (YOLOv8n) ───────────────────────────────────
     for det in _latest["vision_objects"].get("detections", []):
         if det["label"] in ("backpack", "suitcase", "bottle", "cup", "book", "laptop"):
-            score += 6; factors.append(f"loose {det['label']} (camera)"); break
+            score += S.yolo_object_score; factors.append(f"loose {det['label']} (camera)"); break
 
     # ── Vision: loose objects on seats (Qwen) ────────────────────────────
     for sid, sv in _latest.get("vision_all_seats", {}).items():
         if isinstance(sv, dict) and sv.get("objects"):
             obj_str = ", ".join(sv["objects"])
-            score += min(10, len(sv["objects"]) * 4)
+            score += min(S.qwen_object_max_score, len(sv["objects"]) * S.qwen_object_score_per_item)
             factors.append(f"unsecured object on {sid.replace('_', ' ')} ({obj_str})")
             break  # one factor entry is enough
 
@@ -204,7 +210,7 @@ def _proposed() -> list[dict]:
         sid.replace("_", " ").title() for sid in child_pet_seat_ids
     ) if child_pet_seat_ids else ""
 
-    if audio_label in ("crying", "animal", "barking") and audio_conf > 0.25 \
+    if audio_label in ("crying", "animal", "barking") and audio_conf > S.audio_conf_threshold \
             and child_pet_seats:
         who = "child" if audio_label in ("crying",) else "pet"
         out.append(dict(
@@ -214,7 +220,7 @@ def _proposed() -> list[dict]:
                    "Lower media volume 30%, warm AC +1°C, soft cabin lighting.",
             severity="advisory", confirm=True))
 
-    elif audio_label == "talking" and audio_conf > 0.25 and child_pet_seats:
+    elif audio_label == "talking" and audio_conf > S.audio_conf_threshold and child_pet_seats:
         out.append(dict(
             id="baby_engagement", title="Engage baby",
             usecase="Audio comfort",
@@ -222,7 +228,7 @@ def _proposed() -> list[dict]:
                    "soft music to maintain a calm, stimulating environment.",
             severity="advisory", confirm=True))
 
-    elif audio_label == "happy" and audio_conf > 0.25 and child_pet_seats:
+    elif audio_label == "happy" and audio_conf > S.audio_conf_threshold and child_pet_seats:
         out.append(dict(
             id="baby_happy", title="Passenger content",
             usecase="Cabin monitoring",
@@ -231,7 +237,7 @@ def _proposed() -> list[dict]:
             severity="advisory", confirm=True))
 
     # --- Shouting / passenger distress ---
-    if audio_label == "shouting" and audio_conf > 0.25:
+    if audio_label == "shouting" and audio_conf > S.audio_conf_threshold:
         out.append(dict(
             id="shouting_alert", title="Passenger distress",
             usecase="Audio comfort",
@@ -241,15 +247,15 @@ def _proposed() -> list[dict]:
 
     # --- USE CASE 2: driver persona tuning from vitals + emotion ---
     if d and d.get("occupied"):
-        hr = d.get("heart_rate_bpm") or 72
-        if hr > 95 or world.driver_emotion == "stressed":
+        hr = d.get("heart_rate_bpm") or S.driver_hr_default
+        if hr > S.driver_hr_high_thresh or world.driver_emotion == "stressed":
             out.append(dict(
                 id="persona_calm", title="Calming persona",
                 usecase="Persona tuning",
                 detail="Driver stress detected (HR ↑, breathing ↑). "
                        "Switch to calm playlist, cool blue lighting, temp −1°C.",
                 severity="advisory", confirm=True))
-        elif hr < 60 or world.driver_emotion == "tired":
+        elif hr < S.driver_hr_low_thresh or world.driver_emotion == "tired":
             out.append(dict(
                 id="persona_alert", title="Alertness boost",
                 usecase="Persona tuning",
@@ -270,7 +276,7 @@ def _proposed() -> list[dict]:
     # --- USE CASE 3b: pre-emptive object securing before rough road ---
     if world.unsecured_object and veh.get("pothole_ahead_m") is not None:
         dist = veh["pothole_ahead_m"]
-        if dist <= 120:
+        if dist <= M.pothole_warning_distance_m:
             out.append(dict(
                 id="secure_object", title="Secure loose item",
                 usecase="Pothole-aware advisory",
@@ -301,7 +307,7 @@ def _proposed() -> list[dict]:
         None)
     if yolo_obj and veh.get("pothole_ahead_m") is not None:
         dist = veh["pothole_ahead_m"]
-        if dist <= 120 and not any(m["id"] == "secure_object" for m in out):
+        if dist <= M.pothole_warning_distance_m and not any(m["id"] == "secure_object" for m in out):
             out.append(dict(
                 id="secure_object_cam", title="Secure loose item (camera)",
                 usecase="Pothole-aware advisory",
@@ -319,7 +325,7 @@ def _proposed() -> list[dict]:
             continue
         obj_list   = ", ".join(objs)
         seat_label = sid.replace("_", " ").title()
-        if pothole_dist is not None and pothole_dist <= 120:
+        if pothole_dist is not None and pothole_dist <= M.pothole_warning_distance_m:
             out.append(dict(
                 id="loose_obj_" + sid, title="Secure loose item",
                 usecase="Pothole-aware advisory",
@@ -341,10 +347,10 @@ def _proposed() -> list[dict]:
         hr = occ.heart_rate_bpm
         if hr is None:
             continue
-        hr_thresh = 115 if occ.kind == "child" else 125
+        hr_thresh = S.child_hr_thresh if occ.kind == "child" else S.pet_hr_thresh
         if hr > hr_thresh:
             seat_label = sid.replace("_", " ").title()
-            severity = "critical" if hr > hr_thresh + 20 else "warning"
+            severity = "critical" if hr > hr_thresh + S.child_hr_critical_offset else "warning"
             out.append(dict(
                 id="hr_alert_" + sid,
                 title=occ.kind.title() + " heartbeat elevated",
@@ -388,7 +394,6 @@ def _proposed() -> list[dict]:
     return out
 
 
-_GRACE = 6.0  # seconds to keep confirmed/dismissed mitigations after condition clears
 
 
 def _reconcile(proposed: list[dict]) -> list[dict]:

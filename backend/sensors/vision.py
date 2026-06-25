@@ -25,13 +25,14 @@ import cv2
 import numpy as np
 
 from bus import bus
+from config import vision as vcfg
 
 _landmarker: Any = None
 _yolo: Any = None
 
 frame_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=4)
 
-EAR_THRESH = 0.20
+EAR_THRESH = vcfg.ear_drowsy_thresh
 _MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 MODEL_PATH  = str(_MODELS_DIR / "face_landmarker.task")
 _YOLO_PATH  = str(_MODELS_DIR / "yolov8n.pt")
@@ -59,7 +60,7 @@ def _load_models() -> None:
         min_tracking_confidence=0.5,
     )
     _landmarker = mpv.FaceLandmarker.create_from_options(opts)
-    _yolo = YOLO(_YOLO_PATH)
+    _yolo = YOLO(_YOLO_PATH, conf=vcfg.yolo_conf_thresh)
 
 
 def _ear(lm, indices, w, h) -> float:
@@ -96,9 +97,9 @@ def _run_face(bgr: np.ndarray) -> dict:
     drowsy = avg_ear < EAR_THRESH
     if drowsy:
         emotion = "tired"
-    elif mouth_r > 0.5:
+    elif mouth_r > vcfg.mouth_stressed_thresh:
         emotion = "stressed"
-    elif avg_ear > 0.32:
+    elif avg_ear > vcfg.ear_happy_thresh:
         emotion = "happy"
     else:
         emotion = "calm"
@@ -108,7 +109,7 @@ def _run_face(bgr: np.ndarray) -> dict:
 
 
 def _run_yolo(bgr: np.ndarray) -> list[dict]:
-    results = _yolo(bgr, verbose=False, conf=0.35)[0]
+    results = _yolo(bgr, verbose=False)[0]
     out = []
     for box in results.boxes:
         cls_id = int(box.cls[0])

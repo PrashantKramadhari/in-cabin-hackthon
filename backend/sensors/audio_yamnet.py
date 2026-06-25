@@ -42,7 +42,8 @@ _LABEL_MAP = {
     468: "rattle",
     0:  "speech",
 }
-_THRESHOLD = 0.15
+from config import audio as acfg
+_THRESHOLD = acfg.ast_conf_threshold
 _AST_HUB   = "MIT/ast-finetuned-audioset-10-10-0.4593"
 _AST_LOCAL = Path(__file__).resolve().parent.parent / "models" / "ast-audioset"
 _MODEL_ID  = str(_AST_LOCAL) if _AST_LOCAL.exists() else _AST_HUB
@@ -52,7 +53,7 @@ chunk_queue: asyncio.Queue[list[float]] = asyncio.Queue(maxsize=8)
 
 def _load_model() -> None:
     global _processor, _model
-    from transformers import ASTFeatureExtractor, ASTForAudioClassification
+    from transformers.models.audio_spectrogram_transformer import ASTFeatureExtractor, ASTForAudioClassification
     _processor = ASTFeatureExtractor.from_pretrained(_MODEL_ID)
     _model = ASTForAudioClassification.from_pretrained(_MODEL_ID)
     _model.eval()

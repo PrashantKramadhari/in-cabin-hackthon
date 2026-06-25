@@ -24,16 +24,17 @@ import time
 from collections import deque
 
 from bus import bus
+from config import vibration as vibcfg
 from world import world
 
 CSV_PATH = pathlib.Path(__file__).resolve().parent.parent / "data" / "route_imu.csv"
-HZ = 50
-WINDOW = int(HZ * 0.5)      # 0.5 s RMS window
-LOOKAHEAD_ROWS = HZ * 4     # 4 s ahead: how far we look for rough patches
+HZ             = vibcfg.hz
+WINDOW         = int(HZ * 0.5)   # 0.5 s RMS window
+LOOKAHEAD_ROWS = HZ * 4          # 4 s ahead: how far we look for rough patches
 
-RMS_ROUGH   = 0.18          # z-axis RMS threshold for "rough"
-RMS_POTHOLE = 0.55          # z-axis RMS threshold for "pothole"
-POTHOLE_WARN_M = 100.0      # distance (m) to start warning
+RMS_ROUGH      = vibcfg.rms_rough
+RMS_POTHOLE    = vibcfg.rms_pothole
+POTHOLE_WARN_M = vibcfg.pothole_warn_m
 
 
 def _load() -> list[dict]:
