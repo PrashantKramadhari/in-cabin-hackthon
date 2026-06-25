@@ -288,7 +288,11 @@ var ISSUE_MAP={
   'child distress':'Child Distress Detected',
   'pet distress':'Pet Distress Detected',
   'child rapid breathing':'Child Respiratory Alert',
-  'pet rapid breathing':'Pet Respiratory Alert'
+  'pet rapid breathing':'Pet Respiratory Alert',
+  'loose backpack (camera)':'Loose Object Detected',
+  'loose suitcase (camera)':'Loose Object Detected',
+  'loose bottle (camera)':'Loose Object Detected',
+  'loose laptop (camera)':'Loose Object Detected'
 };
 
 /* IMU driving presets */
@@ -1697,7 +1701,9 @@ function RecommendationPanel({mitigations,send}){
       'Passenger content':'Maintain Cabin Comfort',
       'Child heartbeat elevated':'Child Heartbeat Alert',
       'Pet heartbeat elevated':'Pet Heartbeat Alert',
-      'Cabin monitoring active':'Radar Monitoring Active'
+      'Cabin monitoring active':'Radar Monitoring Active',
+      'Unsecured item on seat':'Stow Loose Item',
+      'Secure loose item':'Secure Before Road Hazard'
     };
     return map[t]||t;
   };

@@ -164,10 +164,18 @@ def _cognitive_load() -> tuple[int, list[str]]:
         elif vd.get("emotion") == "stressed":
             score += 10; factors.append("stress expression (camera)")
 
-    # ── Vision: loose object ──────────────────────────────────────────────
+    # ── Vision: loose object (YOLOv8n) ───────────────────────────────────
     for det in _latest["vision_objects"].get("detections", []):
         if det["label"] in ("backpack", "suitcase", "bottle", "cup", "book", "laptop"):
             score += 6; factors.append(f"loose {det['label']} (camera)"); break
+
+    # ── Vision: loose objects on seats (Qwen) ────────────────────────────
+    for sid, sv in _latest.get("vision_all_seats", {}).items():
+        if isinstance(sv, dict) and sv.get("objects"):
+            obj_str = ", ".join(sv["objects"])
+            score += min(10, len(sv["objects"]) * 4)
+            factors.append(f"unsecured object on {sid.replace('_', ' ')} ({obj_str})")
+            break  # one factor entry is enough
 
     return int(min(100, score)), factors
 
@@ -300,6 +308,31 @@ def _proposed() -> list[dict]:
                 detail=f"{yolo_obj['label'].title()} detected by camera, rough road "
                        f"in ~{int(dist)} m. Secure it now.",
                 severity="warning", confirm=True))
+
+    # --- Qwen: loose objects on seats → advisory / pothole pre-empt ---
+    pothole_dist = veh.get("pothole_ahead_m")
+    for sid, sv in _latest.get("vision_all_seats", {}).items():
+        if not isinstance(sv, dict):
+            continue
+        objs = sv.get("objects", [])
+        if not objs:
+            continue
+        obj_list   = ", ".join(objs)
+        seat_label = sid.replace("_", " ").title()
+        if pothole_dist is not None and pothole_dist <= 120:
+            out.append(dict(
+                id="loose_obj_" + sid, title="Secure loose item",
+                usecase="Pothole-aware advisory",
+                detail=f"{obj_list.title()} on {seat_label} — rough road in ~{int(pothole_dist)} m. "
+                       "Secure or stow the item now to prevent it becoming a projectile.",
+                severity="warning", confirm=True))
+        else:
+            out.append(dict(
+                id="loose_obj_" + sid, title="Unsecured item on seat",
+                usecase="Object safety",
+                detail=f"{obj_list.title()} detected on {seat_label}. "
+                       "Could slide or fall during sudden braking or cornering.",
+                severity="advisory", confirm=True))
 
     # --- Elevated child/pet HR mitigation (fires immediately from world.seats) ---
     for sid, occ in world.seats.items():

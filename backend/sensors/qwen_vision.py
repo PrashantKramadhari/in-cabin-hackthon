@@ -47,13 +47,15 @@ _PROMPT = (
     "A dog or cat in any position counts as kind='pet'. "
     "For each seat return a JSON object with exactly these keys: "
     "occupied (bool), kind (adult|child|infant|pet|unknown), "
-    "emotion (calm|happy|stressed|tired|distressed), buckled (bool). "
+    "emotion (calm|happy|stressed|tired|distressed), buckled (bool), "
+    "objects (array of strings — list any loose/unsecured items ON or near the seat "
+    "such as box, bag, laptop, bottle, phone, toy, camera, groceries; empty array [] if none). "
     "Set occupied=false only if the seat is clearly empty or not visible. "
     "Reply with ONLY a valid JSON object — no markdown, no explanation:\n"
     '{"driver":{...},"front_passenger":{...},"rear_left":{...},"rear_right":{...}}'
 )
 
-_EMPTY_SEAT = {"occupied": False, "kind": "unknown", "emotion": "calm", "buckled": False}
+_EMPTY_SEAT = {"occupied": False, "kind": "unknown", "emotion": "calm", "buckled": False, "objects": []}
 
 
 def _load_model() -> None:
@@ -84,11 +86,14 @@ def _safe_seat(raw: Any) -> dict:
     # If Qwen identified a child/infant/pet it must be present even if it
     # incorrectly set occupied=false — trust kind over the occupied flag.
     occupied = bool(raw.get("occupied", False)) or kind in ("child", "infant", "pet")
+    raw_objs = raw.get("objects", [])
+    objects  = [str(o) for o in raw_objs if isinstance(o, str)] if isinstance(raw_objs, list) else []
     return {
         "occupied": occupied,
         "kind":     kind,
         "emotion":  str(raw.get("emotion", "calm")),
         "buckled":  bool(raw.get("buckled", False)),
+        "objects":  objects,
     }
 
 
