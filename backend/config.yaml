@@ -6,6 +6,8 @@
 fusion:
   hz: 10                  # fusion loop rate (ticks per second)
   grace_period_s: 6.0     # seconds to keep confirmed/dismissed mitigations after condition clears
+  recommend_analysis_s: 5.0    # seconds of feed before context-aware recommendations
+  recommend_min_ratio: 0.45    # signal must appear in this fraction of window ticks
 
   # ── Cognitive Load score contributions ─────────────────────────────────────
   score:

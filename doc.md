@@ -44,6 +44,9 @@ CabinSense is a **multi-modal in-cabin intelligence layer** that sits alongside 
 
 ## 2. Architecture
 
+> **Canonical pipeline reference:** [ARCHITECTURE.md](ARCHITECTURE.md) — sensing,
+> bus, fusion, context analysis, WebSocket, and Pipeline Debug flows with diagrams.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  SENSING NODES  (each an async coroutine, independent Hz)               │

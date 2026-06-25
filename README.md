@@ -10,6 +10,9 @@ drives **non-intrusive, confirm-first** cabin mitigations.
 
 ## Architecture
 
+See **[ARCHITECTURE.md](ARCHITECTURE.md)** for full pipeline topology, bus contracts,
+context-analysis flow, and SDV mapping. Summary:
+
 ```
  SENSING NODES            FUSION / DECISION ENGINE          FEEDBACK / HMI
   Radar (mmWave)  ─┐
@@ -42,11 +45,17 @@ uvicorn main:app --reload
 ## Layout
 ```
 backend/
-  bus.py        # async pub/sub message bus
-  schemas.py    # shared event/state dataclasses
-  fusion.py     # cognitive-load score + mitigation rules
+  bus.py              # async pub/sub message bus
+  schemas.py          # shared event/state dataclasses
+  fusion.py           # cognitive-load score + mitigation rules
+  fusion_context.py   # 5 s sustained-signal context analysis
   sensors/
-    radar.py    # synthetic mmWave radar node (occupancy + vitals)
-  main.py       # FastAPI + websocket + scenario injection
-frontend/       # React Cabin HMI (Day 1 PM)
+    radar.py          # synthetic mmWave radar node (occupancy + vitals)
+    audio_clap.py     # CLAP zero-shot audio (primary)
+    vision.py         # YuNet + HSEmotion + YOLOv8n
+  main.py             # FastAPI + websocket + scenario injection
+frontend/
+  index.html          # React HMI + Pipeline Debug (zero-build)
 ```
+
+**Docs:** [ARCHITECTURE.md](ARCHITECTURE.md) · [USAGE.md](USAGE.md) · [doc.md](doc.md)

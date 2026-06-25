@@ -16,6 +16,7 @@ import time
 
 from bus import bus
 from config import fusion as cfg
+from fusion_context import get_feed, reset_feed
 from world import world
 
 # latest frame per modality
@@ -32,6 +33,64 @@ HZ = cfg.hz
 _GRACE = cfg.grace_period_s
 S = cfg.score   # shorthand
 M = cfg.mitigations
+
+_LOOSE_LABELS = frozenset({
+    "backpack", "suitcase", "bottle", "cup", "book", "laptop",
+    "handbag", "cell phone", "remote", "mouse", "teddy bear", "wine glass",
+})
+
+_last_scenario: str | None = None
+
+
+def _seat_label(sid: str) -> str:
+    return sid.replace("_", " ").title()
+
+
+def _objects_by_seat() -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for sid, sv in _latest.get("vision_all_seats", {}).items():
+        if isinstance(sv, dict) and sv.get("objects"):
+            out[sid] = list(sv["objects"])
+    for det in _latest["vision_objects"].get("detections", []):
+        seat = det.get("seat")
+        label = det.get("label")
+        if seat and label in _LOOSE_LABELS:
+            out.setdefault(seat, [])
+            if label not in out[seat]:
+                out[seat].append(label)
+    return out
+
+
+def _observe_feed_tick() -> None:
+    audio_label, audio_conf = _effective_audio()
+    seats: dict[str, dict] = {}
+    for sid, occ in world.seats.items():
+        seats[sid] = {
+            "occupied": occ.occupied,
+            "kind": occ.kind,
+            "emotion": occ.emotion,
+        }
+    for sid, sv in _latest.get("vision_all_seats", {}).items():
+        if isinstance(sv, dict) and sv.get("occupied"):
+            seats[sid] = {
+                "occupied": True,
+                "kind": _norm_kind(sv.get("kind", seats.get(sid, {}).get("kind", "unknown"))),
+                "emotion": sv.get("emotion", seats.get(sid, {}).get("emotion", "calm")),
+            }
+    vd = _latest["vision_driver"]
+    if vd.get("face_detected"):
+        seats["driver"] = {
+            "occupied": True,
+            "kind": seats.get("driver", {}).get("kind", "adult"),
+            "emotion": vd.get("emotion", "calm"),
+        }
+    get_feed().observe({
+        "audio_label": audio_label,
+        "audio_conf": audio_conf,
+        "seats": seats,
+        "objects_by_seat": _objects_by_seat(),
+        "driver_drowsy": bool(vd.get("drowsy")),
+    })
 
 
 def _driver_seat() -> dict | None:
@@ -191,204 +250,18 @@ def _cognitive_load() -> tuple[int, list[str]]:
     return int(min(100, score)), factors
 
 
-def _proposed() -> list[dict]:
-    """Compute which mitigations should currently be offered."""
+def _critical_mitigations() -> list[dict]:
+    """Safety-critical — always active, no feed warm-up required."""
     out: list[dict] = []
-    audio_label, audio_conf = _effective_audio()
-    veh = _latest["vehicle"]
     d = _driver_seat()
-
-    # --- USE CASE 1: audio comfort, corroborated by occupancy in ANY seat ---
-    # Merge radar seats + world.seats so mitigations fire immediately on manual config,
-    # without waiting for the radar node to republish after a scenario/seat change.
-    radar_child_pet = {
-        s["seat"] for s in _latest["radar"].get("seats", [])
-        if s.get("occupant") in ("child", "pet") and s.get("occupied")
-    }
-    world_child_pet = {
-        sid for sid, occ in world.seats.items()
-        if sid != "driver" and occ.occupied and occ.kind in ("child", "pet")
-    }
-    child_pet_seat_ids = radar_child_pet | world_child_pet
-    child_pet_seats = [{"seat": sid} for sid in child_pet_seat_ids] + _vision_child_pet_seats()
-    seat_names = ", ".join(
-        sid.replace("_", " ").title() for sid in child_pet_seat_ids
-    ) if child_pet_seat_ids else ""
-
-    if audio_label in ("crying", "animal", "barking") and audio_conf > S.audio_conf_threshold \
-            and child_pet_seats:
-        who = "child" if audio_label in ("crying",) else "pet"
-        out.append(dict(
-            id="comfort_audio", title="Soothe cabin",
-            usecase="Audio comfort",
-            detail=f"{who.title()} distress detected in {seat_names}. "
-                   "Lower media volume 30%, warm AC +1°C, soft cabin lighting.",
-            severity="advisory", confirm=True))
-
-    elif audio_label == "talking" and audio_conf > S.audio_conf_threshold and child_pet_seats:
-        out.append(dict(
-            id="baby_engagement", title="Engage baby",
-            usecase="Audio comfort",
-            detail=f"Baby babbling in {seat_names}. Play a nursery rhyme or "
-                   "soft music to maintain a calm, stimulating environment.",
-            severity="advisory", confirm=True))
-
-    elif audio_label == "happy" and audio_conf > S.audio_conf_threshold and child_pet_seats:
-        out.append(dict(
-            id="baby_happy", title="Passenger content",
-            usecase="Cabin monitoring",
-            detail=f"Baby sounds happy in {seat_names}. Maintain current "
-                   "cabin temperature, lighting and media volume.",
-            severity="advisory", confirm=True))
-
-    # --- Shouting / passenger distress ---
-    if audio_label == "shouting" and audio_conf > S.audio_conf_threshold:
-        out.append(dict(
-            id="shouting_alert", title="Passenger distress",
-            usecase="Audio comfort",
-            detail="Shouting detected in cabin. Check passenger status and consider "
-                   "pulling over if safe.",
-            severity="warning", confirm=True))
-
-    # --- USE CASE 2: driver persona tuning from vitals + emotion ---
-    if d and d.get("occupied"):
-        hr = d.get("heart_rate_bpm") or S.driver_hr_default
-        if hr > S.driver_hr_high_thresh or world.driver_emotion == "stressed":
-            out.append(dict(
-                id="persona_calm", title="Calming persona",
-                usecase="Persona tuning",
-                detail="Driver stress detected (HR ↑, breathing ↑). "
-                       "Switch to calm playlist, cool blue lighting, temp −1°C.",
-                severity="advisory", confirm=True))
-        elif hr < S.driver_hr_low_thresh or world.driver_emotion == "tired":
-            out.append(dict(
-                id="persona_alert", title="Alertness boost",
-                usecase="Persona tuning",
-                detail="Fatigue signs detected. Upbeat playlist, brighter "
-                       "lighting, fresh-air burst, suggest a break.",
-                severity="advisory", confirm=True))
-
-    # --- USE CASE 3a: seatbelt misuse (world.seats is always current) ---
     for sid, occ in world.seats.items():
         if occ.occupied and not occ.buckled:
             out.append(dict(
                 id="belt_" + sid, title="Seatbelt not engaged",
                 usecase="Seatbelt safety",
-                detail=sid.replace("_", " ").title() + " occupied but "
-                       "belt not properly worn. Chime + visual reminder.",
+                detail=_seat_label(sid) + " occupied but belt not properly worn. "
+                       "Chime + visual reminder.",
                 severity="warning", confirm=False))
-
-    # --- USE CASE 3b: pre-emptive object securing before rough road ---
-    if world.unsecured_object and veh.get("pothole_ahead_m") is not None:
-        dist = veh["pothole_ahead_m"]
-        if dist <= M.pothole_warning_distance_m:
-            out.append(dict(
-                id="secure_object", title="Secure loose item",
-                usecase="Pothole-aware advisory",
-                detail=f"Unsecured object detected, rough road in ~{int(dist)} m. "
-                       "Advisory: secure item now to prevent displacement.",
-                severity="warning", confirm=True))
-
-    # --- USE CASE 2 corroboration: vision emotion overrides world state ---
-    vd = _latest["vision_driver"]
-    if vd.get("face_detected") and vd.get("emotion") in ("tired", "stressed"):
-        cam_emotion = vd["emotion"]
-        mit_id = "persona_calm" if cam_emotion == "stressed" else "persona_alert"
-        if not any(m["id"] == mit_id for m in out):
-            out.append(dict(
-                id=mit_id,
-                title="Calming persona" if cam_emotion == "stressed" else "Alertness boost",
-                usecase="Persona tuning (camera)",
-                detail=f"Camera detected {cam_emotion} expression. "
-                       + ("Calm playlist, cool lighting, temp −1°C."
-                          if cam_emotion == "stressed"
-                          else "Upbeat playlist, bright lighting, fresh-air burst."),
-                severity="advisory", confirm=True))
-
-    # --- vision: unsecured object → pre-empt pothole advisory ---
-    yolo_obj = next(
-        (d for d in _latest["vision_objects"].get("detections", [])
-         if d["label"] in (
-             "backpack", "suitcase", "bottle", "cup", "book", "laptop",
-             "handbag", "cell phone", "remote", "mouse", "teddy bear", "wine glass",
-         )),
-        None)
-    if yolo_obj and veh.get("pothole_ahead_m") is not None:
-        dist = veh["pothole_ahead_m"]
-        if dist <= M.pothole_warning_distance_m and not any(m["id"] == "secure_object" for m in out):
-            out.append(dict(
-                id="secure_object_cam", title="Secure loose item (camera)",
-                usecase="Pothole-aware advisory",
-                detail=f"{yolo_obj['label'].title()} detected by camera, rough road "
-                       f"in ~{int(dist)} m. Secure it now.",
-                severity="warning", confirm=True))
-
-    # --- Qwen: loose objects on seats → advisory / pothole pre-empt ---
-    pothole_dist = veh.get("pothole_ahead_m")
-    for sid, sv in _latest.get("vision_all_seats", {}).items():
-        if not isinstance(sv, dict):
-            continue
-        objs = sv.get("objects", [])
-        if not objs:
-            continue
-        obj_list   = ", ".join(objs)
-        seat_label = sid.replace("_", " ").title()
-        if pothole_dist is not None and pothole_dist <= M.pothole_warning_distance_m:
-            out.append(dict(
-                id="loose_obj_" + sid, title="Secure loose item",
-                usecase="Pothole-aware advisory",
-                detail=f"{obj_list.title()} on {seat_label} — rough road in ~{int(pothole_dist)} m. "
-                       "Secure or stow the item now to prevent it becoming a projectile.",
-                severity="warning", confirm=True))
-        else:
-            out.append(dict(
-                id="loose_obj_" + sid, title="Unsecured item on seat",
-                usecase="Object safety",
-                detail=f"{obj_list.title()} detected on {seat_label}. "
-                       "Could slide or fall during sudden braking or cornering.",
-                severity="advisory", confirm=True))
-
-    # --- Elevated child/pet HR mitigation (fires immediately from world.seats) ---
-    for sid, occ in world.seats.items():
-        if sid == "driver" or not occ.occupied or occ.kind not in ("child", "pet"):
-            continue
-        hr = occ.heart_rate_bpm
-        if hr is None:
-            continue
-        hr_thresh = S.child_hr_thresh if occ.kind == "child" else S.pet_hr_thresh
-        if hr > hr_thresh:
-            seat_label = sid.replace("_", " ").title()
-            severity = "critical" if hr > hr_thresh + S.child_hr_critical_offset else "warning"
-            out.append(dict(
-                id="hr_alert_" + sid,
-                title=occ.kind.title() + " heartbeat elevated",
-                usecase="Radar vital monitoring",
-                detail=seat_label + " — " + occ.kind + " heart rate " + str(int(hr)) + " bpm "
-                       + "(normal <" + str(hr_thresh) + "). "
-                       + ("Immediate check recommended." if severity == "critical"
-                          else "Monitor and adjust cabin comfort."),
-                severity=severity, confirm=True))
-
-    # --- Child/pet monitoring card (fires on manual config, no audio required) ---
-    manual_child_pet = [
-        (sid, occ) for sid, occ in world.seats.items()
-        if sid != "driver" and occ.occupied and occ.kind in ("child", "pet")
-    ]
-    if manual_child_pet and not any(m["id"] in ("comfort_audio", "baby_engagement") for m in out):
-        high_distress = any(occ.distress > 0.5 for _, occ in manual_child_pet)
-        who_list = ", ".join(
-            occ.kind.title() + " (" + sid.replace("_", " ").title() + ")"
-            for sid, occ in manual_child_pet
-        )
-        out.append(dict(
-            id="cabin_monitoring", title="Cabin monitoring active",
-            usecase="Child / pet welfare",
-            detail=who_list + " detected via radar. Vitals monitoring active. "
-                   + ("Elevated distress — check cabin comfort." if high_distress
-                      else "Adjust volume, AC or lighting as needed."),
-            severity="warning" if high_distress else "advisory", confirm=False))
-
-    # --- safety-critical: child left behind ---
     driver_present = bool(d and d.get("occupied"))
     rear_child = any(s.get("occupant") == "child" and s.get("occupied")
                      for s in _latest["radar"].get("seats", []))
@@ -399,6 +272,197 @@ def _proposed() -> list[dict]:
             detail="Child detected in rear seat with no driver present. "
                    "Escalate: horn + lights + owner notification.",
             severity="critical", confirm=False))
+    return out
+
+
+def _proposed() -> list[dict]:
+    """Context-aware mitigations after multi-second feed analysis."""
+    feed = get_feed()
+    out: list[dict] = list(_critical_mitigations())
+
+    if not feed.ready():
+        return out
+
+    veh = _latest["vehicle"]
+    d = _driver_seat()
+    pothole_dist = veh.get("pothole_ahead_m")
+    child_pet_ids = feed.child_pet_seats() | {
+        sid for sid, occ in world.seats.items()
+        if sid != "driver" and occ.occupied and occ.kind in ("child", "pet")
+    } | {
+        s["seat"] for s in _latest["radar"].get("seats", [])
+        if s.get("occupant") in ("child", "pet") and s.get("occupied")
+    }
+    child_pet_names = ", ".join(_seat_label(s) for s in sorted(child_pet_ids))
+
+    # ── Audio + vision corroborated comfort ───────────────────────────────
+    cry_ok, cry_lbl, cry_conf = feed.sustained_audio("crying", "animal", "barking")
+    if cry_ok and child_pet_ids:
+        who = "child" if cry_lbl in ("crying",) else "pet"
+        distressed = feed.seats_with_sustained_emotion("distressed", "stressed")
+        emo_note = ""
+        if distressed:
+            emo_note = (
+                f" Camera shows {' and '.join(_seat_label(s) for s in distressed)} "
+                f"appearing {', '.join(set((_latest.get('vision_all_seats') or {}).get(s, {}).get('emotion', '') for s in distressed))}."
+            )
+        out.append(dict(
+            id="comfort_audio", title="Soothe cabin",
+            usecase="Audio + vision comfort",
+            detail=f"Sustained {cry_lbl} ({int(cry_conf * 100)}% conf) with {who} in "
+                   f"{child_pet_names}.{emo_note} "
+                   "Lower media 30%, warm AC +1°C, soft lighting.",
+            severity="advisory", confirm=True))
+
+    talk_ok, _, talk_conf = feed.sustained_audio("talking")
+    if talk_ok and child_pet_ids and not cry_ok:
+        out.append(dict(
+            id="baby_engagement", title="Engage passenger",
+            usecase="Audio + vision comfort",
+            detail=f"Sustained speech/babbling ({int(talk_conf * 100)}% conf) from "
+                   f"{child_pet_names}. Play nursery rhyme or soft music.",
+            severity="advisory", confirm=True))
+
+    happy_ok, _, happy_conf = feed.sustained_audio("happy")
+    if happy_ok and child_pet_ids:
+        calm_seats = feed.seats_with_sustained_emotion("calm", "happy")
+        out.append(dict(
+            id="baby_happy", title="Passenger content",
+            usecase="Cabin monitoring",
+            detail=f"Happy sounds ({int(happy_conf * 100)}% conf) from {child_pet_names}"
+                   + (f"; {' and '.join(_seat_label(s) for s in calm_seats)} appear calm."
+                      if calm_seats else ".")
+                   + " Maintain current cabin settings.",
+            severity="advisory", confirm=True))
+
+    # ── Shouting + passenger distress emotion ─────────────────────────────
+    shout_ok, _, shout_conf = feed.sustained_audio("shouting")
+    if shout_ok:
+        stressed = feed.seats_with_sustained_emotion("stressed", "distressed")
+        out.append(dict(
+            id="shouting_alert", title="Passenger distress",
+            usecase="Audio + emotion",
+            detail="Sustained shouting (" + str(int(shout_conf * 100)) + "% conf)"
+                   + (f" with {_seat_label(stressed[0])} showing stress."
+                      if stressed else ".")
+                   + " Check passengers; consider pulling over if safe.",
+            severity="warning", confirm=True))
+
+    # ── Emotion-only rear passenger (no loud audio) ─────────────────────
+    if not shout_ok and not cry_ok:
+        for sid in feed.seats_with_sustained_emotion("stressed", "distressed"):
+            if sid == "driver":
+                continue
+            sv = (_latest.get("vision_all_seats") or {}).get(sid, {})
+            emo = sv.get("emotion", "stressed")
+            out.append(dict(
+                id="emotion_" + sid, title="Passenger comfort check",
+                usecase="Vision emotion",
+                detail=f"{_seat_label(sid)} appears {emo} for several seconds "
+                       "(camera, no matching audio). Adjust climate, lighting, or media.",
+                severity="advisory", confirm=True))
+
+    # ── Driver persona: vitals + sustained camera emotion ─────────────
+    if d and d.get("occupied"):
+        hr = d.get("heart_rate_bpm") or S.driver_hr_default
+        drv_stressed = feed.sustained_emotion("driver", "stressed")
+        drv_tired = feed.sustained_emotion("driver", "tired") or feed.sustained_drowsy()
+        if hr > S.driver_hr_high_thresh or drv_stressed or world.driver_emotion == "stressed":
+            out.append(dict(
+                id="persona_calm", title="Calming persona",
+                usecase="Persona tuning",
+                detail="Driver stress detected"
+                       + (" (sustained camera expression)" if drv_stressed else "")
+                       + (f", HR {int(hr)} bpm" if hr > S.driver_hr_high_thresh else "")
+                       + ". Calm playlist, cool lighting, temp −1°C.",
+                severity="advisory", confirm=True))
+        elif hr < S.driver_hr_low_thresh or drv_tired or world.driver_emotion == "tired":
+            out.append(dict(
+                id="persona_alert", title="Alertness boost",
+                usecase="Persona tuning",
+                detail="Fatigue signs detected"
+                       + (" (sustained drowsy/tired camera)" if drv_tired else "")
+                       + ". Upbeat playlist, brighter lighting, fresh-air burst.",
+                severity="advisory", confirm=True))
+
+    # ── Sustained loose objects (vision) ────────────────────────────────
+    stable_objs = feed.sustained_objects()
+    for sid, objs in stable_objs.items():
+        obj_list = ", ".join(objs)
+        seat_lbl = _seat_label(sid)
+        rattle_ok, _, _ = feed.sustained_audio("rattle")
+        if pothole_dist is not None and pothole_dist <= M.pothole_warning_distance_m:
+            out.append(dict(
+                id="loose_obj_" + sid, title="Secure loose item",
+                usecase="Object + road context",
+                detail=f"{obj_list.title()} on {seat_lbl} detected for several seconds"
+                       + (" with rattling audio." if rattle_ok else ".")
+                       + f" Rough road in ~{int(pothole_dist)} m — secure now.",
+                severity="warning", confirm=True))
+        elif rattle_ok:
+            out.append(dict(
+                id="rattle_obj_" + sid, title="Item may be rattling",
+                usecase="Audio + object fusion",
+                detail=f"Rattling sound corroborates {obj_list} on {seat_lbl}. "
+                       "Secure or stow before rough motion.",
+                severity="warning", confirm=True))
+        else:
+            out.append(dict(
+                id="loose_obj_" + sid, title="Unsecured item on seat",
+                usecase="Object safety",
+                detail=f"{obj_list.title()} on {seat_lbl} (stable camera detection). "
+                       "Could slide during braking or cornering.",
+                severity="advisory", confirm=True))
+
+    # ── World pothole + unsecured flag (scenario) ───────────────────────
+    if world.unsecured_object and pothole_dist is not None:
+        if pothole_dist <= M.pothole_warning_distance_m:
+            if not any(m["id"].startswith("loose_obj_") for m in out):
+                out.append(dict(
+                    id="secure_object", title="Secure loose item",
+                    usecase="Pothole-aware advisory",
+                    detail=f"Unsecured object flagged, rough road in ~{int(pothole_dist)} m.",
+                    severity="warning", confirm=True))
+
+    # ── Elevated child/pet HR ─────────────────────────────────────────
+    for sid, occ in world.seats.items():
+        if sid == "driver" or not occ.occupied or occ.kind not in ("child", "pet"):
+            continue
+        hr = occ.heart_rate_bpm
+        if hr is None:
+            continue
+        hr_thresh = S.child_hr_thresh if occ.kind == "child" else S.pet_hr_thresh
+        if hr > hr_thresh:
+            severity = "critical" if hr > hr_thresh + S.child_hr_critical_offset else "warning"
+            out.append(dict(
+                id="hr_alert_" + sid,
+                title=occ.kind.title() + " heartbeat elevated",
+                usecase="Radar vital monitoring",
+                detail=f"{_seat_label(sid)} — {int(hr)} bpm (normal <{hr_thresh}). "
+                       + ("Immediate check recommended." if severity == "critical"
+                          else "Monitor and adjust cabin comfort."),
+                severity=severity, confirm=True))
+
+    # ── Cabin monitoring when child/pet present, no stronger alert ────
+    manual_child_pet = [
+        (sid, occ) for sid, occ in world.seats.items()
+        if sid != "driver" and occ.occupied and occ.kind in ("child", "pet")
+    ]
+    if manual_child_pet and not any(
+        m["id"] in ("comfort_audio", "baby_engagement", "baby_happy") for m in out
+    ):
+        high_distress = any(occ.distress > 0.5 for _, occ in manual_child_pet)
+        who_list = ", ".join(
+            f"{occ.kind.title()} ({_seat_label(sid)})" for sid, occ in manual_child_pet
+        )
+        out.append(dict(
+            id="cabin_monitoring", title="Cabin monitoring active",
+            usecase="Child / pet welfare",
+            detail=f"{who_list} on board. Vitals monitoring active."
+                   + (" Elevated distress — check comfort." if high_distress
+                      else " Adjust volume, AC or lighting as needed."),
+            severity="warning" if high_distress else "advisory", confirm=False))
+
     return out
 
 
@@ -442,6 +506,7 @@ def reset_vision() -> None:
     _latest["vision_driver"] = {}
     _latest["vision_objects"] = {}
     _latest["vision_faces"] = {}
+    reset_feed()
 
 
 def confirm(mitigation_id: str) -> None:
@@ -516,19 +581,26 @@ async def _consume(topic: str) -> None:
 
 
 async def run() -> None:
+    global _last_scenario
     for t in ("radar", "audio", "vehicle", "vibration",
               "vision_driver", "vision_objects", "vision_all_seats", "vision_faces"):
         asyncio.create_task(_consume(t))
     while True:
         t0 = time.perf_counter()
+        if world.scenario != _last_scenario:
+            _last_scenario = world.scenario
+            reset_feed()
+        _observe_feed_tick()
         score, factors = _cognitive_load()
         mitigations = _reconcile(_proposed())
+        feed = get_feed()
         state = dict(
             ts=time.time(),
             scenario=world.scenario,
             demo_running=world.demo_running,
             cognitive_load=score,
             factors=factors,
+            feed_analysis=feed.snapshot(),
             radar=_latest["radar"],
             audio=_latest["audio"],
             audio_effective=_audio_effective(),

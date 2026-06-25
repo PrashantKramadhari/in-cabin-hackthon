@@ -6,6 +6,8 @@ CabinSense is a real-time in-cabin disturbance intelligence system. It fuses
 **radar + audio + vision + vibration** into a single Cognitive-Load score and
 surfaces non-intrusive, confirm-first mitigations on a live dashboard.
 
+**Architecture & pipelines:** [ARCHITECTURE.md](ARCHITECTURE.md)
+
 ```
 Radar (mmWave)  ─┐
 Mic  → AST model ─┤

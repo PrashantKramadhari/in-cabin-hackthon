@@ -2139,9 +2139,10 @@ function CircularGauge({value}){
 }
 
 /* ── RecommendationPanel ── */
-function RecommendationPanel({mitigations,send}){
+function RecommendationPanel({mitigations,feedAnalysis,send}){
   var vis=(mitigations||[]).filter(function(m){return m.status!=='dismissed';});
   var proposed=vis.filter(function(m){return m.status==='proposed'&&m.confirm;});
+  var warming=feedAnalysis&&!feedAnalysis.ready;
 
   /* map technical titles to user-friendly names */
   var friendlyTitle=function(t){
@@ -2150,17 +2151,19 @@ function RecommendationPanel({mitigations,send}){
       'Calming persona':'Enable Focus Mode',
       'Alertness boost':'Take a Driver Break',
       'Passenger distress':'Check on Passenger',
+      'Passenger comfort check':'Check on Passenger',
       'Seatbelt not engaged':'Fasten Seatbelt',
       'Secure loose item':'Secure Loose Items',
       'Secure loose item (camera)':'Secure Loose Items',
+      'Item may be rattling':'Secure Loose Items',
       'CHILD PRESENCE ALERT':'Child Left Behind — Act Now',
       'Engage baby':'Play Nursery Content',
+      'Engage passenger':'Play Nursery Content',
       'Passenger content':'Maintain Cabin Comfort',
       'Child heartbeat elevated':'Child Heartbeat Alert',
       'Pet heartbeat elevated':'Pet Heartbeat Alert',
       'Cabin monitoring active':'Radar Monitoring Active',
       'Unsecured item on seat':'Stow Loose Item',
-      'Secure loose item':'Secure Before Road Hazard'
     };
     return map[t]||t;
   };
@@ -2168,6 +2171,12 @@ function RecommendationPanel({mitigations,send}){
   return (
     <div>
       <div className="rec-ttl">Recommendation</div>
+      {warming&&(
+        <div className="rec-warm" style={{fontSize:'0.7rem',color:'var(--text-secondary)',marginBottom:8,padding:'6px 8px',
+          background:'var(--bg-subtle)',borderRadius:6,border:'1px solid var(--border-subtle)'}}>
+          Analyzing cabin ({Math.round(feedAnalysis.span_s||0)}s / {feedAnalysis.window_s||5}s) — context recommendations after sustained audio &amp; vision.
+        </div>
+      )}
       <div className="rec-list">
         {vis.length===0&&<div className="rec-empty">All systems nominal.</div>}
         {vis.slice(0,4).map(function(m,i){
@@ -2332,7 +2341,7 @@ function InfotainmentView({state,send}){
       </div>
       {/* Col 4: Recommendation + sensor summary */}
       <div className="iv-col iv-rec">
-        <RecommendationPanel mitigations={state.mitigations} send={send}/>
+        <RecommendationPanel mitigations={state.mitigations} feedAnalysis={state.feed_analysis} send={send}/>
         {/* Sensor health */}
         <div style={{marginTop:16}}>
           <div className="iss-lbl">Sensor Status</div>
@@ -2868,6 +2877,16 @@ function DebugView({state,pipelineDebugRef,caps,visionThresh,onVisionThreshChang
             {yoloDets.length?' · '+yoloDets.length+' YOLO':''}
           </span>
         </div>
+        <div className="dbg-model-chip">
+          <span className="dbg-model-kind">Context analysis</span>
+          <span className="dbg-model-name">{(state.feed_analysis&&state.feed_analysis.window_s)||5}s window</span>
+          <span className={'dbg-model-status'+(state.feed_analysis&&state.feed_analysis.ready?'':' off')}>
+            {state.feed_analysis&&state.feed_analysis.ready
+              ?('● ready · '+((state.feed_analysis.dominant_audio!=='none')?state.feed_analysis.dominant_audio:'quiet')
+                +' · '+((state.feed_analysis.span_s)||0)+'s')
+              :('○ warming · '+((state.feed_analysis&&state.feed_analysis.ticks)||0)+' ticks')}
+          </span>
+        </div>
       </div>
       <div className="dbg-viz-row">
         <div className="dbg-viz-panel">
@@ -3014,6 +3033,14 @@ function DebugView({state,pipelineDebugRef,caps,visionThresh,onVisionThreshChang
               {k:'cognitive_load', v:load, crit:load>=66, warn:load>=33&&load<66, hi:load<33},
               {k:'latency',        v:(state.latency_ms||0)+'ms', warn:(state.latency_ms||0)>100},
               {k:'scenario',       v:state.scenario||'idle'},
+              {k:'context ready',  v:state.feed_analysis&&state.feed_analysis.ready?'yes':'warming up',
+                warn:!(state.feed_analysis&&state.feed_analysis.ready), hi:state.feed_analysis&&state.feed_analysis.ready},
+              {k:'analysis span',  v:state.feed_analysis?(state.feed_analysis.span_s+'s / '+state.feed_analysis.window_s+'s'):'—'},
+              {k:'sustained audio',v:state.feed_analysis&&state.feed_analysis.dominant_audio!=='none'
+                ?(state.feed_analysis.dominant_audio+' '+Math.round((state.feed_analysis.audio_conf||0)*100)+'%'):'none'},
+              {k:'distressed seats',v:(state.feed_analysis&&state.feed_analysis.distressed_seats||[]).join(', ')||'none'},
+              {k:'stable objects', v:state.feed_analysis&&state.feed_analysis.objects_by_seat
+                ?Object.entries(state.feed_analysis.objects_by_seat).map(function(e){return e[0]+': '+e[1].join(', ');}).join(' · ')||'none':'none'},
               {k:'factors',        v:(state.factors||[]).length+' active'},
             ]}/>
             {(state.factors||[]).length>0&&(
@@ -3073,6 +3100,7 @@ function BrandBar(){
 function App(){
   const INIT={
     cognitive_load:0,factors:[],radar:{},audio:{},audio_effective:{label:'none',confidence:0,source:'none'},vehicle:{},mitigations:[],
+    feed_analysis:{ready:false,window_s:5,ticks:0,span_s:0,dominant_audio:'none'},
     scenario:'idle',demo_running:false,latency_ms:0,
     seat_configs:{
       driver:{occupied:true,kind:'adult',buckled:true,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},

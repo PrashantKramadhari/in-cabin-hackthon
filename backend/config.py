@@ -81,6 +81,8 @@ class _Mitigations:
 class _Fusion:
     hz                          = _get("fusion.hz")
     grace_period_s              = _get("fusion.grace_period_s")
+    recommend_analysis_s        = _get("fusion.recommend_analysis_s")
+    recommend_min_ratio         = _get("fusion.recommend_min_ratio")
     score                       = _Score()
     mitigations                 = _Mitigations()
 
