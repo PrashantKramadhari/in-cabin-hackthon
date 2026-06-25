@@ -52,7 +52,7 @@ chunk_queue: asyncio.Queue[list[float]] = asyncio.Queue(maxsize=8)
 
 def _load_model() -> None:
     global _processor, _model
-    from transformers import ASTFeatureExtractor, ASTForAudioClassification
+    from transformers.models.audio_spectrogram_transformer import ASTFeatureExtractor, ASTForAudioClassification
     _processor = ASTFeatureExtractor.from_pretrained(_MODEL_ID)
     _model = ASTForAudioClassification.from_pretrained(_MODEL_ID)
     _model.eval()

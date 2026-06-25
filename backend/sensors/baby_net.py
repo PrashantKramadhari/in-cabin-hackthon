@@ -196,7 +196,7 @@ _AST_THRESH = 0.15
 
 def _load_ast() -> None:
     global _ast_processor, _ast_model
-    from transformers import ASTFeatureExtractor, ASTForAudioClassification
+    from transformers.models.audio_spectrogram_transformer import ASTFeatureExtractor, ASTForAudioClassification
     _ast_processor = ASTFeatureExtractor.from_pretrained(_AST_ID)
     _ast_model     = ASTForAudioClassification.from_pretrained(_AST_ID)
     _ast_model.eval()
