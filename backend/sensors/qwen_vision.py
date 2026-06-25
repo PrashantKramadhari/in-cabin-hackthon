@@ -22,6 +22,7 @@ import io
 import json
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -30,7 +31,9 @@ from bus import bus
 
 frame_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=4)
 
-_MODEL_ID = "Qwen/Qwen2-VL-2B-Instruct"
+_HUB_ID   = "Qwen/Qwen2-VL-2B-Instruct"
+_LOCAL    = Path(__file__).resolve().parent.parent / "models" / "qwen2-vl-2b"
+_MODEL_ID = str(_LOCAL) if _LOCAL.exists() else _HUB_ID
 _model: Any     = None
 _processor: Any = None
 

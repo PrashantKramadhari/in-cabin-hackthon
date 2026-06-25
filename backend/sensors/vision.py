@@ -32,7 +32,9 @@ _yolo: Any = None
 frame_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=4)
 
 EAR_THRESH = 0.20
-MODEL_PATH = str(Path(__file__).resolve().parent.parent / "models" / "face_landmarker.task")
+_MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+MODEL_PATH  = str(_MODELS_DIR / "face_landmarker.task")
+_YOLO_PATH  = str(_MODELS_DIR / "yolov8n.pt")
 
 # MediaPipe 478-landmark indices
 _LEFT_EYE  = [362, 385, 387, 263, 373, 380]
@@ -57,7 +59,7 @@ def _load_models() -> None:
         min_tracking_confidence=0.5,
     )
     _landmarker = mpv.FaceLandmarker.create_from_options(opts)
-    _yolo = YOLO("yolov8n.pt")
+    _yolo = YOLO(_YOLO_PATH)
 
 
 def _ear(lm, indices, w, h) -> float:

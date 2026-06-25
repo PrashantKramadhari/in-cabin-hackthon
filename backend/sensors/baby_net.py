@@ -189,7 +189,8 @@ _ast_processor: Any = None
 _ast_model: Any     = None
 _AST_MAP  = {22: "crying", 21: "crying", 80: "animal", 74: "animal",
              73: "animal", 468: "rattle", 0: "speech"}
-_AST_ID   = "MIT/ast-finetuned-audioset-10-10-0.4593"
+_AST_LOCAL = Path(__file__).resolve().parent.parent / "models" / "ast-audioset"
+_AST_ID    = str(_AST_LOCAL) if _AST_LOCAL.exists() else "MIT/ast-finetuned-audioset-10-10-0.4593"
 _AST_THRESH = 0.15
 
 

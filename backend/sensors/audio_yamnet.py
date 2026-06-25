@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -42,7 +43,9 @@ _LABEL_MAP = {
     0:  "speech",
 }
 _THRESHOLD = 0.15
-_MODEL_ID = "MIT/ast-finetuned-audioset-10-10-0.4593"
+_AST_HUB   = "MIT/ast-finetuned-audioset-10-10-0.4593"
+_AST_LOCAL = Path(__file__).resolve().parent.parent / "models" / "ast-audioset"
+_MODEL_ID  = str(_AST_LOCAL) if _AST_LOCAL.exists() else _AST_HUB
 
 chunk_queue: asyncio.Queue[list[float]] = asyncio.Queue(maxsize=8)
 
