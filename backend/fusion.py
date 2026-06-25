@@ -41,24 +41,26 @@ def _driver_seat() -> dict | None:
     return None
 
 
-def _effective_audio() -> tuple[str, float]:
-    """Return (label, confidence) — sensor audio first, seat-config world fallback second.
-
-    The live YAMNet node reads the microphone and publishes to the bus regardless of
-    world.audio_label, so scenario/seat-config audio state would otherwise be invisible
-    to the fusion engine when live audio is active.  This fallback ensures that manually
-    configured seat events (crying, barking, shouting…) always reach the cognitive-load
-    formula, while real microphone detections take priority.
-    """
+def _audio_effective() -> dict:
+    """Resolved audio label for fusion — classifier first, world/seat fallback second."""
     sensor = _latest["audio"]
-    s_label = sensor.get("label", "none")
-    s_conf = sensor.get("confidence", 0.0)
-    if s_label not in ("none", "", None) and s_conf > 0.25:
-        return s_label, s_conf
-    # Fallback: audio state derived from per-seat config (set by _sync_audio_from_seats)
+    s_label = sensor.get("label", "none") or "none"
+    s_conf = float(sensor.get("confidence", 0.0) or 0.0)
+    if s_label not in ("none", "") and s_conf > 0.25:
+        return {"label": s_label, "confidence": s_conf, "source": "classifier"}
     if world.audio_label not in ("none", "", None):
-        return world.audio_label, world.audio_conf
-    return "none", 0.0
+        return {
+            "label": world.audio_label,
+            "confidence": world.audio_conf,
+            "source": "world",
+        }
+    return {"label": "none", "confidence": 0.0, "source": "none"}
+
+
+def _effective_audio() -> tuple[str, float]:
+    """Return (label, confidence) — sensor audio first, seat-config world fallback second."""
+    eff = _audio_effective()
+    return eff["label"], eff["confidence"]
 
 
 def _cognitive_load() -> tuple[int, list[str]]:
@@ -522,6 +524,7 @@ async def run() -> None:
             factors=factors,
             radar=_latest["radar"],
             audio=_latest["audio"],
+            audio_effective=_audio_effective(),
             vehicle=_latest["vehicle"],
             vision_driver=_latest["vision_driver"],
             vision_objects=_latest["vision_objects"],

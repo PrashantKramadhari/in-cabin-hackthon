@@ -91,6 +91,10 @@ class _Audio:
     ast_conf_threshold          = _get("audio.ast_conf_threshold")
     babynet_conf_threshold      = _get("audio.babynet_conf_threshold")
     ast_fallback_threshold      = _get("audio.ast_fallback_threshold")
+    clap_model                  = _get("audio.clap_model")
+    clap_conf_threshold         = _get("audio.clap_conf_threshold")
+    clap_margin_over_none        = _get("audio.clap_margin_over_none")
+    clap_categories             = _get("audio.clap_categories")
 
 
 # ── Vision ────────────────────────────────────────────────────────────────────

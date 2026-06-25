@@ -86,6 +86,72 @@ audio:
   babynet_conf_threshold: 0.60      # min confidence for BabyNet to skip AST fallback
   ast_fallback_threshold: 0.15      # same as ast_conf_threshold (used in baby_net.py)
 
+  # Zero-shot CLAP (audio_clap.py) — edit prompts without retraining
+  clap_model: laion/clap-htsat-fused
+  clap_conf_threshold: 0.06         # min softmax prob for non-none class
+  clap_margin_over_none: 0.01       # winner must beat 'none' by this margin
+  clap_categories:
+    - id: none
+      label: none
+      distress_class: none
+      prompts:
+        - quiet background noise inside a car
+        - silence with faint road hum
+        - soft car engine idle
+    - id: kid_crying
+      label: crying
+      distress_class: kid
+      prompts:
+        - a baby crying and sobbing in a car
+        - infant distress crying
+        - a young child wailing
+    - id: kid_happy
+      label: happy
+      distress_class: none
+      prompts:
+        - a happy baby babbling and cooing
+        - toddler laughing playfully
+    - id: kid_talking
+      label: talking
+      distress_class: none
+      prompts:
+        - a baby babbling and talking
+        - young child speaking
+    - id: human_shouting
+      label: shouting
+      distress_class: human
+      prompts:
+        - a person shouting angrily in a car
+        - adult yelling in distress
+        - passengers screaming
+    - id: human_speech
+      label: talking
+      distress_class: none
+      prompts:
+        - normal adult conversation in a vehicle
+        - person talking calmly
+    - id: pet_distress
+      label: animal
+      distress_class: pet
+      prompts:
+        - a dog whining in distress
+        - anxious dog yelping in a car
+        - cat meowing in distress
+    - id: pet_bark
+      label: barking
+      distress_class: none
+      prompts:
+        - a dog barking
+        - dog barking inside a vehicle
+    - id: vehicle_distress
+      label: rattle
+      distress_class: vehicle
+      prompts:
+        - car tire squealing sharply
+        - vehicle impact or collision sound
+        - loud mechanical grinding from a car
+        - loose object rattling in a moving car
+
 # ── Vision ───────────────────────────────────────────────────────────────────
 vision:
   ear_drowsy_thresh: 0.20           # EAR below this → driver marked drowsy

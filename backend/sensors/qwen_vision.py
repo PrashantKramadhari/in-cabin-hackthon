@@ -1,18 +1,6 @@
 """Qwen2-VL-2B-Instruct local vision node — all-seat occupant analysis.
 
-Replaces vision.py when available.
-Model:   Qwen/Qwen2-VL-2B-Instruct  (4-bit quant → ~2.5 GB VRAM)
-Latency: ~100–150 ms on RTX 3080
-
-Publishes to two bus topics:
-  "vision_driver"    — legacy compat: {face_detected, ear, drowsy, emotion}
-  "vision_all_seats" — {driver:{…}, front_passenger:{…}, rear_left:{…}, rear_right:{…}}
-
-Each seat dict:
-  occupied  bool
-  kind      "adult"|"child"|"infant"|"unknown"
-  emotion   "calm"|"happy"|"stressed"|"tired"|"distressed"
-  buckled   bool
+GPU: 4-bit quant (~2.5 GB VRAM).  CPU: float32 fallback (slow, no GPU required).
 """
 from __future__ import annotations
 
@@ -28,6 +16,7 @@ from typing import Any
 import torch
 
 from bus import bus
+from sensors import vision_status as vstat
 
 frame_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=8)
 
@@ -36,6 +25,12 @@ _LOCAL    = Path(__file__).resolve().parent.parent / "models" / "qwen2-vl-2b"
 _MODEL_ID = str(_LOCAL) if _LOCAL.exists() else _HUB_ID
 _model: Any     = None
 _processor: Any = None
+_device: str    = "cpu"
+
+NODE_NAME = "qwen2vl"
+READY = False
+LOAD_ERROR: str | None = None
+DEVICE = "cpu"
 
 _SEAT_IDS = ["driver", "front_passenger", "rear_left", "rear_middle", "rear_right"]
 
@@ -69,25 +64,69 @@ _PROMPT = (
 _EMPTY_SEAT = {"occupied": False, "kind": "unknown", "emotion": "calm", "buckled": False, "objects": []}
 
 
-def _load_model() -> None:
-    global _model, _processor
-    from transformers import Qwen2VLForConditionalGeneration, AutoProcessor, BitsAndBytesConfig
+def weights_available() -> bool:
+    """True if local weights or a HuggingFace cache snapshot exists."""
+    if _LOCAL.is_dir() and any(_LOCAL.iterdir()):
+        return True
+    hub = Path.home() / ".cache" / "huggingface" / "hub" / "models--Qwen--Qwen2-VL-2B-Instruct"
+    snaps = hub / "snapshots"
+    return snaps.is_dir() and any(snaps.iterdir())
 
-    quant = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_quant_type="nf4",
-    )
-    print(f"[QwenVision] Loading {_MODEL_ID} (4-bit) …")
+
+def _load_model() -> None:
+    global _model, _processor, _device, NODE_NAME, READY, LOAD_ERROR
+    from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+
+    use_cuda = torch.cuda.is_available()
+    _device = "cuda" if use_cuda else "cpu"
+    NODE_NAME = "qwen2vl_gpu" if use_cuda else "qwen2vl_cpu"
+
+    print(f"[QwenVision] Loading {_MODEL_ID} on {_device} …")
     _processor = AutoProcessor.from_pretrained(_MODEL_ID)
-    _model = Qwen2VLForConditionalGeneration.from_pretrained(
-        _MODEL_ID,
-        quantization_config=quant,
-        device_map="cuda",
-        torch_dtype=torch.float16,
-    )
+
+    if use_cuda:
+        from transformers import BitsAndBytesConfig
+        quant = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+        )
+        _model = Qwen2VLForConditionalGeneration.from_pretrained(
+            _MODEL_ID,
+            quantization_config=quant,
+            device_map="cuda",
+            torch_dtype=torch.float16,
+        )
+    else:
+        _model = Qwen2VLForConditionalGeneration.from_pretrained(
+            _MODEL_ID,
+            torch_dtype=torch.float32,
+            low_cpu_mem_usage=True,
+        )
+        _model.to("cpu")
+
     _model.eval()
-    print("[QwenVision] Model ready")
+    READY = True
+    LOAD_ERROR = None
+    globals()["DEVICE"] = _device
+    vstat.set_ready(node=NODE_NAME, device=_device, backend="qwen")
+    print(f"[QwenVision] Model ready ({NODE_NAME})")
+
+
+def try_load() -> bool:
+    """Eager load for startup probe. Returns True if weights are ready."""
+    global LOAD_ERROR
+    if READY and _model is not None:
+        return True
+    try:
+        _load_model()
+        return True
+    except Exception as exc:
+        LOAD_ERROR = str(exc)
+        READY = False
+        vstat.set_failed(node="qwen2vl", error=LOAD_ERROR, backend="qwen")
+        print(f"[QwenVision] load failed: {exc}")
+        return False
 
 
 def _safe_seat(raw: Any) -> dict:
@@ -135,7 +174,8 @@ def _infer(b64: str) -> dict[str, dict]:
         videos=video_inputs,
         padding=True,
         return_tensors="pt",
-    ).to("cuda")
+    )
+    inputs = {k: v.to(_device) if hasattr(v, "to") else v for k, v in inputs.items()}
 
     with torch.no_grad():
         out_ids = _model.generate(
@@ -183,7 +223,11 @@ def reset_cache() -> None:
 
 async def run() -> None:
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _load_model)
+    if not READY:
+        ok = await loop.run_in_executor(None, try_load)
+        if not ok:
+            print("[QwenVision] run() exiting — model not loaded")
+            return
 
     while True:
         b64 = await frame_queue.get()

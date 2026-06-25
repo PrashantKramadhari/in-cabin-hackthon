@@ -40,6 +40,8 @@ class AudioEvent:
     label: str = "none"                # crying | animal | rattle | speech | none
     confidence: float = 0.0
     source: str = "audio"
+    distress_class: str = "none"       # kid | human | pet | vehicle | none (zero-shot)
+    prompt: str = ""                 # winning CLAP text prompt (debug)
 
     def to_dict(self) -> dict:
         return asdict(self)

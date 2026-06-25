@@ -26,9 +26,15 @@ import numpy as np
 
 from bus import bus
 from config import vision as vcfg
+from sensors import vision_status as vstat
 
 _landmarker: Any = None
 _yolo: Any = None
+
+NODE_NAME = "mediapipe"
+READY = False
+LOAD_ERROR: str | None = None
+DEVICE = "cpu"
 
 frame_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=4)
 
@@ -47,7 +53,9 @@ _MOUTH_R   = 308
 
 
 def _load_models() -> None:
-    global _landmarker, _yolo
+    global _landmarker, _yolo, READY, LOAD_ERROR
+    if not Path(MODEL_PATH).is_file():
+        raise FileNotFoundError(f"face_landmarker.task missing at {MODEL_PATH}")
     from mediapipe.tasks import python as mpt
     from mediapipe.tasks.python import vision as mpv
     from ultralytics import YOLO
@@ -60,7 +68,26 @@ def _load_models() -> None:
         min_tracking_confidence=0.5,
     )
     _landmarker = mpv.FaceLandmarker.create_from_options(opts)
-    _yolo = YOLO(_YOLO_PATH, conf=vcfg.yolo_conf_thresh)
+    _yolo = YOLO(_YOLO_PATH, conf=vcfg.yolo_conf_thresh) if Path(_YOLO_PATH).is_file() else None
+    READY = True
+    LOAD_ERROR = None
+    vstat.set_ready(node=NODE_NAME, device=DEVICE, backend="mediapipe")
+    print("[vision] MediaPipe + YOLO ready")
+
+
+def try_load() -> bool:
+    global READY, LOAD_ERROR
+    if READY and _landmarker is not None:
+        return True
+    try:
+        _load_models()
+        return True
+    except Exception as exc:
+        LOAD_ERROR = str(exc)
+        READY = False
+        vstat.set_failed(node="mediapipe", error=LOAD_ERROR, backend="mediapipe")
+        print(f"[vision] load failed: {exc}")
+        return False
 
 
 def _ear(lm, indices, w, h) -> float:
@@ -109,6 +136,8 @@ def _run_face(bgr: np.ndarray) -> dict:
 
 
 def _run_yolo(bgr: np.ndarray) -> list[dict]:
+    if _yolo is None:
+        return []
     results = _yolo(bgr, verbose=False)[0]
     out = []
     for box in results.boxes:
@@ -135,7 +164,11 @@ def _process(b64: str) -> tuple[dict, list[dict]]:
 
 async def run() -> None:
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _load_models)
+    if not READY:
+        ok = await loop.run_in_executor(None, try_load)
+        if not ok:
+            print("[vision] run() exiting — models not loaded")
+            return
 
     while True:
         b64 = await frame_queue.get()

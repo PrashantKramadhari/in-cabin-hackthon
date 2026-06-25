@@ -16,37 +16,79 @@ import scenarios
 from bus import bus
 from sensors import radar, audio, vehicle, vibration
 
-# BabyNet takes priority over AST; fall back gracefully
+# CLAP zero-shot takes priority; then BabyNet → AST → synthetic
 try:
-    from sensors import baby_net as _audio_live
+    from sensors import audio_clap as _audio_live  # type: ignore[assignment]
     _USE_LIVE_AUDIO = True
-    _AUDIO_NODE_NAME = "baby_net"
+    _AUDIO_NODE_NAME = "clap_zs"
 except Exception as _e:
-    print(f"[main] BabyNet unavailable ({_e}), trying AST …")
+    print(f"[main] CLAP zero-shot unavailable ({_e}), trying BabyNet …")
     try:
-        from sensors import audio_yamnet as _audio_live  # type: ignore[assignment]
+        from sensors import baby_net as _audio_live  # type: ignore[assignment]
         _USE_LIVE_AUDIO = True
-        _AUDIO_NODE_NAME = "ast"
-    except Exception:
-        _USE_LIVE_AUDIO = False
-        _AUDIO_NODE_NAME = "synthetic"
+        _AUDIO_NODE_NAME = "baby_net"
+    except Exception as _e2:
+        print(f"[main] BabyNet unavailable ({_e2}), trying AST …")
+        try:
+            from sensors import audio_yamnet as _audio_live  # type: ignore[assignment]
+            _USE_LIVE_AUDIO = True
+            _AUDIO_NODE_NAME = "ast"
+        except Exception:
+            _USE_LIVE_AUDIO = False
+            _AUDIO_NODE_NAME = "synthetic"
 
-# Qwen2-VL vision takes priority; fall back to MediaPipe/YOLO then nothing
+# Vision: probe-load at startup (Qwen CPU/GPU → MediaPipe fallback)
+_vision = None
+_USE_VISION = False
 _USE_QWEN_VISION = False
-_USE_VISION      = False
-try:
-    from sensors import qwen_vision as _vision  # type: ignore[assignment]
-    _USE_QWEN_VISION = True
-    _USE_VISION      = True
-    _VISION_NODE_NAME = "qwen2vl"
-except Exception as _e:
-    print(f"[main] QwenVision unavailable ({_e}), trying MediaPipe …")
+_VISION_NODE_NAME = "none"
+
+
+def _init_vision_sync() -> None:
+    """Try Qwen first, then MediaPipe; sets module globals from probe result."""
+    global _vision, _USE_VISION, _USE_QWEN_VISION, _VISION_NODE_NAME
+    import torch
+    from sensors import vision_status as vstat
+
     try:
-        from sensors import vision as _vision  # type: ignore[assignment]
-        _USE_VISION = True
-        _VISION_NODE_NAME = "mediapipe"
-    except Exception:
-        _VISION_NODE_NAME = "none"
+        from sensors import qwen_vision as qv
+        can_try_qwen = torch.cuda.is_available() or qv.weights_available()
+        if not can_try_qwen:
+            print(
+                "[main] Qwen skipped on CPU — no weights at backend/models/qwen2-vl-2b "
+                "and no HF cache (use MediaPipe or download weights)"
+            )
+        elif qv.try_load():
+            _vision = qv
+            _USE_VISION = True
+            _USE_QWEN_VISION = True
+            _VISION_NODE_NAME = qv.NODE_NAME
+            print(f"[main] Vision ready: {qv.NODE_NAME} on {qv.DEVICE}")
+            return
+        else:
+            print(f"[main] QwenVision not loaded: {qv.LOAD_ERROR}")
+    except Exception as exc:
+        print(f"[main] QwenVision unavailable ({exc})")
+
+    try:
+        from sensors import vision as mpv
+        if mpv.try_load():
+            _vision = mpv
+            _USE_VISION = True
+            _USE_QWEN_VISION = False
+            _VISION_NODE_NAME = mpv.NODE_NAME
+            print(f"[main] Vision ready: {mpv.NODE_NAME} (fallback)")
+            return
+        print(f"[main] MediaPipe vision not loaded: {mpv.LOAD_ERROR}")
+    except Exception as exc:
+        print(f"[main] MediaPipe vision unavailable ({exc})")
+
+    vstat.set_failed(node="none", error="no vision backend available", backend="none")
+    _vision = None
+    _USE_VISION = False
+    _USE_QWEN_VISION = False
+    _VISION_NODE_NAME = "none"
+    print("[main] No vision backend available")
 
 app = FastAPI(title="CabinSense")
 
@@ -111,9 +153,11 @@ async def _run_demo() -> None:
 
 @app.on_event("startup")
 async def _startup() -> None:
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _init_vision_sync)
     audio_node = _audio_live.run if _USE_LIVE_AUDIO else audio.run
     nodes = [radar.run, audio_node, vehicle.run, vibration.run, fusion.run]
-    if _USE_VISION:
+    if _USE_VISION and _vision is not None:
         nodes.append(_vision.run)
     for node in nodes:
         asyncio.create_task(node())
@@ -136,13 +180,16 @@ async def list_videos() -> dict:
 
 @app.get("/api/caps")
 async def caps() -> dict:
-    return {
+    from sensors import vision_status as vstat
+    out = {
         "live_audio":    _USE_LIVE_AUDIO,
-        "live_vision":   _USE_VISION,
-        "qwen_vision":   _USE_QWEN_VISION,
         "audio_node":    _AUDIO_NODE_NAME,
-        "vision_node":   _VISION_NODE_NAME,
     }
+    out.update(vstat.snapshot())
+    # legacy keys — now driven by actual load state
+    if not out.get("vision_ready"):
+        out["qwen_vision"] = False
+    return out
 
 
 @app.get("/api/audio-mode")
@@ -308,8 +355,7 @@ async def ws(sock: WebSocket) -> None:
                 if b64 and not _vision.frame_queue.full():
                     await _vision.frame_queue.put(b64)
             elif cmd == "reset_vision":
-                # Clear Qwen sticky cache + fusion vision state + seat overrides
-                if _USE_QWEN_VISION:
+                if _USE_QWEN_VISION and _vision is not None and hasattr(_vision, "reset_cache"):
                     _vision.reset_cache()
                 fusion.reset_vision()
                 scenarios.world.seat_overrides.clear()
