@@ -188,13 +188,13 @@ vision:
   yunet_score_thresh: 0.55
   yunet_nms_thresh: 0.3
   emotion_model: enet_b0_8_best_afew
-  emotion_smooth_frames: 7
+  emotion_smooth_frames: 3
   emotion_min_conf: 0.35
   # Multi-frame stability (YOLO objects, seat occupancy, drowsy)
-  temporal_window_frames: 5
-  temporal_min_hits: 3
-  temporal_clear_misses: 4
-  driver_drowsy_min_frames: 3
+  temporal_window_frames: 3
+  temporal_min_hits: 2
+  temporal_clear_misses: 2
+  driver_drowsy_min_frames: 2
 
 # ── IMU / Vibration ──────────────────────────────────────────────────────────
 vibration:

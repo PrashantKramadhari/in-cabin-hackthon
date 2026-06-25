@@ -2382,7 +2382,7 @@ var SEAT_DBG_RECTS={
 
 var DBG_THRESH_DEFAULTS={
   yolo_conf_thresh:0.35,yunet_score_thresh:0.55,emotion_min_conf:0.35,
-  display_conf_thresh:0.6,temporal_min_hits:3
+  display_conf_thresh:0.6,temporal_min_hits:2
 };
 function dbgFilterDets(dets,minConf){
   var m=minConf!=null?minConf:DBG_THRESH_DEFAULTS.display_conf_thresh;
