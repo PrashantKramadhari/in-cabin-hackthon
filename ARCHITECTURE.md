@@ -6,7 +6,8 @@
 
 This document is the canonical reference for data pipelines, message flows, and
 component topology. For setup and day-to-day usage see [USAGE.md](USAGE.md).
-For scoring rules and mitigation tables see [doc.md](doc.md).
+For scoring rules and mitigation tables see [doc.md](doc.md).  
+**Cognitive load scoring flow:** [§6](ARCHITECTURE.md#6-cognitive-load-scoring-flow).
 
 ---
 
@@ -17,15 +18,16 @@ For scoring rules and mitigation tables see [doc.md](doc.md).
 3. [Sensing Pipelines](#3-sensing-pipelines)
 4. [Message Bus](#4-message-bus)
 5. [Fusion & Decision Pipeline](#5-fusion--decision-pipeline)
-6. [Context Analysis Pipeline](#6-context-analysis-pipeline)
-7. [HMI & WebSocket Pipeline](#7-hmi--websocket-pipeline)
-8. [Pipeline Debug & Observability](#8-pipeline-debug--observability)
-9. [Control & Scenario Pipeline](#9-control--scenario-pipeline)
-10. [Model Selection & Fallback Chains](#10-model-selection--fallback-chains)
-11. [Configuration Surfaces](#11-configuration-surfaces)
-12. [Temporal Processing](#12-temporal-processing)
-13. [SDV / Production Mapping](#13-sdv--production-mapping)
-14. [Repository Map](#14-repository-map)
+6. [Cognitive Load Scoring Flow](#6-cognitive-load-scoring-flow)
+7. [Context Analysis Pipeline](#7-context-analysis-pipeline)
+8. [HMI & WebSocket Pipeline](#8-hmi--websocket-pipeline)
+9. [Pipeline Debug & Observability](#9-pipeline-debug--observability)
+10. [Control & Scenario Pipeline](#10-control--scenario-pipeline)
+11. [Model Selection & Fallback Chains](#11-model-selection--fallback-chains)
+12. [Configuration Surfaces](#12-configuration-surfaces)
+13. [Temporal Processing](#13-temporal-processing)
+14. [SDV / Production Mapping](#14-sdv--production-mapping)
+15. [Repository Map](#15-repository-map)
 
 ---
 
@@ -333,7 +335,7 @@ flowchart TB
 | `factors` | Human-readable contributing factors |
 | `mitigations` | Cards: `id`, `title`, `detail`, `severity`, `status`, `confirm` |
 | `seat_configs` | Merged world + radar + vision per seat |
-| `feed_analysis` | Context window status (see §6) |
+| `feed_analysis` | Context window status (see §7) |
 | `audio_effective` | Label fusion actually uses |
 | `vision_*` | Latest vision frames passthrough |
 | `latency_ms` | Fusion tick duration |
@@ -354,7 +356,223 @@ after triggering condition clears.
 
 ---
 
-## 6. Context Analysis Pipeline
+## 6. Cognitive Load Scoring Flow
+
+**Module:** `fusion._cognitive_load()` — runs every fusion tick (10 Hz).  
+**Model:** additive rule-based sum, capped at **100**. Each hit appends a string to `factors[]` for the HMI.
+
+> **Important:** Mitigations are **independent** of the score. Safety alerts (child left behind, seatbelt, critical HR) surface even when the gauge reads low.
+
+### 6.1 Scoring pipeline (overview)
+
+```mermaid
+flowchart TB
+  START([Fusion tick 10 Hz])
+  LATEST[_latest sensor cache + world.py]
+
+  subgraph INPUTS["Data sources"]
+    RAD[radar → driver vitals]
+    WLD[world → driver_emotion, seats]
+    AUD[_effective_audio]
+    VEH[vehicle → speed, visibility]
+    VIB[vibration → road_quality]
+    VD[vision_driver → drowsy, emotion]
+    VO[vision_objects → YOLO]
+    VS[vision_all_seats → seat objects]
+  end
+
+  subgraph SCORE["_cognitive_load() — sequential checks"]
+    G1[① Driver physiology]
+    G2[② Driver emotion]
+    G3[③ Audio anomaly]
+    G4[④ Vehicle context]
+    G5[⑤ Child/pet world.seats]
+    G6[⑥ Rear radar vitals + motion]
+    G7[⑦ Road / IMU]
+    G8[⑧ Vision driver face]
+    G9[⑨ Loose objects YOLO + seats]
+    CAP["score = min(100, Σ contributions)"]
+  end
+
+  OUT([cognitive_load + factors → fused state → HMI gauge])
+
+  START --> LATEST
+  LATEST --> INPUTS
+  RAD --> G1
+  WLD --> G2 & G5
+  AUD --> G3
+  VEH --> G4
+  WLD --> G5
+  RAD --> G6
+  VIB --> G7
+  VD --> G8
+  VO & VS --> G9
+
+  G1 --> G2 --> G3 --> G4 --> G5 --> G6 --> G7 --> G8 --> G9 --> CAP --> OUT
+```
+
+### 6.2 Audio resolution (feeds step ③)
+
+Before audio contributes to the score, `_effective_audio()` picks one label:
+
+```mermaid
+flowchart LR
+  BUS[bus audio frame]
+  CLS{classifier label ≠ none\nand conf > 0.25?}
+  WORLD[world.audio_label\nfrom seat configs]
+  NONE[none / 0.0]
+
+  BUS --> CLS
+  CLS -->|yes| USE_CLS[Use classifier]
+  CLS -->|no| WORLD
+  WORLD -->|set| USE_WLD[Use world fallback]
+  WORLD -->|empty| NONE
+```
+
+This lets demo scenarios and manual seat `audio_event` settings influence the score when the mic is quiet, while live CLAP detections take priority when confident.
+
+### 6.3 Contribution table (defaults from `config.yaml`)
+
+All weights are tunable under `fusion.score` without code changes.
+
+#### ① Driver physiology — `radar` driver seat
+
+| Condition | Points | Formula / notes |
+|-----------|--------|-----------------|
+| HR > 95 bpm | up to **30** | `min(30, (HR − 95) × 1.5)` |
+| Resp > 20 rpm | up to **15** | `min(15, (resp − 20) × 2.0)` |
+| HR < 60 bpm | **12** | flat (low arousal / fatigue) |
+
+#### ② Driver emotion — `world.driver_emotion`
+
+| Condition | Points |
+|-----------|--------|
+| `stressed` | **10** |
+| `tired` | **8** |
+| `calm` / `happy` | 0 |
+
+#### ③ Audio — `_effective_audio()`, conf > **0.25**
+
+| Label | Points | Notes |
+|-------|--------|-------|
+| `crying`, `barking`, `animal` | **25** | mutually exclusive branch |
+| `shouting` | **20** | |
+| `rattle` | **10** | |
+| `talking` + child/pet present | **10** | radar or vision child/pet seat |
+| `talking` (no child/pet) | **5** | |
+| `happy` | **2** | |
+
+Only **one** audio branch applies per tick (first matching `elif`).
+
+#### ④ Vehicle — `vehicle` topic
+
+| Condition | Points |
+|-----------|--------|
+| visibility ∈ `low`, `rain`, `fog` | **12** |
+| speed > 100 km/h | **8** |
+
+#### ⑤ Child / pet — `world.seats` (instant, no radar lag)
+
+Per occupied non-driver seat with `kind` ∈ {child, pet}:
+
+| Condition | Points | Formula |
+|-----------|--------|---------|
+| Presence | **5** | flat per seat |
+| distress > 0.05 | up to **30** | `min(30, distress × 40)` |
+| HR above threshold | up to **40** | child > 115 bpm, pet > 125 bpm → `min(40, (HR − thresh) × 1.5)` |
+
+HR scored here is tracked in `_scored_hr_seats` to avoid double-counting in ⑥.
+
+#### ⑥ Rear radar — non-driver child/pet seats
+
+| Condition | Points | Formula |
+|-----------|--------|---------|
+| Elevated HR (if not in ⑤) | up to **20** | `min(20, (HR − thresh) × 0.8)` |
+| Resp > 28 rpm | up to **10** | `min(10, (resp − 28) × 0.5)` |
+| motion > 0.40 | **10** | agitation |
+
+#### ⑦ Road / IMU — `vibration` topic
+
+| Condition | Points |
+|-----------|--------|
+| `road_quality == pothole` | **18** |
+| `road_quality == rough` | **8** |
+| `pothole_ahead_m` < 80 m | **5** |
+
+#### ⑧ Vision driver — `vision_driver`
+
+Only when `face_detected: true`:
+
+| Condition | Points |
+|-----------|--------|
+| `drowsy: true` (EAR < 0.20) | **15** |
+| `emotion == stressed` | **10** | skipped if drowsy branch fired |
+
+#### ⑨ Loose objects — vision
+
+| Source | Points | Notes |
+|--------|--------|-------|
+| YOLO `vision_objects` | **6** | first matching loose label only |
+| Per-seat `vision_all_seats.objects` | up to **10** | `min(10, count × 4)`; first seat with objects only |
+
+Loose labels: backpack, suitcase, bottle, cup, book, laptop, handbag, cell phone, remote, mouse, teddy bear, wine glass.
+
+### 6.4 Output and HMI bands
+
+```mermaid
+flowchart LR
+  SUM[Σ all contributions]
+  CAP[int min 100 score]
+  FACTORS[factors list]
+  WS[WebSocket fused]
+  GAUGE[CircularGauge]
+
+  SUM --> CAP
+  SUM --> FACTORS
+  CAP --> WS --> GAUGE
+  FACTORS --> WS
+```
+
+| Score | Gauge colour | Label (HMI) |
+|-------|--------------|-------------|
+| 0 – 19 | Teal `#14b8a6` | Nominal |
+| 20 – 39 | Teal | Low |
+| 40 – 65 | Amber `#f59e0b` | Medium |
+| 66 – 84 | Red `#ef4444` | High |
+| 85 – 100 | Red | Critical |
+
+Debug badges use simplified bands: green &lt; 33, amber 33–65, red ≥ 66.
+
+### 6.5 Example walk-through
+
+**Scenario:** `child_crying_rear` — child in rear_left, distress 0.7, CLAP detects crying at 0.82 conf, driver calm.
+
+| Step | Check | Points | Running total |
+|------|-------|--------|---------------|
+| ① | Driver HR 72 (normal) | 0 | 0 |
+| ② | driver_emotion calm | 0 | 0 |
+| ③ | crying conf 0.82 | +25 | 25 |
+| ⑤ | child presence rear_left | +5 | 30 |
+| ⑤ | distress 0.7 → min(30, 28) | +28 | 58 |
+| **Output** | | | **58** (Medium) |
+
+Factors shown: `["crying in cabin", "child in cabin (rear left)", "child distress 70%"]`
+
+### 6.6 Score vs recommendations
+
+| Aspect | Cognitive load (`_cognitive_load`) | Mitigations (`_proposed`) |
+|--------|--------------------------------------|-----------------------------|
+| Rate | Every tick, immediate | Comfort rules wait for 5 s `FeedAnalyzer` |
+| Purpose | Attention-risk gauge | Actionable cabin interventions |
+| Audio | Single-frame `_effective_audio` | Sustained audio ratios |
+| Vision emotion | Latest frame drowsy/stress | Sustained emotion per seat |
+| Coupling | None — computed in parallel each tick | Independent card list |
+
+Full formula tables also in [doc.md §5–6](doc.md#5-q2--all-factors-in-cognitive-load-calculation).
+
+---
+
+## 7. Context Analysis Pipeline
 
 **Module:** `backend/fusion_context.py` — `FeedAnalyzer`
 
@@ -416,7 +634,7 @@ flowchart LR
 
 ---
 
-## 7. HMI & WebSocket Pipeline
+## 8. HMI & WebSocket Pipeline
 
 ```mermaid
 flowchart TB
@@ -452,7 +670,7 @@ State is a single React `useState` updated from WebSocket JSON — no build step
 
 ---
 
-## 8. Pipeline Debug & Observability
+## 9. Pipeline Debug & Observability
 
 The **Pipeline Debug** tab is a live observability layer on top of the same WebSocket stream.
 
@@ -479,7 +697,7 @@ flowchart LR
 
 ---
 
-## 9. Control & Scenario Pipeline
+## 10. Control & Scenario Pipeline
 
 ```
 User clicks scenario  OR  demo auto-play  OR  seat config overlay
@@ -498,7 +716,7 @@ User clicks scenario  OR  demo auto-play  OR  seat config overlay
 
 ---
 
-## 10. Model Selection & Fallback Chains
+## 11. Model Selection & Fallback Chains
 
 ### Audio (startup probe in `main.py`)
 
@@ -521,7 +739,7 @@ Status exposed via `GET /api/caps`: `audio_node`, `vision_node`, `yolo_ready`, `
 
 ---
 
-## 11. Configuration Surfaces
+## 12. Configuration Surfaces
 
 | File / API | Controls |
 |------------|----------|
@@ -535,7 +753,7 @@ Status exposed via `GET /api/caps`: `audio_node`, `vision_node`, `yolo_ready`, `
 
 ---
 
-## 12. Temporal Processing
+## 13. Temporal Processing
 
 Smoothing happens at three layers:
 
@@ -557,7 +775,7 @@ emotion_smooth_frames: 3
 
 ---
 
-## 13. SDV / Production Mapping
+## 14. SDV / Production Mapping
 
 The hackathon software topology maps directly onto a software-defined vehicle:
 
@@ -575,7 +793,7 @@ To go to production hardware: **replace only the node body** inside each `sensor
 
 ---
 
-## 14. Repository Map
+## 15. Repository Map
 
 ```
 in-cabin-hackthon/
