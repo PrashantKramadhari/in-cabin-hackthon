@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CabinSense — Presentation</title>
+<style>
+  :root {
+    --teal:   #00d4b0;
+    --amber:  #f6ad55;
+    --red:    #fc8181;
+    --blue:   #63b3ed;
+    --bg:     #0a0e1a;
+    --panel:  #111827;
+    --border: rgba(0,212,176,.18);
+    --text:   #e2e8f0;
+    --muted:  #8899aa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+
+  /* ── deck ── */
+  #deck{width:100%;height:100vh;position:relative}
+  .slide{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    padding:52px 64px 40px;
+  }
+  .slide.active{display:flex}
+
+  /* ── nav ── */
+  #nav{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    display:flex;gap:12px;align-items:center;z-index:99;
+    background:rgba(10,14,26,.85);border:1px solid var(--border);
+    border-radius:32px;padding:8px 20px;backdrop-filter:blur(8px)
+  }
+  #nav button{
+    background:none;border:none;color:var(--muted);cursor:pointer;
+    font-size:22px;line-height:1;transition:color .15s
+  }
+  #nav button:hover{color:var(--teal)}
+  #slide-count{font-size:13px;color:var(--muted);min-width:52px;text-align:center}
+
+  /* ── dots ── */
+  #dots{display:flex;gap:6px;align-items:center}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);cursor:pointer;transition:background .2s,transform .2s}
+  .dot.active{background:var(--teal);transform:scale(1.3)}
+
+  /* ── common elements ── */
+  .slide-title{
+    font-size:13px;font-weight:600;letter-spacing:3px;text-transform:uppercase;
+    color:var(--teal);margin-bottom:10px
+  }
+  .slide-heading{
+    font-size:34px;font-weight:700;line-height:1.2;margin-bottom:28px;
+    background:linear-gradient(135deg,#fff 60%,var(--teal));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent
+  }
+  .slide-heading.sm{font-size:26px}
+  .tag{
+    display:inline-block;font-size:11px;font-weight:700;letter-spacing:1.5px;
+    text-transform:uppercase;padding:3px 10px;border-radius:20px;
+    border:1px solid;margin-bottom:6px
+  }
+  .tag.teal{color:var(--teal);border-color:var(--teal);background:rgba(0,212,176,.08)}
+  .tag.amber{color:var(--amber);border-color:var(--amber);background:rgba(246,173,85,.08)}
+  .tag.red{color:var(--red);border-color:var(--red);background:rgba(252,129,129,.08)}
+  .tag.blue{color:var(--blue);border-color:var(--blue);background:rgba(99,179,237,.08)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;flex:1}
+  .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;flex:1}
+
+  .card{
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:20px 22px;
+  }
+  .card.highlight{border-color:var(--teal);background:rgba(0,212,176,.05)}
+  .card h3{font-size:14px;font-weight:700;color:var(--teal);margin-bottom:10px;text-transform:uppercase;letter-spacing:.8px}
+  .card h4{font-size:13px;font-weight:700;color:var(--amber);margin-bottom:8px}
+  .card p{font-size:13px;color:var(--muted);line-height:1.6}
+  .card ul{list-style:none;padding:0}
+  .card ul li{font-size:13px;color:var(--muted);padding:3px 0;line-height:1.5}
+  .card ul li::before{content:'→ ';color:var(--teal);font-weight:700}
+
+  code{
+    font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;
+    background:rgba(0,212,176,.08);color:var(--teal);
+    padding:2px 6px;border-radius:4px
+  }
+
+  .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .pill{
+    font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;
+    border:1px solid var(--border);color:var(--text)
+  }
+
+  /* score bar */
+  .score-row{display:flex;align-items:center;gap:10px;margin:5px 0}
+  .score-label{font-size:12px;color:var(--muted);width:180px;flex-shrink:0}
+  .score-bar-bg{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px}
+  .score-bar{height:6px;border-radius:3px}
+  .score-val{font-size:12px;font-weight:700;width:36px;text-align:right;flex-shrink:0}
+
+  /* pipeline arrow */
+  .pipeline{
+    display:flex;align-items:center;gap:0;flex:1;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:20px 24px;overflow:hidden
+  }
+  .pnode{
+    flex:1;text-align:center;padding:10px 4px
+  }
+  .pnode .icon{font-size:28px;margin-bottom:6px}
+  .pnode .name{font-size:12px;font-weight:700;color:var(--teal);margin-bottom:4px}
+  .pnode .sub{font-size:11px;color:var(--muted);line-height:1.4}
+  .parrow{color:var(--teal);font-size:22px;flex-shrink:0;opacity:.6}
+
+  /* title slide */
+  .title-slide{
+    display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+    padding:80px 100px
+  }
+  .title-slide .logo{font-size:52px;font-weight:900;letter-spacing:-2px;
+    background:linear-gradient(135deg,var(--teal),#7dd3fc);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+  .title-slide .sub{font-size:18px;color:var(--muted);margin-bottom:40px;font-weight:400}
+  .title-slide .tagline{
+    font-size:28px;font-weight:700;line-height:1.4;max-width:660px;
+    color:var(--text);margin-bottom:40px
+  }
+  .badge-row{display:flex;gap:12px;flex-wrap:wrap}
+  .badge{
+    padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;
+    border:1px solid var(--border);color:var(--muted)
+  }
+
+  /* arch diagram */
+  .arch{display:grid;grid-template-columns:1.1fr 1.5fr 1.1fr;gap:16px;flex:1}
+  .arch-col{display:flex;flex-direction:column;gap:10px}
+  .arch-col h4{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+    color:var(--muted);margin-bottom:4px;text-align:center}
+  .arch-node{
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:10px 14px;font-size:12px;color:var(--text);text-align:center;line-height:1.4
+  }
+  .arch-node.core{border-color:var(--teal);background:rgba(0,212,176,.06)}
+  .arch-center{
+    display:flex;flex-direction:column;justify-content:center;align-items:center;
+    gap:8px
+  }
+  .arch-arrows{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    font-size:18px;color:var(--teal);opacity:.5;margin:6px 0
+  }
+
+  /* formula */
+  .formula{
+    background:rgba(0,212,176,.05);border:1px solid var(--teal);
+    border-radius:12px;padding:18px 22px;font-family:'Cascadia Code','Fira Code',monospace;
+    font-size:13px;color:var(--teal);line-height:2;margin-bottom:16px
+  }
+  .formula span.w{color:#fff}
+  .formula span.m{color:var(--muted)}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);
+     font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text)}
+  tr:hover td{background:rgba(0,212,176,.04)}
+  td code{font-size:11px}
+
+  /* scrollable inner */
+  .scroll{overflow-y:auto;flex:1;padding-right:4px}
+  .scroll::-webkit-scrollbar{width:4px}
+  .scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+  .two-col{display:flex;gap:20px;flex:1}
+  .col{flex:1;display:flex;flex-direction:column;gap:12px}
+
+  .mit-card{
+    border-left:3px solid var(--teal);padding:10px 14px;
+    background:rgba(0,212,176,.04);border-radius:0 8px 8px 0;
+  }
+  .mit-card.warn{border-left-color:var(--amber);background:rgba(246,173,85,.04)}
+  .mit-card.crit{border-left-color:var(--red);background:rgba(252,129,129,.04)}
+  .mit-card h5{font-size:12px;font-weight:700;margin-bottom:4px}
+  .mit-card p{font-size:11px;color:var(--muted);line-height:1.5}
+
+  .model-card{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:16px 18px;display:flex;flex-direction:column;gap:8px
+  }
+  .model-card h4{font-size:13px;font-weight:700;color:var(--blue)}
+  .model-card .model-id{font-family:monospace;font-size:11px;color:var(--teal);
+    background:rgba(0,212,176,.08);padding:3px 8px;border-radius:4px;display:inline-block}
+  .model-card p{font-size:12px;color:var(--muted);line-height:1.5}
+  .model-card .spec-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .model-card .spec{font-size:11px;padding:2px 8px;border-radius:12px;
+    border:1px solid var(--border);color:var(--muted)}
+
+  /* closing */
+  .closing{
+    display:flex;flex-direction:column;justify-content:center;align-items:center;
+    text-align:center;gap:16px;flex:1
+  }
+  .big-score{
+    font-size:90px;font-weight:900;line-height:1;
+    background:linear-gradient(135deg,var(--teal),#7dd3fc);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent
+  }
+
+  /* keyboard hint */
+  #hint{position:fixed;top:16px;right:20px;font-size:11px;color:var(--muted);opacity:.5}
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 1 — TITLE
+════════════════════════════════════════════════════════════ -->
+<div class="slide title-slide active">
+  <div class="logo">CabinSense</div>
+  <div class="sub">In-Cabin Disturbance Intelligence</div>
+  <div class="tagline">
+    A real-time multi-modal AI platform that detects<br>
+    micro-distractions, fuses them into a Cognitive Load score,<br>
+    and delivers <em style="color:var(--teal)">confirm-first</em> cabin mitigations.
+  </div>
+  <div class="badge-row">
+    <div class="badge">🎯 Hackathon Build · 2 Days</div>
+    <div class="badge">⚡ &lt;1 ms Fusion Latency</div>
+    <div class="badge">🔒 Privacy-First (no cloud)</div>
+    <div class="badge">🚗 SDV-Ready Architecture</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 2 — PROBLEM
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">The Problem</div>
+  <div class="slide-heading">Drivers Face Continuous, Unmonitored Micro-Distractions</div>
+  <div class="grid3" style="align-items:start">
+    <div class="card">
+      <h3>Critical Gap</h3>
+      <p>Modern vehicles monitor the <strong style="color:#fff">road ahead</strong> with ADAS — but the <strong style="color:var(--red)">cabin interior</strong> is completely unmonitored.</p>
+      <div style="margin-top:14px">
+        <div class="tag red">No infant / pet welfare</div><br>
+        <div class="tag red">No object hazard detection</div><br>
+        <div class="tag red">No cognitive load awareness</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>5 Real Scenarios</h3>
+      <ul>
+        <li>Baby crying while driving (distraction)</li>
+        <li>Child / pet left behind (safety)</li>
+        <li>Unsecured objects before a pothole (hazard)</li>
+        <li>Driver fatigue or stress (cognitive load)</li>
+        <li>Automatic cabin changes without consent (UX failure)</li>
+      </ul>
+    </div>
+    <div class="card highlight">
+      <h3>Our Insight</h3>
+      <p>These 5 scenarios are <strong style="color:var(--teal)">not 5 products</strong> — they are 5 use cases on <strong style="color:var(--teal)">one shared pipeline</strong>.</p>
+      <div style="margin-top:16px;font-size:22px;text-align:center;color:var(--teal);font-weight:800">
+        sense → detect → fuse → adapt
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 3 — ARCHITECTURE
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">Architecture</div>
+  <div class="slide-heading sm">Edge-Node + Async Bus + Decision Engine</div>
+  <div class="arch" style="flex:1">
+    <div class="arch-col">
+      <h4>Sensing Nodes</h4>
+      <div class="arch-node">📡 <strong>Radar (mmWave)</strong><br><small>Occupancy · HR · Breathing · Micro-motion</small></div>
+      <div class="arch-node">🎙️ <strong>Microphone</strong><br><small>BabyNet CNN + AST fallback</small></div>
+      <div class="arch-node">📷 <strong>Camera</strong><br><small>Qwen2-VL-2B · MediaPipe · YOLOv8n</small></div>
+      <div class="arch-node">📳 <strong>IMU / Vibration</strong><br><small>Road quality · Pothole ahead</small></div>
+      <div class="arch-node">🚗 <strong>Vehicle CAN</strong><br><small>Speed · Visibility · GPS</small></div>
+    </div>
+    <div class="arch-col">
+      <h4>Fusion Engine (core)</h4>
+      <div class="arch-arrows">←→←→←</div>
+      <div class="arch-node core" style="padding:16px">
+        <strong style="color:var(--teal);font-size:14px">Async Pub/Sub Bus</strong><br>
+        <small style="color:var(--muted)">bus.py · bounded queue · &lt;1ms</small>
+      </div>
+      <div style="text-align:center;color:var(--teal);font-size:20px">↓</div>
+      <div class="arch-node core" style="padding:16px">
+        <strong style="color:var(--teal);font-size:14px">World State</strong><br>
+        <small style="color:var(--muted)">world.py · shared ground truth</small>
+      </div>
+      <div style="text-align:center;color:var(--teal);font-size:20px">↓</div>
+      <div class="arch-node core" style="padding:16px">
+        <strong style="color:var(--teal);font-size:14px">Fusion + Decision</strong><br>
+        <small style="color:var(--muted)">fusion.py · 10 Hz · Cognitive Load → Mitigations</small>
+      </div>
+    </div>
+    <div class="arch-col">
+      <h4>HMI / Feedback</h4>
+      <div class="arch-node">🖥️ <strong>React Cabin HMI</strong><br><small>WebSocket 10Hz live state</small></div>
+      <div class="arch-node">🔊 <strong>ANC / Volume</strong><br><small>Audio comfort</small></div>
+      <div class="arch-node">💡 <strong>Lighting / AC</strong><br><small>Persona tuning</small></div>
+      <div class="arch-node">⚠️ <strong>Confirm-First Alerts</strong><br><small>Nothing auto-acts without consent</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 4 — FUSION ENGINE CORE (cognitive load)
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">Fusion Engine · Core</div>
+  <div class="slide-heading sm">Cognitive Load Score — Multi-Modal Weighted Accumulator</div>
+  <div class="two-col">
+    <div class="col">
+      <div class="formula">
+<span class="m">CL_score = 0</span><br>
+<span class="m">── Driver vitals (radar) ──────────────────</span><br>
+<span class="w">if</span> HR &gt; 95:   CL += <span class="w">min(30, (HR−95)×1.5)</span><br>
+<span class="w">if</span> RESP &gt; 20:  CL += <span class="w">min(15, (RESP−20)×2)</span><br>
+<span class="w">if</span> HR &lt; 60:   CL += <span class="w">12</span>  <span class="m"># fatigue</span><br>
+<span class="m">── Driver emotion (vision / world) ────────</span><br>
+<span class="w">if</span> stressed:  CL += <span class="w">10</span><br>
+<span class="w">if</span> tired:     CL += <span class="w">8</span><br>
+<span class="m">── Audio (BabyNet + AST) ──────────────────</span><br>
+<span class="w">if</span> crying|animal: CL += <span class="w">25</span><br>
+<span class="w">if</span> shouting:       CL += <span class="w">20</span><br>
+<span class="w">if</span> rattle:         CL += <span class="w">10</span><br>
+<span class="m">── Child / pet (world.seats — no lag) ─────</span><br>
+<span class="w">per seat</span>:  CL += <span class="w">5</span> + distress×40 + HR_over×1.5<br>
+<span class="m">── Road quality (IMU) ─────────────────────</span><br>
+<span class="w">if</span> pothole: CL += <span class="w">18</span> &nbsp;<span class="w">if</span> rough: CL += <span class="w">8</span><br>
+<span class="m">── Vision (Qwen + YOLO + MediaPipe) ───────</span><br>
+<span class="w">if</span> drowsy:         CL += <span class="w">15</span><br>
+<span class="w">if</span> loose_object:   CL += <span class="w">6–10</span><br>
+<span class="m">── Visibility / speed ─────────────────────</span><br>
+<span class="w">if</span> vis=low: CL += <span class="w">12</span> &nbsp;<span class="w">if</span> spd&gt;100: CL += <span class="w">8</span><br>
+<span class="w">return</span> <span class="w">min(100, CL)</span>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" style="margin-bottom:0">
+        <h3>Score Bands</h3>
+        <div class="score-row">
+          <div class="score-label">0–25 · Low · Nominal</div>
+          <div class="score-bar-bg"><div class="score-bar" style="width:25%;background:var(--teal)"></div></div>
+          <div class="score-val" style="color:var(--teal)">25</div>
+        </div>
+        <div class="score-row">
+          <div class="score-label">26–55 · Medium · Monitor</div>
+          <div class="score-bar-bg"><div class="score-bar" style="width:55%;background:var(--amber)"></div></div>
+          <div class="score-val" style="color:var(--amber)">55</div>
+        </div>
+        <div class="score-row">
+          <div class="score-label">56–80 · High · Advisory</div>
+          <div class="score-bar-bg"><div class="score-bar" style="width:80%;background:#f97316"></div></div>
+          <div class="score-val" style="color:#f97316">80</div>
+        </div>
+        <div class="score-row">
+          <div class="score-label">81–100 · Critical · Alert</div>
+          <div class="score-bar-bg"><div class="score-bar" style="width:100%;background:var(--red)"></div></div>
+          <div class="score-val" style="color:var(--red)">100</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Key Design Choices</h3>
+        <ul>
+          <li>Rule-based for <strong>full transparency</strong> (auditable)</li>
+          <li><code>world.seats</code> read directly → <strong>zero radar lag</strong> on manual config</li>
+          <li>HR deduplication across radar + world seats</li>
+          <li>Additive accumulation → easy to extend with ML scorer</li>
+          <li>Capped at 100; each factor is <strong>independently traceable</strong></li>
+          <li>Fusion runs at 10 Hz, measured latency &lt;1 ms</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 5 — MITIGATIONS / CONFIRM-FIRST
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">Fusion Engine · Mitigations</div>
+  <div class="slide-heading sm">Confirm-First · Non-Intrusive · Rule-Driven</div>
+  <div class="two-col">
+    <div class="col">
+      <div class="tag teal">Advisory</div>
+      <div class="mit-card"><h5>Soothe Cabin</h5><p>Crying / animal sound + child/pet seat confirmed → lower media volume 30%, warm AC +1°C, soft lighting.</p></div>
+      <div class="mit-card"><h5>Calming Persona</h5><p>Driver HR &gt;95 or stressed emotion → calm playlist, cool blue lighting, temp −1°C.</p></div>
+      <div class="mit-card"><h5>Alertness Boost</h5><p>Driver HR &lt;60 or tired → upbeat playlist, bright lighting, fresh-air burst, break suggestion.</p></div>
+      <div class="mit-card"><h5>Unsecured Item on Seat</h5><p>Qwen detects object on seat → advisory to stow before braking.</p></div>
+      <div class="mit-card"><h5>Cabin Monitoring Active</h5><p>Child/pet detected, no audio anomaly → radar vitals monitoring confirmed, adjustable.</p></div>
+    </div>
+    <div class="col">
+      <div class="tag amber">Warning</div>
+      <div class="mit-card warn"><h5>Seatbelt Not Engaged</h5><p>Seat occupied (<code>world.seats</code>) but buckled=false → chime + visual, fires immediately on configure.</p></div>
+      <div class="mit-card warn"><h5>Secure Before Road Hazard</h5><p>Loose object + pothole within 120 m → urgent secure advisory before impact.</p></div>
+      <div class="mit-card warn"><h5>Child / Pet Heartbeat Alert</h5><p>Child HR &gt;115 bpm (pet &gt;125) → warning. &gt;threshold+20 → escalates to critical.</p></div>
+      <div class="mit-card warn"><h5>Passenger Distress</h5><p>Shouting detected → check passenger, consider pulling over.</p></div>
+      <div class="tag red" style="margin-top:10px">Critical</div>
+      <div class="mit-card crit"><h5>CHILD PRESENCE ALERT</h5><p>Child in rear, no driver present → horn + lights + owner notification. No confirm required.</p></div>
+    </div>
+  </div>
+  <div style="margin-top:16px;background:rgba(0,212,176,.06);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;color:var(--muted)">
+    ⚡ <strong style="color:#fff">Grace period 6s</strong> — confirmed/dismissed mitigations are retained for 6 seconds after the condition clears, preventing flicker from momentary sensor noise.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 6 — SENSOR STACK
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">Sensing Stack</div>
+  <div class="slide-heading sm">Four Modalities · Privacy-Preserving · Graceful Degrade</div>
+  <div class="grid4" style="align-items:start">
+    <div class="card">
+      <h3>📡 Radar</h3>
+      <div class="tag teal" style="margin-bottom:10px">mmWave</div>
+      <ul>
+        <li>4-seat occupancy map</li>
+        <li>Contactless HR (Doppler)</li>
+        <li>Respiration rate</li>
+        <li>Micro-motion (agitation)</li>
+        <li>Child-left-behind alert</li>
+      </ul>
+      <p style="margin-top:10px">Ref HW: TI IWR6843 / AWR class</p>
+    </div>
+    <div class="card">
+      <h3>🎙️ Audio</h3>
+      <div class="tag amber" style="margin-bottom:10px">2-stage</div>
+      <ul>
+        <li><strong style="color:#fff">BabyNet CNN</strong> — custom mel-spec, ~10ms GPU</li>
+        <li>Classes: none / crying / talking / happy</li>
+        <li>≥0.60 conf → fast-path</li>
+        <li><strong style="color:#fff">AST fallback</strong> — MIT AudioSet 527-class</li>
+        <li>Detects: crying, barking, rattle, speech</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>📷 Vision</h3>
+      <div class="tag blue" style="margin-bottom:10px">3-layer</div>
+      <ul>
+        <li><strong style="color:#fff">Qwen2-VL-2B</strong> — per-seat: kind, emotion, objects, buckled</li>
+        <li><strong style="color:#fff">MediaPipe</strong> — EAR drowsiness, mouth emotion</li>
+        <li><strong style="color:#fff">YOLOv8n</strong> — loose object detection (COCO)</li>
+        <li>Priority: Qwen → MediaPipe → YOLO</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>📳 IMU + Vehicle</h3>
+      <div class="tag red" style="margin-bottom:10px">CAN / GPS</div>
+      <ul>
+        <li>Road quality: smooth / rough / pothole</li>
+        <li>Pothole-ahead distance (m)</li>
+        <li>Speed (km/h)</li>
+        <li>Visibility: good / low / fog / rain</li>
+        <li>Pre-emptive object-securing trigger</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Sensor Priority &amp; Fallback</h3>
+    <div style="font-size:13px;color:var(--muted)">
+      Radar occupancy → World state override → Qwen vision → MediaPipe &nbsp;|&nbsp;
+      BabyNet fast-path → AST fallback &nbsp;|&nbsp;
+      All nodes publish independently — fusion always has the latest frame per modality, never blocked.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 7 — AI MODELS
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">AI Models</div>
+  <div class="slide-heading sm">On-Device · No Cloud · Packaged in <code>models/</code></div>
+  <div class="grid3" style="align-items:start;flex:1">
+    <div class="model-card">
+      <h4>Qwen2-VL-2B-Instruct</h4>
+      <div class="model-id">Qwen/Qwen2-VL-2B-Instruct</div>
+      <p>Vision-language model analyzing each camera frame. Returns structured JSON per seat: occupant kind, emotion, buckled state, and loose objects list.</p>
+      <div class="spec-row">
+        <div class="spec">4-bit quantized</div>
+        <div class="spec">~2.5 GB VRAM</div>
+        <div class="spec">100–150 ms/frame</div>
+        <div class="spec">RTX 3080</div>
+      </div>
+    </div>
+    <div class="model-card">
+      <h4>BabyNet CNN</h4>
+      <div class="model-id">models/baby_net.pt</div>
+      <p>Custom lightweight mel-spectrogram CNN trained on baby audio samples. Fast-path classifier with 4 classes. Falls back to AST on low confidence.</p>
+      <div class="spec-row">
+        <div class="spec">Custom trained</div>
+        <div class="spec">~458 KB</div>
+        <div class="spec">~10 ms GPU</div>
+        <div class="spec">4 classes</div>
+      </div>
+    </div>
+    <div class="model-card">
+      <h4>AST — AudioSet</h4>
+      <div class="model-id">MIT/ast-finetuned-audioset-10-10-0.4593</div>
+      <p>Audio Spectrogram Transformer fine-tuned on 527-class AudioSet. Fallback for BabyNet low-confidence frames. Detects: crying, barking, rattle, speech.</p>
+      <div class="spec-row">
+        <div class="spec">527 classes</div>
+        <div class="spec">~330 MB</div>
+        <div class="spec">CPU inference</div>
+        <div class="spec">Threshold 0.15</div>
+      </div>
+    </div>
+    <div class="model-card">
+      <h4>MediaPipe FaceLandmarker</h4>
+      <div class="model-id">models/face_landmarker.task</div>
+      <p>478 facial landmarks → EAR-based drowsiness detection and heuristic emotion (eye openness + mouth ratio). Runs as fallback when Qwen is absent.</p>
+      <div class="spec-row">
+        <div class="spec">float16</div>
+        <div class="spec">3.6 MB</div>
+        <div class="spec">Real-time</div>
+        <div class="spec">EAR thresh 0.20</div>
+      </div>
+    </div>
+    <div class="model-card">
+      <h4>YOLOv8n</h4>
+      <div class="model-id">models/yolov8n.pt</div>
+      <p>Nano YOLO for fast object detection in cabin frames. Identifies loose objects: backpack, suitcase, bottle, laptop, book. Triggers secure-object advisory.</p>
+      <div class="spec-row">
+        <div class="spec">COCO classes</div>
+        <div class="spec">6.3 MB</div>
+        <div class="spec">~10 ms</div>
+        <div class="spec">Conf threshold 0.35</div>
+      </div>
+    </div>
+    <div class="card highlight" style="display:flex;flex-direction:column;justify-content:center">
+      <h3>Model Strategy</h3>
+      <ul style="margin-top:8px">
+        <li>All models in <code>models/</code> — fully offline</li>
+        <li>Qwen overrides MediaPipe/YOLO when available</li>
+        <li>BabyNet fast-path → AST fallback cascade</li>
+        <li>Vision override guard — manual seat config never overridden by Qwen</li>
+        <li><code>download_models.py</code> for one-shot packaging</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 8 — DEMO SCENARIOS
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">Demo Scenarios</div>
+  <div class="slide-heading sm">7 Scripted Situations · All Verify End-to-End</div>
+  <div style="flex:1">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Scenario</th>
+          <th>Sensors Triggered</th>
+          <th>Cognitive Load</th>
+          <th>Mitigation Fired</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Idle</strong></td>
+          <td>All baseline</td>
+          <td style="color:var(--teal)">Low (~5)</td>
+          <td>None</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Baby Crying</strong></td>
+          <td>Audio (crying) + Radar (child seat)</td>
+          <td style="color:var(--amber)">Medium (~35)</td>
+          <td>Soothe Cabin</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Driver Stress</strong></td>
+          <td>Radar (HR↑, RESP↑) + Vision (emotion)</td>
+          <td style="color:var(--amber)">Medium (~42)</td>
+          <td>Calming Persona</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Pothole Ahead</strong></td>
+          <td>IMU (pothole_ahead_m) + Object on seat</td>
+          <td style="color:#f97316">High (~58)</td>
+          <td>Secure Before Road Hazard</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Seatbelt Off</strong></td>
+          <td>World state (buckled=false)</td>
+          <td style="color:var(--amber)">Medium (+12)</td>
+          <td>Seatbelt Not Engaged (no confirm)</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><strong>Child Left Behind</strong></td>
+          <td>Radar (child rear, no driver)</td>
+          <td style="color:var(--red)">Critical (~70)</td>
+          <td>CHILD PRESENCE ALERT (immediate)</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><strong>Night Drive</strong></td>
+          <td>Vehicle (low visibility + speed &gt;100)</td>
+          <td style="color:#f97316">High (~65)</td>
+          <td>Alertness Boost + Visibility Warning</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-top:16px;display:flex;gap:12px">
+    <div class="tag teal">Confirm-First on all advisories</div>
+    <div class="tag amber">Immediate on safety-critical (belt, child-left)</div>
+    <div class="tag blue">6s grace period on dismiss</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 9 — TECH STACK & REPO
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">Technical Stack</div>
+  <div class="slide-heading sm">Backend · Frontend · Comm · Models</div>
+  <div class="grid2">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <h3>Backend — Python 3.11</h3>
+        <ul>
+          <li><code>FastAPI</code> + <code>uvicorn</code> — WebSocket + REST</li>
+          <li><code>bus.py</code> — async pub/sub, bounded queue, &lt;1ms</li>
+          <li><code>world.py</code> — shared ground-truth cabin state</li>
+          <li><code>fusion.py</code> — 10Hz fusion loop, rule-based scorer</li>
+          <li><code>sensors/</code> — 6 independent async nodes</li>
+          <li><code>scenarios.py</code> — scripted demo mutations</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Communication</h3>
+        <ul>
+          <li>WebSocket <code>/ws</code> — bidirectional JSON at 10Hz</li>
+          <li>Frontend → backend: <code>audio_chunk</code>, <code>vision_frame</code>, <code>configure_seat</code>, <code>scenario</code>, <code>confirm/dismiss</code></li>
+          <li>Backend → frontend: full fused state per tick</li>
+        </ul>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <h3>Frontend — React 18 (zero-build)</h3>
+        <ul>
+          <li>CDN-free local libs (Babel 7.12.17 pinned)</li>
+          <li>SensorView: Video, Audio, Radar, Vehicle, IMU, Seat widgets</li>
+          <li>InfotainmentView: Circular gauge, Mitigation cards, Scenarios</li>
+          <li>TimelineBar: Mode indicator (Manual / Live A/V / Scenario)</li>
+          <li>RadarWidget: per-seat kind selector + HR sliders</li>
+          <li>Live WebSocket push — no polling</li>
+        </ul>
+      </div>
+      <div class="card highlight">
+        <h3>Key Invariants</h3>
+        <ul>
+          <li>Sensor nodes <strong>never block</strong> — each runs at its own Hz</li>
+          <li>Swap only the node body to go to real hardware</li>
+          <li>Fusion stays rule-based → ML scorer can replace <code>_cognitive_load()</code> behind same interface</li>
+          <li>HMI is build-free for hackathon speed</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 10 — INNOVATION & SCORING
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="slide-title">Innovation &amp; Scoring</div>
+  <div class="slide-heading sm">Why CabinSense Wins on Every Dimension</div>
+  <div class="grid3" style="align-items:start;flex:1">
+    <div class="card highlight">
+      <h3>🎯 Innovation</h3>
+      <ul>
+        <li>Radar contactless vitals as cognitive-load signal — first-class sensor</li>
+        <li>One unifying fusion engine for all 5 use cases</li>
+        <li>Pre-emptive object-securing before pothole (not reactive)</li>
+        <li>Qwen2-VL per-seat occupant + emotion + object analysis</li>
+        <li>Custom BabyNet CNN → fast-path audio classification</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>🧑‍✈️ Driver-Centric</h3>
+      <ul>
+        <li>Confirm-first on every mitigation — nothing auto-acts</li>
+        <li>6s grace period — no flicker from sensor noise</li>
+        <li>Mode system: Manual / Live A/V / Scenario clearly shown</li>
+        <li>Safety-critical alerts (child-left) bypass confirm immediately</li>
+        <li>Optimistic UI — seat config responds instantly</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>✅ Feasibility</h3>
+      <ul>
+        <li>Reuses existing / near-term cabin sensors</li>
+        <li>SDV-aligned async bus topology</li>
+        <li>&lt;1ms fusion latency (goal: &lt;200ms)</li>
+        <li>Fully offline — no cloud dependency</li>
+        <li>Swap-in real hardware: only replace node body</li>
+        <li>ML scorer can replace rule engine behind same interface</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>🛡️ Safety</h3>
+      <ul>
+        <li>Child / pet welfare: vitals, distress, HR threshold alerts</li>
+        <li>Child-left-behind: immediate critical (no confirm)</li>
+        <li>Seatbelt misuse: real-time, fires on configure</li>
+        <li>Pre-emptive pothole + loose-object hazard</li>
+        <li>Driver fatigue + drowsiness multimodal corroboration</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>💼 Business Value</h3>
+      <ul>
+        <li>Premium / EV cabin refinement differentiator</li>
+        <li>ADAS expansion into internal cabin awareness</li>
+        <li>Upgradeable SDV feature via software update</li>
+        <li>Privacy-preserving radar → no GDPR camera concerns</li>
+        <li>One platform, 5 revenue use cases</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>📡 Radar Differentiator</h3>
+      <ul>
+        <li>Production-relevant: TI IWR6843 / AWR class</li>
+        <li>Privacy-preserving: no sensitive video for occupant detection</li>
+        <li>Only sensor giving contactless driver vitals</li>
+        <li>Direct cognitive-load signal (HR, respiration, motion)</li>
+        <li>Child-left detection even when camera is off</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SLIDE 11 — CLOSING
+════════════════════════════════════════════════════════════ -->
+<div class="slide">
+  <div class="closing" style="flex:1">
+    <div class="logo" style="font-size:60px;font-weight:900;letter-spacing:-2px;
+      background:linear-gradient(135deg,var(--teal),#7dd3fc);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent">CabinSense</div>
+    <div style="font-size:20px;color:var(--muted);max-width:600px;text-align:center;line-height:1.6">
+      The cabin is the last unmonitored space in a connected vehicle.<br>
+      <strong style="color:#fff">CabinSense closes that gap.</strong>
+    </div>
+    <div style="display:flex;gap:32px;margin:8px 0">
+      <div style="text-align:center">
+        <div style="font-size:36px;font-weight:800;color:var(--teal)">&lt;1ms</div>
+        <div style="font-size:12px;color:var(--muted)">Fusion Latency</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:36px;font-weight:800;color:var(--blue)">5</div>
+        <div style="font-size:12px;color:var(--muted)">Models On-Device</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:36px;font-weight:800;color:var(--amber)">10</div>
+        <div style="font-size:12px;color:var(--muted)">Mitigations</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:36px;font-weight:800;color:#a78bfa">10Hz</div>
+        <div style="font-size:12px;color:var(--muted)">Fusion Rate</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <div class="tag teal">Multi-Modal Fusion</div>
+      <div class="tag blue">Radar Vitals</div>
+      <div class="tag amber">Confirm-First UX</div>
+      <div class="tag red">Child Safety</div>
+      <div class="tag teal">Fully Offline</div>
+      <div class="tag blue">SDV-Ready</div>
+    </div>
+    <div style="font-size:14px;color:var(--muted)">
+      github.com/PrashantKramadhari/in-cabin-hackthon
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- ── Navigation ── -->
+<div id="nav">
+  <button id="prev">&#8592;</button>
+  <div id="dots"></div>
+  <button id="next">&#8594;</button>
+  <div id="slide-count"></div>
+</div>
+<div id="hint">← → or click dots to navigate</div>
+
+<script>
+  var slides = document.querySelectorAll('.slide');
+  var cur = 0;
+
+  var dotsEl = document.getElementById('dots');
+  var countEl = document.getElementById('slide-count');
+
+  slides.forEach(function(_, i){
+    var d = document.createElement('div');
+    d.className = 'dot' + (i===0?' active':'');
+    d.addEventListener('click', function(){ go(i); });
+    dotsEl.appendChild(d);
+  });
+
+  function go(n){
+    slides[cur].classList.remove('active');
+    dotsEl.children[cur].classList.remove('active');
+    cur = (n + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    dotsEl.children[cur].classList.add('active');
+    countEl.textContent = (cur+1) + ' / ' + slides.length;
+  }
+
+  document.getElementById('prev').addEventListener('click', function(){ go(cur-1); });
+  document.getElementById('next').addEventListener('click', function(){ go(cur+1); });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key===' ') go(cur+1);
+    if(e.key==='ArrowLeft') go(cur-1);
+  });
+
+  go(0);
+</script>
+</body>
+</html>

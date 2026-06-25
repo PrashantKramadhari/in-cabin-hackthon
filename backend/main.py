@@ -218,28 +218,39 @@ async def ws(sock: WebSocket) -> None:
                 seat_id = msg.get("seat")
                 if seat_id in scenarios.world.seats:
                     occ = scenarios.world.seats[seat_id]
+                    ov = scenarios.world.seat_overrides.setdefault(seat_id, {})
                     if "occupied" in msg:
                         occ.occupied = bool(msg["occupied"])
+                        ov["occupied"] = occ.occupied
                         if not occ.occupied:
                             occ.audio_event = "none"
+                            scenarios.world.seat_overrides.pop(seat_id, None)
                     if "kind" in msg:
                         if occ.kind != msg["kind"]:
-                            occ.audio_event = "none"   # reset on type change
+                            occ.audio_event = "none"
+                            ov.pop("audio_event", None)
                         occ.kind = msg["kind"]
+                        ov["kind"] = occ.kind
                     if "buckled" in msg:
                         occ.buckled = bool(msg["buckled"])
+                        ov["buckled"] = occ.buckled
                     if "distress" in msg:
                         occ.distress = float(msg["distress"])
+                        ov["distress"] = occ.distress
                     if "audio_event" in msg:
                         occ.audio_event = msg["audio_event"]
+                        ov["audio_event"] = occ.audio_event
                     if "heart_rate_bpm" in msg:
                         v = msg["heart_rate_bpm"]
                         occ.heart_rate_bpm = float(v) if v is not None else None
+                        ov["heart_rate_bpm"] = occ.heart_rate_bpm
                     if "respiration_rpm" in msg:
                         v = msg["respiration_rpm"]
                         occ.respiration_rpm = float(v) if v is not None else None
+                        ov["respiration_rpm"] = occ.respiration_rpm
                     if "emotion" in msg:
                         occ.emotion = msg["emotion"]
+                        ov["emotion"] = occ.emotion
                     if seat_id == "driver":
                         scenarios.world.driver_emotion = occ.emotion
                         if occ.heart_rate_bpm is not None:

@@ -10,6 +10,7 @@ def _reset(w: World) -> None:
         "driver": Occupant(occupied=True, kind="adult", buckled=True),
         "front_passenger": Occupant(),
         "rear_left": Occupant(),
+        "rear_middle": Occupant(),
         "rear_right": Occupant(),
     }
     w.driver_hr = 72.0
@@ -24,12 +25,23 @@ def _reset(w: World) -> None:
     w.object_motion = 0.0
 
 
+def _apply_overrides(w: World) -> None:
+    for sid, ov in w.seat_overrides.items():
+        if sid not in w.seats:
+            continue
+        occ = w.seats[sid]
+        for k, v in ov.items():
+            if hasattr(occ, k):
+                setattr(occ, k, v)
+
+
 def apply(name: str) -> None:
     w = world
     _reset(w)
     w.scenario = name
 
     if name == "idle":
+        _apply_overrides(w)
         return
 
     if name == "child_crying_rear":
@@ -75,6 +87,8 @@ def apply(name: str) -> None:
         w.seats["rear_right"] = Occupant(
             occupied=True, kind="child", buckled=True, distress=0.4)
         w.speed_kmh = 0.0
+
+    _apply_overrides(w)
 
 
 SCENARIOS = [

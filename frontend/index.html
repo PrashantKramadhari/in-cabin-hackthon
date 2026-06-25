@@ -239,7 +239,9 @@ input[type=checkbox]{accent-color:var(--accent);cursor:pointer;width:16px;height
   border:1px solid var(--warn);color:var(--warn);flex-shrink:0;align-self:flex-start;font-weight:500}
 
 /* ─── Seats widget ─── */
-.seat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:1}
+.seat-grid{display:flex;flex-wrap:wrap;gap:6px;flex:1;align-content:flex-start}
+.seat-grid>.seat-cell:nth-child(-n+2){width:calc(50% - 3px)}
+.seat-grid>.seat-cell:nth-child(n+3){width:calc(33.33% - 4px)}
 .seat-cell{border-radius:8px;border:1px solid var(--border-default);background:var(--bg-subtle);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:3px;cursor:pointer;padding:8px;transition:all .3s;position:relative}
@@ -395,8 +397,8 @@ window._CHUNKER_URL=URL.createObjectURL(new Blob([window._CHUNKER_SRC],{type:'ap
 const {useState,useEffect,useRef,useCallback}=React;
 
 /* ── constants ── */
-const SEAT_IDS=['driver','front_passenger','rear_left','rear_right'];
-const SEAT_LABELS={driver:'Driver',front_passenger:'Front Pass.',rear_left:'Rear Left',rear_right:'Rear Right'};
+const SEAT_IDS=['driver','front_passenger','rear_left','rear_middle','rear_right'];
+const SEAT_LABELS={driver:'Driver',front_passenger:'Front Pass.',rear_left:'Rear Left',rear_middle:'Rear Mid.',rear_right:'Rear Right'};
 const ICONS={adult:'👤',child:'🧒',infant:'🧒',pet:'🐾',unknown:'👤'};
 const AICONS={none:'—',talking:'💬',shouting:'📢',crying:'😢',happy:'😊',barking:'🐕'};
 const loadCol=function(v){return v<33?'#14b8a6':v<66?'#f59e0b':'#ef4444';};
@@ -559,6 +561,7 @@ var AUDIO_SEAT_OPTS=[
   {id:'driver',            label:'Driver'},
   {id:'front_passenger',   label:'Front P.'},
   {id:'rear_left',         label:'Rear L'},
+  {id:'rear_middle',       label:'Rear M'},
   {id:'rear_right',        label:'Rear R'}
 ];
 var AUDIO_KIND_OPTS=[{id:'child',label:'Baby'},{id:'pet',label:'Pet'}];
@@ -1292,10 +1295,11 @@ function RoadQualityWidget({vib,send}){
 var SEAT_POS_RADAR={
   driver:          {x:42, y:28},
   front_passenger: {x:118,y:28},
-  rear_left:       {x:42, y:88},
-  rear_right:      {x:118,y:88}
+  rear_left:       {x:35, y:88},
+  rear_middle:     {x:80, y:88},
+  rear_right:      {x:125,y:88}
 };
-var _RADAR_SHORT={driver:'Drv',front_passenger:'FP',rear_left:'RL',rear_right:'RR'};
+var _RADAR_SHORT={driver:'Drv',front_passenger:'FP',rear_left:'RL',rear_middle:'RM',rear_right:'RR'};
 var _RADAR_KIND_CYCLE=['none','adult','child','pet'];
 var _RADAR_DIST=[
   {id:0,l:'C',col:'#00d4b0'},
@@ -1354,7 +1358,7 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
       ctx.fillRect(72*SX,10*SY,16*SX,80*SY);
 
       var sc=scRef.current||{};
-      var seatIds=['driver','front_passenger','rear_left','rear_right'];
+      var seatIds=['driver','front_passenger','rear_left','rear_middle','rear_right'];
       seatIds.forEach(function(sid){
         var pos=SEAT_POS_RADAR[sid];if(!pos)return;
         var cfg=sc[sid]||{};
@@ -1368,7 +1372,7 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
         ctx.font='bold '+(10*SX)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText(isOcc?(ICONS[kind]||'?'):'·',pos.x*SX,pos.y*SY);
         ctx.fillStyle=labelCol;ctx.font='600 '+(7*SX)+'px sans-serif';
-        var sh=sid==='driver'?'DRV':sid==='front_passenger'?'F.P':sid==='rear_left'?'R.L':'R.R';
+        var sh=sid==='driver'?'DRV':sid==='front_passenger'?'F.P':sid==='rear_left'?'R.L':sid==='rear_middle'?'R.M':'R.R';
         ctx.fillText(sh,pos.x*SX,(pos.y+14)*SY);
       });
 
@@ -1408,6 +1412,7 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
         var _seats=[
           {id:'front_passenger',label:'F.P'},
           {id:'rear_left',      label:'R.L'},
+          {id:'rear_middle',    label:'R.M'},
           {id:'rear_right',     label:'R.R'},
         ];
         var _kinds=[
@@ -1417,12 +1422,10 @@ function RadarWidget({radar,seatConfigs,onSelectSeat,send,scenario}){
           {k:'pet',    icon:'🐾',  col:'#a78bfa'},
         ];
         var _setKind=function(sid,k){
-          if(scenario&&scenario!=='idle')send({cmd:'scenario',name:'idle'});
           if(k==='none') send({cmd:'configure_seat',seat:sid,occupied:false});
           else           send({cmd:'configure_seat',seat:sid,occupied:true,kind:k});
         };
         var _setHR=function(sid,val){
-          if(scenario&&scenario!=='idle')send({cmd:'scenario',name:'idle'});
           send({cmd:'configure_seat',seat:sid,heart_rate_bpm:parseInt(val)});
         };
         return (
@@ -1593,7 +1596,6 @@ function SeatConfigOverlay({seatId,config,send,onClose,scenario}){
 
   var field=function(key,val){send({cmd:'configure_seat',seat:seatId,[key]:val});};
   var setOccupant=function(k){
-    if(scenario&&scenario!=='idle')send({cmd:'scenario',name:'idle'});
     if(k==='empty'){
       setLocalOcc(false);
       send({cmd:'configure_seat',seat:seatId,occupied:false});
@@ -1602,8 +1604,8 @@ function SeatConfigOverlay({seatId,config,send,onClose,scenario}){
       send({cmd:'configure_seat',seat:seatId,occupied:true,kind:k});
     }
   };
-  var aopts={adult:['none','talking','shouting'],child:['none','crying','happy'],
-    pet:['none','barking','happy'],unknown:['none','talking']};
+  var aopts={adult:['none','talking','shouting','crying'],child:['none','crying','happy'],
+    pet:['none','barking','happy'],unknown:['none','talking','crying','shouting']};
   var opts=aopts[localKind]||['none','talking'];
   return (
     <div className="overlay" onClick={function(e){if(e.target===e.currentTarget)onClose();}}>
@@ -1923,8 +1925,9 @@ function CabinSVG({seatConfigs,factors}){
   var seats=[
     {id:'driver',           x:42,  y:44,  label:'Driver'},
     {id:'front_passenger',  x:118, y:44,  label:'Passenger'},
-    {id:'rear_left',        x:42,  y:116, label:'Rear L'},
-    {id:'rear_right',       x:118, y:116, label:'Rear R'}
+    {id:'rear_left',        x:33,  y:116, label:'Rear L'},
+    {id:'rear_middle',      x:80,  y:116, label:'Rear M'},
+    {id:'rear_right',       x:127, y:116, label:'Rear R'}
   ];
   return (
     <svg viewBox="0 0 160 220" style={{width:'96%',height:'auto',display:'block',margin:'0 auto',flexShrink:0}}>
@@ -1934,18 +1937,21 @@ function CabinSVG({seatConfigs,factors}){
       <rect x="20" y="14" width="120" height="42" rx="14" fill="var(--bg-elevated)" stroke="var(--border-default)" strokeWidth="1"/>
       {/* Rear window */}
       <rect x="20" y="164" width="120" height="40" rx="10" fill="var(--bg-elevated)" stroke="var(--border-default)" strokeWidth="1"/>
-      {/* Center console */}
-      <rect x="72" y="30" width="16" height="140" rx="5" fill="var(--bg-subtle)" stroke="var(--border-default)" strokeWidth="1"/>
+      {/* Center console (front section) */}
+      <rect x="72" y="30" width="16" height="100" rx="5" fill="var(--bg-subtle)" stroke="var(--border-default)" strokeWidth="1"/>
+      {/* Rear armrest (shorter) */}
+      <rect x="74" y="138" width="12" height="28" rx="4" fill="var(--bg-subtle)" stroke="var(--border-default)" strokeWidth="1"/>
       {/* Steering wheel */}
       <circle cx="42" cy="95" r="13" fill="none" stroke="var(--border-default)" strokeWidth="1.5"/>
       <line x1="30" y1="95" x2="54" y2="95" stroke="var(--border-default)" strokeWidth="1"/>
       <line x1="42" y1="83" x2="42" y2="107" stroke="var(--border-default)" strokeWidth="1"/>
       {/* Seats */}
       {[
-        {id:'driver',          x:42,  y:62 },
-        {id:'front_passenger', x:118, y:62 },
-        {id:'rear_left',       x:42,  y:152},
-        {id:'rear_right',      x:118, y:152}
+        {id:'driver',          x:42,  y:62,  r:26},
+        {id:'front_passenger', x:118, y:62,  r:26},
+        {id:'rear_left',       x:33,  y:152, r:22},
+        {id:'rear_middle',     x:80,  y:152, r:22},
+        {id:'rear_right',      x:127, y:152, r:22}
       ].map(function(s){
         var c=(seatConfigs&&seatConfigs[s.id])||{};
         var d=c.distress||0;
@@ -1953,8 +1959,8 @@ function CabinSVG({seatConfigs,factors}){
         var stroke=!c.occupied?'var(--border-default)':d>0.7?'var(--crit)':d>0.35?'var(--warn)':'var(--accent)';
         return (
           <g key={s.id}>
-            <circle cx={s.x} cy={s.y} r="28" fill={fill} stroke={stroke} strokeWidth="2"/>
-            <text x={s.x} y={s.y+6} textAnchor="middle" fill={stroke} fontSize="18" fontFamily="inherit">
+            <circle cx={s.x} cy={s.y} r={s.r} fill={fill} stroke={stroke} strokeWidth="2"/>
+            <text x={s.x} y={s.y+6} textAnchor="middle" fill={stroke} fontSize={s.r>24?'18':'15'} fontFamily="inherit">
               {c.occupied?(ICONS[c.kind]||'👤'):''}
             </text>
           </g>
@@ -2226,6 +2232,7 @@ function App(){
       driver:{occupied:true,kind:'adult',buckled:true,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
       front_passenger:{occupied:false,kind:'unknown',buckled:false,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
       rear_left:{occupied:false,kind:'unknown',buckled:false,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
+      rear_middle:{occupied:false,kind:'unknown',buckled:false,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
       rear_right:{occupied:false,kind:'unknown',buckled:false,distress:0,audio_event:'none',heart_rate_bpm:null,respiration_rpm:null,emotion:'calm'},
     },
     driver_emotion:'calm',vib_override:false,vib_road_quality:'smooth',vib_rms:0.05,

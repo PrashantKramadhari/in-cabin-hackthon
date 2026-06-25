@@ -37,13 +37,13 @@ _MODEL_ID = str(_LOCAL) if _LOCAL.exists() else _HUB_ID
 _model: Any     = None
 _processor: Any = None
 
-_SEAT_IDS = ["driver", "front_passenger", "rear_left", "rear_right"]
+_SEAT_IDS = ["driver", "front_passenger", "rear_left", "rear_middle", "rear_right"]
 
 _PROMPT = (
     "You are analyzing an in-vehicle cabin camera image. "
     "The camera angle may be front-facing, rear-facing, or side-facing. "
     "Identify ALL visible occupants and which seat they are in: "
-    "driver (front-left), front_passenger (front-right), rear_left, rear_right. "
+    "driver (front-left), front_passenger (front-right), rear_left, rear_middle (center rear), rear_right. "
     "A dog or cat in any position counts as kind='pet'. "
     "For each seat return a JSON object with exactly these keys: "
     "occupied (bool), kind (adult|child|infant|pet|unknown), "
@@ -52,7 +52,7 @@ _PROMPT = (
     "such as box, bag, laptop, bottle, phone, toy, camera, groceries; empty array [] if none). "
     "Set occupied=false only if the seat is clearly empty or not visible. "
     "Reply with ONLY a valid JSON object — no markdown, no explanation:\n"
-    '{"driver":{...},"front_passenger":{...},"rear_left":{...},"rear_right":{...}}'
+    '{"driver":{...},"front_passenger":{...},"rear_left":{...},"rear_middle":{...},"rear_right":{...}}'
 )
 
 _EMPTY_SEAT = {"occupied": False, "kind": "unknown", "emotion": "calm", "buckled": False, "objects": []}

@@ -28,6 +28,7 @@ class World:
         "driver": Occupant(occupied=True, kind="adult", buckled=True),
         "front_passenger": Occupant(),
         "rear_left": Occupant(),
+        "rear_middle": Occupant(),
         "rear_right": Occupant(),
     })
     # driver physiology (drives cognitive-load estimate)
@@ -55,6 +56,7 @@ class World:
 
     scenario: str = "idle"
     demo_running: bool = False
+    seat_overrides: dict = field(default_factory=dict)
 
 
 # single shared world

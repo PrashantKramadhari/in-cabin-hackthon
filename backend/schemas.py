@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field, asdict
 from typing import Literal
 
-SeatId = Literal["driver", "front_passenger", "rear_left", "rear_right"]
+SeatId = Literal["driver", "front_passenger", "rear_left", "rear_middle", "rear_right"]
 
 
 @dataclass
