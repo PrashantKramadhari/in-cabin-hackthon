@@ -51,10 +51,15 @@ except Exception as _e:
 app = FastAPI(title="CabinSense")
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
+VIDEO_DIR = Path(__file__).resolve().parent / "video"
 
 # serve bundled JS libs before any routes so /static/* is always available
 if FRONTEND.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
+
+# serve video files from backend/video/
+if VIDEO_DIR.exists():
+    app.mount("/videos", StaticFiles(directory=VIDEO_DIR), name="videos")
 
 _demo_stop = False
 
@@ -112,6 +117,21 @@ async def _startup() -> None:
         nodes.append(_vision.run)
     for node in nodes:
         asyncio.create_task(node())
+
+
+_VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".avi"}
+
+
+@app.get("/api/videos")
+async def list_videos() -> dict:
+    """Return sorted list of video filenames available in backend/video/."""
+    if not VIDEO_DIR.exists():
+        return {"videos": []}
+    files = sorted(
+        f.name for f in VIDEO_DIR.iterdir()
+        if f.is_file() and f.suffix.lower() in _VIDEO_EXTS
+    )
+    return {"videos": files}
 
 
 @app.get("/api/caps")
@@ -287,6 +307,13 @@ async def ws(sock: WebSocket) -> None:
                 b64 = msg.get("data", "")
                 if b64 and not _vision.frame_queue.full():
                     await _vision.frame_queue.put(b64)
+            elif cmd == "reset_vision":
+                # Clear Qwen sticky cache + fusion vision state + seat overrides
+                if _USE_QWEN_VISION:
+                    _vision.reset_cache()
+                fusion.reset_vision()
+                scenarios.world.seat_overrides.clear()
+                scenarios.apply("idle")
     except WebSocketDisconnect:
         pass
     finally:

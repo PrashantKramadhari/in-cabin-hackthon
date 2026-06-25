@@ -428,6 +428,13 @@ def _reconcile(proposed: list[dict]) -> list[dict]:
             for m in _mitigations.values()]
 
 
+def reset_vision() -> None:
+    """Clear all cached vision data so a fresh video starts clean."""
+    _latest["vision_all_seats"] = {}
+    _latest["vision_driver"] = {}
+    _latest["vision_objects"] = {}
+
+
 def confirm(mitigation_id: str) -> None:
     if mitigation_id in _mitigations:
         _mitigations[mitigation_id]["status"] = "active"
@@ -476,10 +483,20 @@ def _build_seat_configs() -> dict:
         if isinstance(seat_v, dict) and seat_v.get("occupied"):
             cfg["occupied"] = True
             raw_kind = seat_v.get("kind", "")
-            # Only let vision override kind when the world has no manual setting
-            if raw_kind and occ.kind in ("unknown", ""):
+            has_manual = sid in world.seat_overrides
+            # Vision overrides kind unless user manually configured this seat
+            if raw_kind and raw_kind != "unknown" and not has_manual:
                 cfg["kind"] = _norm_kind(raw_kind)
-            cfg["emotion"] = seat_v.get("emotion", cfg["emotion"])
+            emotion = seat_v.get("emotion", cfg["emotion"])
+            cfg["emotion"] = emotion
+            # Derive audio_event from Qwen emotion when no manual override
+            if not has_manual or "audio_event" not in world.seat_overrides.get(sid, {}):
+                if emotion == "distressed":
+                    cfg["audio_event"] = "crying"
+                elif emotion == "stressed":
+                    cfg["audio_event"] = "shouting"
+                elif emotion in ("calm", "happy", "tired"):
+                    cfg["audio_event"] = "none"
         configs[sid] = cfg
     return configs
 

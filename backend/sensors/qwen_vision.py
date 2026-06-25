@@ -29,7 +29,7 @@ import torch
 
 from bus import bus
 
-frame_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=4)
+frame_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=8)
 
 _HUB_ID   = "Qwen/Qwen2-VL-2B-Instruct"
 _LOCAL    = Path(__file__).resolve().parent.parent / "models" / "qwen2-vl-2b"
@@ -41,17 +41,28 @@ _SEAT_IDS = ["driver", "front_passenger", "rear_left", "rear_middle", "rear_righ
 
 _PROMPT = (
     "You are analyzing an in-vehicle cabin camera image. "
-    "The camera angle may be front-facing, rear-facing, or side-facing. "
-    "Identify ALL visible occupants and which seat they are in: "
-    "driver (front-left), front_passenger (front-right), rear_left, rear_middle (center rear), rear_right. "
-    "A dog or cat in any position counts as kind='pet'. "
-    "For each seat return a JSON object with exactly these keys: "
+    "Identify ALL visible occupants and map each one to the correct seat.\n\n"
+    "SEAT LAYOUT (5 seats):\n"
+    "  driver          — front row, LEFT side (next to left window/door)\n"
+    "  front_passenger — front row, RIGHT side (next to right window/door)\n"
+    "  rear_left       — rear row, LEFT side (next to left window/door)\n"
+    "  rear_middle     — rear row, CENTER (flanked by rear_left and rear_right, no side window)\n"
+    "  rear_right      — rear row, RIGHT side (next to right window/door)\n\n"
+    "CLASSIFICATION RULES:\n"
+    "  kind='adult'  — teenager or older; full adult body proportions, adult face features.\n"
+    "  kind='child'  — clearly young child, noticeably smaller than an adult, under ~10 years old.\n"
+    "  kind='infant' — baby or toddler, requires car seat.\n"
+    "  kind='pet'    — dog or cat visible.\n"
+    "  kind='unknown'— person present but age/type not clearly visible.\n"
+    "  IMPORTANT: default to adult unless the person is CLEARLY and OBVIOUSLY a young child.\n"
+    "  Do NOT call someone a child just because they appear smaller due to distance or camera angle.\n\n"
+    "For each seat output exactly these keys: "
     "occupied (bool), kind (adult|child|infant|pet|unknown), "
     "emotion (calm|happy|stressed|tired|distressed), buckled (bool), "
-    "objects (array of strings — list any loose/unsecured items ON or near the seat "
-    "such as box, bag, laptop, bottle, phone, toy, camera, groceries; empty array [] if none). "
-    "Set occupied=false only if the seat is clearly empty or not visible. "
-    "Reply with ONLY a valid JSON object — no markdown, no explanation:\n"
+    "objects (array of strings — loose/unsecured items ON the seat: "
+    "box, bag, laptop, bottle, phone, toy, groceries; empty [] if none).\n"
+    "Set occupied=false only if the seat is clearly empty or fully out of frame.\n"
+    "Reply with ONLY valid JSON, no markdown:\n"
     '{"driver":{...},"front_passenger":{...},"rear_left":{...},"rear_middle":{...},"rear_right":{...}}'
 )
 
@@ -83,9 +94,9 @@ def _safe_seat(raw: Any) -> dict:
     if not isinstance(raw, dict):
         return dict(_EMPTY_SEAT)
     kind = str(raw.get("kind", "unknown"))
-    # If Qwen identified a child/infant/pet it must be present even if it
-    # incorrectly set occupied=false — trust kind over the occupied flag.
-    occupied = bool(raw.get("occupied", False)) or kind in ("child", "infant", "pet")
+    # Trust occupied flag directly; only force-true for infant/pet since those
+    # are easy to miss in the occupied field but hard to misidentify as a kind.
+    occupied = bool(raw.get("occupied", False)) or kind in ("infant", "pet")
     raw_objs = raw.get("objects", [])
     objects  = [str(o) for o in raw_objs if isinstance(o, str)] if isinstance(raw_objs, list) else []
     return {
@@ -158,6 +169,18 @@ def _infer(b64: str) -> dict[str, dict]:
     return seats
 
 
+_last_seen: dict[str, dict] = {sid: dict(_EMPTY_SEAT) for sid in _SEAT_IDS}
+_empty_streak: dict[str, int] = {sid: 0 for sid in _SEAT_IDS}
+_CLEAR_AFTER = 5   # consecutive empty detections before a seat is cleared
+
+
+def reset_cache() -> None:
+    """Clear the sticky per-seat cache — call when video source changes."""
+    for sid in _SEAT_IDS:
+        _last_seen[sid] = dict(_EMPTY_SEAT)
+        _empty_streak[sid] = 0
+
+
 async def run() -> None:
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _load_model)
@@ -170,8 +193,19 @@ async def run() -> None:
             print(f"[QwenVision] inference error: {exc}")
             seats = {sid: dict(_EMPTY_SEAT) for sid in _SEAT_IDS}
 
+        # Sticky per-seat cache: keep previous value until confident it changed
+        for sid in _SEAT_IDS:
+            if seats[sid].get("occupied"):
+                _last_seen[sid] = seats[sid]
+                _empty_streak[sid] = 0
+            else:
+                _empty_streak[sid] += 1
+                if _empty_streak[sid] >= _CLEAR_AFTER:
+                    _last_seen[sid] = dict(_EMPTY_SEAT)
+                # else: keep last known occupied state
+
         # Publish all-seat topic
-        await bus.publish("vision_all_seats", {"ts": time.time(), **seats})
+        await bus.publish("vision_all_seats", {"ts": time.time(), **_last_seen})
 
         # Publish legacy vision_driver topic for backward compat with fusion rules
         drv = seats.get("driver", _EMPTY_SEAT)

@@ -166,6 +166,7 @@ body{background:var(--bg-page);color:var(--text-secondary);font-family:system-ui
     linear-gradient(135deg,transparent 58%,var(--accent) 58%,var(--accent) 66%,transparent 66%)}
 .sv:hover::after{opacity:1}
 .iv-shell.sensor-shell{justify-content:flex-start;overflow:auto;min-height:0;padding:10px 0;gap:10px}
+.iv-shell.info-shell{justify-content:flex-start;overflow-y:auto;padding:14px 0 20px;gap:0}
 .panel-slot{position:absolute;box-sizing:border-box;padding:0;min-width:140px;min-height:90px;
   display:flex;flex-direction:column}
 .panel-drag-bar{height:10px;cursor:grab;border-radius:10px 10px 0 0;flex-shrink:0;
@@ -297,6 +298,32 @@ input[type=checkbox]{accent-color:var(--accent);cursor:pointer;width:16px;height
   padding:6px 14px;font-size:var(--font-sm);cursor:pointer;font-family:inherit}
 .close-btn:hover{color:var(--text-secondary);border-color:var(--border-strong)}
 
+/* ─── Debug View ─── */
+.dbg-shell{justify-content:flex-start;overflow-y:auto;padding:14px 20px 20px;gap:14px}
+.dbg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
+.dbg-col{display:flex;flex-direction:column;gap:14px}
+.dbg-card{background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:10px;overflow:hidden}
+.dbg-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-subtle);border-bottom:1px solid var(--border-default)}
+.dbg-title{font-size:var(--font-xs);font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted)}
+.dbg-badge{font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:.5px}
+.dbg-badge.ok{background:rgba(20,184,166,.15);color:var(--accent);border:1px solid var(--accent-border)}
+.dbg-badge.warn{background:rgba(246,173,85,.12);color:#f6ad55;border:1px solid rgba(246,173,85,.3)}
+.dbg-badge.crit{background:rgba(252,129,129,.12);color:#fc8181;border:1px solid rgba(252,129,129,.3)}
+.dbg-body{padding:10px 12px;font-size:var(--font-xs);font-family:monospace;display:flex;flex-direction:column;gap:5px}
+.dbg-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:1px solid var(--border-subtle);padding-bottom:4px}
+.dbg-row:last-child{border-bottom:none;padding-bottom:0}
+.dbg-k{color:var(--text-muted);flex-shrink:0}
+.dbg-v{color:var(--text-primary);font-weight:600;text-align:right;word-break:break-all}
+.dbg-v.hi{color:var(--accent)}
+.dbg-v.warn{color:#f6ad55}
+.dbg-v.crit{color:#fc8181}
+.dbg-seat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 12px}
+.dbg-seat{background:var(--bg-subtle);border:1px solid var(--border-default);border-radius:6px;padding:6px 8px}
+.dbg-seat.occ{border-color:var(--accent-border)}
+.dbg-seat-id{font-size:0.6rem;text-transform:uppercase;letter-spacing:.8px;color:var(--text-faint);margin-bottom:3px}
+.dbg-seat-row{display:flex;justify-content:space-between;font-size:var(--font-xs);font-family:monospace}
+.dbg-seat-k{color:var(--text-muted)}
+.dbg-seat-v{color:var(--text-primary);font-weight:600}
 /* ─── Infotainment View ─── */
 .iv-shell{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:var(--bg-page);transition:var(--transition-theme)}
@@ -305,10 +332,10 @@ input[type=checkbox]{accent-color:var(--accent);cursor:pointer;width:16px;height
   border:1px solid var(--grid-border);background:var(--grid-bg);
   box-shadow:0 0 0 1px var(--grid-glow),var(--shadow-panel),inset 0 1px 0 var(--border-subtle);
   transition:var(--transition-theme)}
-.iv-col{flex:1;display:flex;flex-direction:column;justify-content:center;
+.iv-col{flex:1;display:flex;flex-direction:column;justify-content:flex-start;
   padding:20px 18px;overflow:hidden;border-right:1px solid var(--border-default)}
 .iv-col:last-child{border-right:none}
-.iv-cabin,.iv-gauge{background:var(--bg-panel);align-items:center;justify-content:center}
+.iv-cabin,.iv-gauge{background:var(--bg-panel);align-items:center;justify-content:flex-start}
 .iv-issue,.iv-rec{background:var(--bg-elevated)}
 
 /* infotainment text */
@@ -787,17 +814,23 @@ function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger}){
 
 /* ── VideoWidget ── */
 var SYNTH_CLIPS=[
-  {id:'off',          label:'Camera Off'},
-  {id:'default_video',label:'Default Video (video_1.mp4)'},
-  {id:'live',         label:'Live Camera'}
+  {id:'off',  label:'Camera Off'},
+  {id:'live', label:'Live Camera'}
 ];
 
 function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
   const [mode,setMode]=useState('off');
+  const [videoFiles,setVideoFiles]=useState([]);
   const vRef=useRef(null);
   const camRef=useRef(null);  /* {interval, canvas, ctx, stream} */
   const synthRef=useRef(null); /* {audio, interval} */
   const modeRef=useRef('off');
+
+  useEffect(function(){
+    fetch('/api/videos').then(function(r){return r.json();}).then(function(d){
+      setVideoFiles(d.videos||[]);
+    }).catch(function(){});
+  },[]);
 
   /* ── helpers ── */
   var wsSend=function(msg){
@@ -843,7 +876,7 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
           var b64=cv2.toDataURL('image/jpeg',.85).split(',')[1];
           wsSend({cmd:'vision_frame',data:b64});
         }catch(e){/* frame skipped */}
-      },2000);
+      },250);
       camRef.current={interval,canvas:cv2,ctx:c2,stream:st};
     }catch(e){alert('Camera denied: '+e.message);setMode('off');}
   };
@@ -873,7 +906,7 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
       draw();
       var b64=cv2.toDataURL('image/jpeg',.7).split(',')[1];
       wsSend({cmd:'vision_frame',data:b64});
-    },1000); /* 1 fps for synthetic — Qwen doesn't need fast updates */
+    },250); /* 4 fps synthetic */
 
     /* Play audio via <audio> element + Web Audio chain for BabyNet */
     var audio=new Audio('/static/audio/'+clipId+'.mp3');
@@ -889,10 +922,12 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
     }
   };
 
-  var startDefaultVideo=function(){
+  var _isVideoFile=function(m){return /\.(mp4|mkv|webm|mov|avi)$/i.test(m);};
+
+  var startDefaultVideo=function(filename){
     var vid=vRef.current;
     if(!vid)return;
-    vid.src='/static/video_1.mp4';
+    vid.src='/videos/'+filename;
     vid.loop=true;vid.muted=true;vid.playsInline=true;
     vid.play().catch(function(e){console.warn('video play:',e);});
     /* Canvas created lazily on first frame so we know the real resolution */
@@ -913,16 +948,17 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
         var b64=cv2.toDataURL('image/jpeg',.85).split(',')[1];
         wsSend({cmd:'vision_frame',data:b64});
       }catch(e){/* frame skipped */}
-    },2000); /* 0.5 fps — Qwen inference ~150ms, queue maxsize 4 */
+    },250); /* 4 fps — Qwen ~150ms inference, queue maxsize 4 keeps backlog bounded */
     camRef.current={interval,canvas:cv2,ctx:c2,stream:null};
   };
 
   var handleMode=function(newMode){
     stopAll();
     if(vRef.current)vRef.current.src='';
+    wsSend({cmd:'reset_vision'});   // clear Qwen cache + fusion vision state on source change
     setMode(newMode);modeRef.current=newMode;
     if(newMode==='live')startLive();
-    else if(newMode==='default_video')startDefaultVideo();
+    else if(_isVideoFile(newMode))startDefaultVideo(newMode);
     else if(newMode.startsWith('baby_'))startSynth(newMode);
   };
 
@@ -930,7 +966,7 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
   useEffect(function(){
     if((playTrigger||0)>0){
       var m=modeRef.current;
-      if(m&&m!=='off'){stopAll();if(m==='live')startLive();else if(m==='default_video')startDefaultVideo();else if(m.startsWith('baby_'))startSynth(m);}
+      if(m&&m!=='off'){stopAll();if(m==='live')startLive();else if(_isVideoFile(m))startDefaultVideo(m);else if(m.startsWith('baby_'))startSynth(m);}
     }
   },[playTrigger]);
   useEffect(function(){if((stopTrigger||0)>0)stopAll();},[stopTrigger]);
@@ -942,9 +978,11 @@ function VideoWidget({ws,liveVision,visionDriver,send,playTrigger,stopTrigger}){
       <div className="ph">
         <span className="pt">Cabin Video Feed</span>
         <select value={mode} onChange={function(e){handleMode(e.target.value);}} className="select-input">
-          {SYNTH_CLIPS.filter(function(c){return c.id!=='live'||liveVision;}).map(function(c){
-            return <option key={c.id} value={c.id}>{c.label}</option>;
+          <option value="off">Camera Off</option>
+          {videoFiles.map(function(f,i){
+            return <option key={f} value={f}>Video {i+1} ({f})</option>;
           })}
+          {liveVision&&<option value="live">Live Camera</option>}
         </select>
       </div>
       <div className="vid-box" style={{position:'relative'}}>
@@ -2150,55 +2188,333 @@ function InfotainmentView({state,send}){
   var modeTag=scenario!=='idle'
     ?('Scenario: '+scenario.replace(/_/g,' '))
     :'Manual / Live';
+  var radar=state.radar||{};
+  var radarSeats=radar.seats||[];
+  var drvRadar=radarSeats.find(function(s){return s.seat==='driver';})||{};
+  var veh=state.vehicle||{};
+  var speed=state.world_speed_kmh||veh.speed_kmh||0;
+  var visibility=state.world_visibility||veh.visibility||'good';
+  var road=state.vib_road_quality||'smooth';
+  var audio=state.audio||{};
+  var col=loadCol(load);
   return (
     <div className="iv">
-      {/* Col 1: Vehicle Cabin — centered */}
+      {/* Col 1: Vehicle Cabin */}
       <div className="iv-col iv-cabin">
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginBottom:6}}>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
           <span className="hint-text" style={{textTransform:'uppercase',letterSpacing:'1.5px',fontWeight:600}}>Vehicle Cabin</span>
           <span className="hint-text" style={{color:'var(--accent)',border:'1px solid var(--accent-border)',
-            borderRadius:4,padding:'2px 6px'}}>● LIVE</span>
-          <span className="hint-text">{modeTag}</span>
+            borderRadius:4,padding:'2px 5px',fontSize:'0.65rem'}}>● LIVE</span>
+          <span className="hint-text" style={{marginLeft:'auto'}}>{modeTag}</span>
         </div>
         <CabinSVG seatConfigs={state.seat_configs} factors={factors}/>
-        {/* Qwen vision debug strip */}
+        {/* Vision strip */}
         {(function(){
           var vas=state.vision_all_seats||{};
-          var found=Object.entries(vas).filter(function(e){
-            return e[0]!=='ts'&&e[1]&&e[1].occupied;
-          });
-          if(!found.length)return(
-            <div className="hint-text" style={{textAlign:'center',marginTop:4}}>
-              Vision: no occupants detected
-            </div>
-          );
-          return(
-            <div className="hint-text" style={{color:'var(--accent)',textAlign:'center',marginTop:4}}>
-              Vision: {found.map(function(e){
-                return e[0].replace(/_/g,' ')+' '+ICONS[e[1].kind]||e[1].kind;
-              }).join(' · ')}
-            </div>
-          );
+          var found=Object.entries(vas).filter(function(e){return e[0]!=='ts'&&e[1]&&e[1].occupied;});
+          return <div className="hint-text" style={{textAlign:'center',marginTop:4,minHeight:18}}>
+            {found.length?('Vision: '+found.map(function(e){return e[0].replace(/_/g,' ')+' '+(ICONS[e[1].kind]||'');}).join(' · ')):'Vision: scanning…'}
+          </div>;
         })()}
+        {/* Vehicle stats */}
+        <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:6}}>
+          {[
+            {k:'Speed',      v:Math.round(speed)+' km/h'},
+            {k:'Visibility', v:visibility},
+            {k:'Road',       v:road},
+            {k:'Audio',      v:audio.label&&audio.label!=='none'?(audio.label+' '+(Math.round((audio.confidence||0)*100))+'%'):'quiet'},
+          ].map(function(r){return(
+            <div key={r.k} className="iss-row" style={{padding:'5px 0'}}>
+              <span className="iss-k">{r.k}</span>
+              <span className="iss-v" style={{color:'var(--text-secondary)'}}>{r.v}</span>
+            </div>
+          );})}
+        </div>
       </div>
-      {/* Col 2: Issue / Distract */}
+      {/* Col 2: Issue / Distract + top factors */}
       <div className="iv-col iv-issue">
         <IssuePanel state={state}/>
+        {factors.length>0&&(
+          <div style={{marginTop:16}}>
+            <div className="iss-lbl">Active Factors</div>
+            <div style={{display:'flex',flexDirection:'column',gap:4,marginTop:6}}>
+              {factors.slice(0,5).map(function(f,i){
+                return <div key={i} style={{fontSize:'var(--font-sm)',color:'var(--text-secondary)',
+                  background:'var(--bg-subtle)',borderRadius:5,padding:'4px 8px',
+                  border:'1px solid var(--border-default)'}}>
+                  {ISSUE_MAP[f]||f.replace(/\(.*\)/g,'').trim()}
+                </div>;
+              })}
+            </div>
+          </div>
+        )}
       </div>
-      {/* Col 3: Load Score + Occupant Status — centered as a unit */}
+      {/* Col 3: Load Score + Vitals + Occupant Status */}
       <div className="iv-col iv-gauge">
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:'100%'}}>
           <CircularGauge value={load}/>
+          {/* Driver vitals from radar */}
+          <div style={{width:'100%',marginTop:14,display:'flex',flexDirection:'column',gap:5}}>
+            <div className="iss-lbl" style={{textAlign:'center'}}>Driver Vitals</div>
+            {[
+              {k:'Heart Rate',    v:drvRadar.heart_rate_bpm?Math.round(drvRadar.heart_rate_bpm)+' bpm':'—'},
+              {k:'Respiration',   v:drvRadar.respiration_rpm?Math.round(drvRadar.respiration_rpm)+' rpm':'—'},
+              {k:'Emotion',       v:state.driver_emotion||'calm'},
+            ].map(function(r){return(
+              <div key={r.k} className="iss-row" style={{padding:'4px 0'}}>
+                <span className="iss-k">{r.k}</span>
+                <span className="iss-v" style={{color:r.k==='Heart Rate'&&drvRadar.heart_rate_bpm>95?'var(--warn)':'var(--text-secondary)'}}>{r.v}</span>
+              </div>
+            );})}
+          </div>
           <div style={{width:'100%',marginTop:12}}>
-            <div style={{fontSize:'var(--font-xs)',textTransform:'uppercase',letterSpacing:'1.2px',
-              color:'var(--text-muted)',fontWeight:600,marginBottom:8,textAlign:'center'}}>Cabin Status</div>
+            <div className="iss-lbl" style={{textAlign:'center',marginBottom:6}}>Cabin Status</div>
             <OccupantList seatConfigs={state.seat_configs}/>
           </div>
         </div>
       </div>
-      {/* Col 4: Recommendation */}
+      {/* Col 4: Recommendation + sensor summary */}
       <div className="iv-col iv-rec">
         <RecommendationPanel mitigations={state.mitigations} send={send}/>
+        {/* Sensor health */}
+        <div style={{marginTop:16}}>
+          <div className="iss-lbl">Sensor Status</div>
+          <div style={{display:'flex',flexDirection:'column',gap:4,marginTop:6}}>
+            {[
+              {name:'mmWave Radar', ok:(radar.point_count||0)>0},
+              {name:'Audio',        ok:!!(audio.label)},
+              {name:'Vehicle CAN',  ok:speed>0||visibility==='good'||visibility==='low'},
+              {name:'Fusion Engine',ok:load>=0},
+            ].map(function(s){return(
+              <div key={s.name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+                fontSize:'var(--font-sm)',padding:'4px 0',borderBottom:'1px solid var(--border-default)'}}>
+                <span style={{color:'var(--text-muted)'}}>{s.name}</span>
+                <span style={{color:s.ok?'var(--accent)':'var(--text-faint)',fontWeight:700,fontSize:'0.7rem',
+                  letterSpacing:'0.5px'}}>{s.ok?'● ACTIVE':'○ IDLE'}</span>
+              </div>
+            );})}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── DebugView ── */
+function DebugView({state}){
+  var radar=state.radar||{};
+  var radarSeats=radar.seats||[];
+  var audio=state.audio||{};
+  var veh=state.vehicle||{};
+  var vib=state.vibration||{};
+  var vis=state.vision_all_seats||{};
+  var visDrv=state.vision_driver||{};
+  var visObj=state.vision_objects||{};
+  var sc=state.seat_configs||{};
+
+  function Card({title,badge,badgeCls,children}){
+    return (
+      <div className="dbg-card">
+        <div className="dbg-hdr">
+          <span className="dbg-title">{title}</span>
+          {badge&&<span className={'dbg-badge '+(badgeCls||'ok')}>{badge}</span>}
+        </div>
+        {children}
+      </div>
+    );
+  }
+  function Rows({rows}){
+    return (
+      <div className="dbg-body">
+        {rows.map(function(r,i){
+          var vc='dbg-v'+(r.hi?' hi':r.warn?' warn':r.crit?' crit':'');
+          return <div key={i} className="dbg-row">
+            <span className="dbg-k">{r.k}</span>
+            <span className={vc}>{r.v===null||r.v===undefined?'—':String(r.v)}</span>
+          </div>;
+        })}
+      </div>
+    );
+  }
+
+  /* radar badge */
+  var rpts=radar.point_count||0;
+  var rBadge=rpts>0?rpts+' pts':'no signal';
+  var rBadgeCls=rpts>0?'ok':'warn';
+
+  /* audio badge */
+  var aLabel=audio.label||'none';
+  var aConf=Math.round((audio.confidence||0)*100);
+  var aBadge=aLabel!=='none'?(aLabel+' '+aConf+'%'):'quiet';
+  var aBadgeCls=aLabel!=='none'?'warn':'ok';
+
+  /* vision badge */
+  var qwenSeats=Object.entries(vis).filter(function(e){return e[0]!=='ts'&&e[1]&&e[1].occupied;});
+  var vBadge=qwenSeats.length?qwenSeats.length+' detected':'none';
+  var vBadgeCls=qwenSeats.length?'ok':'warn';
+
+  /* fusion badge */
+  var load=state.cognitive_load||0;
+  var fBadgeCls=load>=66?'crit':load>=33?'warn':'ok';
+
+  return (
+    <div style={{width:'100%',maxWidth:1240}}>
+      <div className="dbg-grid">
+        {/* ── Col 1: Radar + Audio ── */}
+        <div className="dbg-col">
+          <Card title="Radar Stage" badge={rBadge} badgeCls={rBadgeCls}>
+            <Rows rows={[
+              {k:'point_count', v:rpts, hi:rpts>0},
+              {k:'source',      v:radar.source||'—'},
+              {k:'ts',          v:radar.ts?new Date(radar.ts*1000).toLocaleTimeString():'—'},
+            ]}/>
+            {/* per-seat vitals */}
+            <div className="dbg-seat-grid">
+              {radarSeats.map(function(s){
+                var occ=s.occupied;
+                return (
+                  <div key={s.seat} className={'dbg-seat'+(occ?' occ':'')}>
+                    <div className="dbg-seat-id">{s.seat.replace(/_/g,' ')}</div>
+                    {[
+                      {k:'kind',  v:occ?(s.occupant||'?'):'empty'},
+                      {k:'HR',    v:s.heart_rate_bpm?Math.round(s.heart_rate_bpm)+' bpm':'—'},
+                      {k:'Resp',  v:s.respiration_rpm?Math.round(s.respiration_rpm)+' rpm':'—'},
+                      {k:'motion',v:s.motion!=null?s.motion.toFixed(2):'—'},
+                      {k:'buckle',v:s.buckled?'✓':'✗'},
+                    ].map(function(r,i){return(
+                      <div key={i} className="dbg-seat-row">
+                        <span className="dbg-seat-k">{r.k}</span>
+                        <span className="dbg-seat-v">{r.v}</span>
+                      </div>
+                    );})}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card title="Audio Stage" badge={aBadge} badgeCls={aBadgeCls}>
+            <Rows rows={[
+              {k:'label',      v:aLabel, warn:aLabel!=='none'&&aLabel!=='happy', hi:aLabel==='happy'},
+              {k:'confidence', v:aConf+'%', warn:aConf>50},
+              {k:'source',     v:audio.source||'—'},
+              {k:'ts',         v:audio.ts?new Date(audio.ts*1000).toLocaleTimeString():'—'},
+            ]}/>
+          </Card>
+        </div>
+
+        {/* ── Col 2: Vision + Vehicle ── */}
+        <div className="dbg-col">
+          <Card title="Vision — Qwen All Seats" badge={vBadge} badgeCls={vBadgeCls}>
+            <div className="dbg-seat-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+              {SEAT_IDS.map(function(sid){
+                var sv=vis[sid]||{};
+                var occ=sv.occupied;
+                return (
+                  <div key={sid} className={'dbg-seat'+(occ?' occ':'')}>
+                    <div className="dbg-seat-id">{sid.replace(/_/g,' ')}</div>
+                    {[
+                      {k:'occ',  v:occ?'yes':'no'},
+                      {k:'kind', v:sv.kind||'—'},
+                      {k:'emot', v:sv.emotion||'—'},
+                      {k:'belt', v:occ?(sv.buckled?'✓':'✗'):'—'},
+                      {k:'objs', v:sv.objects&&sv.objects.length?sv.objects.join(', '):'none'},
+                    ].map(function(r,i){return(
+                      <div key={i} className="dbg-seat-row">
+                        <span className="dbg-seat-k">{r.k}</span>
+                        <span className="dbg-seat-v" style={{maxWidth:70,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.v}</span>
+                      </div>
+                    );})}
+                  </div>
+                );
+              })}
+            </div>
+            <Rows rows={[
+              {k:'driver face',   v:visDrv.face_detected?'yes':'no'},
+              {k:'driver drowsy', v:visDrv.drowsy?'YES':'no', crit:visDrv.drowsy},
+              {k:'driver emotion',v:visDrv.emotion||'—'},
+              {k:'objects (YOLO)',v:visObj.objects?visObj.objects.join(', '):'none'},
+            ]}/>
+          </Card>
+
+          <Card title="Vehicle / Road">
+            <Rows rows={[
+              {k:'speed',          v:Math.round(state.world_speed_kmh||0)+' km/h'},
+              {k:'visibility',     v:state.world_visibility||'good'},
+              {k:'pothole ahead',  v:state.world_pothole_ahead_m!=null?(state.world_pothole_ahead_m+'m'):'no', warn:state.world_pothole_ahead_m!=null},
+              {k:'road quality',   v:state.vib_road_quality||'smooth'},
+              {k:'vib rms',        v:(state.vib_rms||0).toFixed(3), warn:(state.vib_rms||0)>0.18},
+              {k:'vib override',   v:state.vib_override?'ON':'off'},
+            ]}/>
+          </Card>
+        </div>
+
+        {/* ── Col 3: Seat Configs (merged) + Fusion output ── */}
+        <div className="dbg-col">
+          <Card title="Seat Configs (Merged)" badge="post-fusion">
+            <div className="dbg-seat-grid" style={{gridTemplateColumns:'1fr 1fr 1fr'}}>
+              {SEAT_IDS.map(function(sid){
+                var c=sc[sid]||{};
+                var occ=c.occupied;
+                return (
+                  <div key={sid} className={'dbg-seat'+(occ?' occ':'')}>
+                    <div className="dbg-seat-id">{sid.replace(/_/g,' ')}</div>
+                    {[
+                      {k:'occ',  v:occ?'yes':'no'},
+                      {k:'kind', v:c.kind||'—'},
+                      {k:'emot', v:c.emotion||'—'},
+                      {k:'audio',v:c.audio_event||'none'},
+                      {k:'belt', v:occ?(c.buckled?'✓':'✗'):'—'},
+                      {k:'dist', v:c.distress!=null?c.distress.toFixed(2):'—'},
+                      {k:'HR',   v:c.heart_rate_bpm?Math.round(c.heart_rate_bpm)+' bpm':'—'},
+                    ].map(function(r,i){return(
+                      <div key={i} className="dbg-seat-row">
+                        <span className="dbg-seat-k">{r.k}</span>
+                        <span className="dbg-seat-v">{r.v}</span>
+                      </div>
+                    );})}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card title="Fusion Output" badge={'load: '+load} badgeCls={fBadgeCls}>
+            <Rows rows={[
+              {k:'cognitive_load', v:load, crit:load>=66, warn:load>=33&&load<66, hi:load<33},
+              {k:'latency',        v:(state.latency_ms||0)+'ms', warn:(state.latency_ms||0)>100},
+              {k:'scenario',       v:state.scenario||'idle'},
+              {k:'factors',        v:(state.factors||[]).length+' active'},
+            ]}/>
+            {(state.factors||[]).length>0&&(
+              <div className="dbg-body" style={{paddingTop:0}}>
+                {(state.factors||[]).map(function(f,i){
+                  return <div key={i} style={{fontSize:'0.65rem',color:'var(--text-secondary)',
+                    background:'var(--bg-subtle)',borderRadius:4,padding:'2px 6px',
+                    border:'1px solid var(--border-subtle)',fontFamily:'monospace'}}>
+                    {f}
+                  </div>;
+                })}
+              </div>
+            )}
+            {(state.mitigations||[]).length>0&&(
+              <>
+                <div className="dbg-body" style={{paddingTop:4,paddingBottom:0}}>
+                  <div className="dbg-k" style={{textTransform:'uppercase',letterSpacing:'.5px'}}>Mitigations</div>
+                </div>
+                <div className="dbg-body" style={{paddingTop:2}}>
+                  {(state.mitigations||[]).slice(0,6).map(function(m,i){
+                    var cls=m.severity==='critical'?'crit':m.status==='proposed'?'warn':'';
+                    return <div key={i} className="dbg-row">
+                      <span className="dbg-k" style={{maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.title}</span>
+                      <span className={'dbg-v '+cls}>{m.status}</span>
+                    </div>;
+                  })}
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -2301,10 +2617,17 @@ function App(){
         <Clock/>
         <div className={'dot'+(conn?' on':'')}/>
         <span className="lat">{state.latency_ms}ms</span>
+        <button onClick={function(){_wsSend({cmd:'reset_vision'});}}
+          style={{marginLeft:10,padding:'3px 10px',fontSize:'var(--font-xs)',fontWeight:700,
+            borderRadius:5,cursor:'pointer',border:'1px solid var(--border-strong)',
+            background:'var(--bg-subtle)',color:'var(--text-secondary)',fontFamily:'inherit',
+            letterSpacing:'.5px',textTransform:'uppercase'}}>
+          ↺ Reset
+        </button>
       </div>
       <div className="hmi-content">
-        {/* Both views stay mounted — display:none keeps audio/video running across tab switches */}
-        <div className="view iv-shell sensor-shell" style={{display:tab==='sensor'?undefined:'none'}}>
+        {/* Sensor shell stays in DOM always — opacity/size trick keeps video playing (display:none pauses <video>) */}
+        <div className="view iv-shell sensor-shell" style={tab==='sensor'?{}:{position:'absolute',width:0,height:0,overflow:'hidden',opacity:0,pointerEvents:'none'}}>
           <BrandBar/>
           <SensorView state={state} send={send} ws={ws}
             liveAudio={liveAudio} liveVision={liveVision}
@@ -2312,9 +2635,12 @@ function App(){
             playTrigger={demoTrigger} stopTrigger={demoStopTrigger}
             onDemoToggle={onDemoToggle} localDemoRunning={localDemoRunning}/>
         </div>
-        <div className="view iv-shell" style={{display:tab==='info'?undefined:'none'}}>
+        <div className="view iv-shell info-shell" style={{display:tab==='info'?undefined:'none'}}>
           <BrandBar/>
           <InfotainmentView state={state} send={send}/>
+        </div>
+        <div className="view iv-shell info-shell" style={{display:tab==='debug'?undefined:'none'}}>
+          <DebugView state={state}/>
         </div>
       </div>
       <div className="hmi-tabs">
@@ -2323,6 +2649,9 @@ function App(){
         </button>
         <button className={'tab'+(tab==='info'?' on':'')} onClick={function(){setTab('info');}}>
           Infotainment View
+        </button>
+        <button className={'tab'+(tab==='debug'?' on':'')} onClick={function(){setTab('debug');}}>
+          Pipeline Debug
         </button>
       </div>
       {selSeat&&(
