@@ -1,18 +1,14 @@
-"""Zero-shot audio classification via CLAP (Contrastive Language-Audio Pretraining).
+"""Zero-shot audio classification via CLAP with temporal stability.
 
-Scores each 0.96 s browser chunk against natural-language prompts — no fine-tuning
-required.  Add or edit prompts in config.yaml → audio.clap_categories.
-
-Publishes the same AudioEvent bus contract as baby_net / AST, plus:
-  distress_class  kid | human | pet | vehicle | none
-  prompt          winning text prompt (for Pipeline Debug)
-
-Model: laion/clap-htsat-fused (~400 MB, CPU-friendly at ~0.5–2 s/chunk).
+- Larger chunks (config audio.chunk_samples) for richer context
+- t+1 delay: classify the previous chunk when the next one arrives
+- Majority vote over the last N classifications before publishing
 """
 from __future__ import annotations
 
 import asyncio
 import time
+from collections import Counter, deque
 from pathlib import Path
 from typing import Any
 
@@ -25,9 +21,8 @@ from bus import bus
 from config import audio as acfg
 from schemas import AudioEvent
 
-SR = 16_000          # browser capture rate
-CLAP_SR = 48_000     # laion/clap-htsat-fused expects 48 kHz
-CHUNK = 15_360       # 0.96 s @ 16 kHz — matches browser AudioWorklet
+SR = 16_000
+CLAP_SR = 48_000
 
 chunk_queue: asyncio.Queue[list[float]] = asyncio.Queue(maxsize=8)
 
@@ -39,9 +34,13 @@ _model: Any = None
 _processor: Any = None
 _device: str = "cpu"
 
-# Flatten config categories → parallel prompt / metadata lists (built at import).
 _PROMPTS: list[str] = []
-_PROMPT_CAT: list[dict] = []  # {label, distress_class, id}
+_PROMPT_CAT: list[dict] = []
+
+_pending: list[float] | None = None
+_smooth_hist: deque[tuple[str, float, str, str]] = deque(
+    maxlen=max(1, acfg.clap_smooth_chunks),
+)
 
 
 def _build_prompt_index() -> None:
@@ -70,19 +69,23 @@ def _load_model() -> None:
     _processor = ClapProcessor.from_pretrained(_MODEL_ID)
     _model = ClapModel.from_pretrained(_MODEL_ID).to(_device)
     _model.eval()
-    print(f"[CLAP] Ready — {len(_PROMPTS)} prompts across "
-          f"{len(acfg.clap_categories)} categories")
+    print(
+        f"[CLAP] Ready — {len(_PROMPTS)} prompts, "
+        f"chunk={acfg.chunk_samples / SR:.1f}s, "
+        f"delay={acfg.clap_delay_chunks} smooth={acfg.clap_smooth_chunks}"
+    )
 
 
 def _classify(samples: list[float]) -> tuple[str, float, str, str]:
     """Return (fusion_label, confidence, distress_class, winning_prompt)."""
     assert _model is not None and _processor is not None
 
+    chunk = acfg.chunk_samples
     arr = np.array(samples, dtype=np.float32)
-    if arr.shape[0] < CHUNK:
-        arr = np.pad(arr, (0, CHUNK - arr.shape[0]))
-    elif arr.shape[0] > CHUNK:
-        arr = arr[:CHUNK]
+    if arr.shape[0] < chunk:
+        arr = np.pad(arr, (0, chunk - arr.shape[0]))
+    elif arr.shape[0] > chunk:
+        arr = arr[:chunk]
 
     wav = torch.tensor(arr, dtype=torch.float32).unsqueeze(0)
     wav48 = AF.resample(wav, SR, CLAP_SR).squeeze(0).numpy()
@@ -97,17 +100,15 @@ def _classify(samples: list[float]) -> tuple[str, float, str, str]:
     inputs = {k: v.to(_device) for k, v in inputs.items()}
 
     with torch.no_grad():
-        logits = _model(**inputs).logits_per_audio[0]  # [num_prompts]
+        logits = _model(**inputs).logits_per_audio[0]
     probs = F.softmax(logits, dim=-1).cpu().numpy()
 
-    # Best prompt per category (max over prompts in that category).
     best_per_cat: dict[str, tuple[int, float]] = {}
     for i, cat in enumerate(_PROMPT_CAT):
         cid = cat["id"]
         if cid not in best_per_cat or probs[i] > best_per_cat[cid][1]:
             best_per_cat[cid] = (i, float(probs[i]))
 
-    # Pick winning category (highest prob); require margin over 'none' if present.
     ranked = sorted(best_per_cat.items(), key=lambda x: x[1][1], reverse=True)
     win_id, (win_idx, win_prob) = ranked[0]
     win_cat = next(c for c in acfg.clap_categories if c["id"] == win_id)
@@ -127,28 +128,53 @@ def _classify(samples: list[float]) -> tuple[str, float, str, str]:
     )
 
 
+def _smooth_vote() -> tuple[str, float, str, str]:
+    """Majority label over recent classifications; mean conf for winner."""
+    if not _smooth_hist:
+        return "none", 0.0, "none", ""
+    labels = [h[0] for h in _smooth_hist]
+    winner = Counter(labels).most_common(1)[0][0]
+    matches = [h for h in _smooth_hist if h[0] == winner]
+    conf = round(sum(h[1] for h in matches) / len(matches), 3)
+    distress = matches[-1][2]
+    prompt = matches[-1][3]
+    return winner, conf, distress, prompt
+
+
+def reset_smoothing() -> None:
+    global _pending
+    _pending = None
+    _smooth_hist.clear()
+
+
 async def run() -> None:
+    global _pending
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _load_model)
 
     while True:
         samples = await chunk_queue.get()
-        try:
-            label, conf, distress, prompt = await loop.run_in_executor(
-                None, _classify, samples
-            )
-        except Exception as exc:
-            print(f"[CLAP] inference error: {exc}")
-            label, conf, distress, prompt = "none", 0.0, "none", ""
 
-        await bus.publish(
-            "audio",
-            AudioEvent(
-                ts=time.time(),
-                label=label,
-                confidence=conf,
-                source="clap_zs",
-                distress_class=distress,
-                prompt=prompt,
-            ).to_dict(),
-        )
+        # t+1: classify the previous chunk when this one arrives
+        if _pending is not None:
+            try:
+                result = await loop.run_in_executor(None, _classify, _pending)
+                _smooth_hist.append(result)
+                label, conf, distress, prompt = _smooth_vote()
+            except Exception as exc:
+                print(f"[CLAP] inference error: {exc}")
+                label, conf, distress, prompt = "none", 0.0, "none", ""
+
+            await bus.publish(
+                "audio",
+                AudioEvent(
+                    ts=time.time(),
+                    label=label,
+                    confidence=conf,
+                    source="clap_zs",
+                    distress_class=distress,
+                    prompt=prompt,
+                ).to_dict(),
+            )
+
+        _pending = samples

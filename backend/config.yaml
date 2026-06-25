@@ -88,6 +88,9 @@ audio:
 
   # Zero-shot CLAP (audio_clap.py) — edit prompts without retraining
   clap_model: laion/clap-htsat-fused
+  chunk_samples: 32000              # 2.0 s @ 16 kHz (larger window = stabler CLAP)
+  clap_delay_chunks: 1              # classify previous chunk when next arrives (t+1)
+  clap_smooth_chunks: 3             # majority vote over last N classifications
   clap_conf_threshold: 0.06         # min softmax prob for non-none class
   clap_margin_over_none: 0.01       # winner must beat 'none' by this margin
   clap_categories:
@@ -158,6 +161,40 @@ vision:
   ear_happy_thresh: 0.32            # EAR above this → driver marked happy
   mouth_stressed_thresh: 0.50       # mouth ratio above this → driver marked stressed
   yolo_conf_thresh: 0.35            # minimum YOLO detection confidence
+  child_bbox_height_ratio: 0.55     # person box h / seat ROI h below → child
+  # Normalized seat regions (match frontend SEAT_DBG_RECTS)
+  seat_rois:
+    driver:          {x: 0.06, y: 0.12, w: 0.26, h: 0.40}
+    front_passenger: {x: 0.68, y: 0.12, w: 0.26, h: 0.40}
+    rear_left:       {x: 0.06, y: 0.54, w: 0.18, h: 0.40}
+    rear_middle:     {x: 0.41, y: 0.54, w: 0.18, h: 0.40}
+    rear_right:      {x: 0.76, y: 0.54, w: 0.18, h: 0.40}
+  yolo_person_labels: [person]
+  yolo_pet_labels: [dog, cat]
+  yolo_object_labels:
+    - backpack
+    - handbag
+    - suitcase
+    - bottle
+    - cup
+    - book
+    - laptop
+    - cell phone
+    - remote
+    - mouse
+    - teddy bear
+    - wine glass
+  # YuNet + HSEmotion multi-face emotion (Option A)
+  yunet_score_thresh: 0.55
+  yunet_nms_thresh: 0.3
+  emotion_model: enet_b0_8_best_afew
+  emotion_smooth_frames: 7
+  emotion_min_conf: 0.35
+  # Multi-frame stability (YOLO objects, seat occupancy, drowsy)
+  temporal_window_frames: 5
+  temporal_min_hits: 3
+  temporal_clear_misses: 4
+  driver_drowsy_min_frames: 3
 
 # ── IMU / Vibration ──────────────────────────────────────────────────────────
 vibration:

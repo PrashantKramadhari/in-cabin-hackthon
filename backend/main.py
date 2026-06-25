@@ -178,14 +178,31 @@ async def list_videos() -> dict:
     return {"videos": files}
 
 
+@app.get("/api/vision-thresholds")
+async def get_vision_thresholds() -> dict:
+    from sensors.vision_runtime import snapshot
+    return {"thresholds": snapshot()}
+
+
+@app.put("/api/vision-thresholds")
+async def put_vision_thresholds(body: dict) -> dict:
+    from sensors.vision_runtime import update
+    return {"thresholds": update(body.get("thresholds", body))}
+
+
 @app.get("/api/caps")
 async def caps() -> dict:
+    from config import audio as acfg
     from sensors import vision_status as vstat
     out = {
         "live_audio":    _USE_LIVE_AUDIO,
         "audio_node":    _AUDIO_NODE_NAME,
+        "audio_chunk_samples": acfg.chunk_samples,
+        "audio_chunk_sec": round(acfg.chunk_samples / 16_000, 2),
     }
     out.update(vstat.snapshot())
+    from sensors.vision_runtime import snapshot as vision_thresh_snapshot
+    out["vision_thresholds"] = vision_thresh_snapshot()
     # legacy keys — now driven by actual load state
     if not out.get("vision_ready"):
         out["qwen_vision"] = False
@@ -355,7 +372,7 @@ async def ws(sock: WebSocket) -> None:
                 if b64 and not _vision.frame_queue.full():
                     await _vision.frame_queue.put(b64)
             elif cmd == "reset_vision":
-                if _USE_QWEN_VISION and _vision is not None and hasattr(_vision, "reset_cache"):
+                if _vision is not None and hasattr(_vision, "reset_cache"):
                     _vision.reset_cache()
                 fusion.reset_vision()
                 scenarios.world.seat_overrides.clear()

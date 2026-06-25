@@ -343,7 +343,10 @@ input[type=checkbox]{accent-color:var(--accent);cursor:pointer;width:16px;height
 .dbg-viz-lbl{font-size:0.6rem;text-transform:uppercase;letter-spacing:.6px;color:var(--text-faint);font-weight:600}
 .dbg-audio-wave{height:44px;border-radius:6px;overflow:hidden;border:1px solid var(--border-subtle)}
 .dbg-audio-spec{height:72px;border-radius:6px;overflow:hidden;border:1px solid var(--border-subtle)}
-.dbg-audio-chunk{height:48px;border-radius:6px;overflow:hidden;border:1px solid var(--border-subtle)}
+.dbg-thresh-strip{padding:8px 12px;border-top:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:8px;background:var(--bg-subtle)}
+.dbg-thresh-row{display:flex;align-items:center;gap:8px}
+.dbg-thresh-lbl{font-size:0.6rem;min-width:128px;color:var(--text-muted);font-family:monospace;flex-shrink:0}
+.dbg-thresh-val{font-size:0.65rem;font-weight:600;color:var(--accent);min-width:36px;text-align:right;font-family:monospace}
 .dbg-audio-meter{display:flex;align-items:center;gap:8px;margin-top:2px}
 .dbg-audio-bar{flex:1;height:6px;background:var(--bg-subtle);border-radius:3px;overflow:hidden}
 .dbg-audio-bar-fill{height:100%;border-radius:3px;transition:width .08s}
@@ -425,23 +428,26 @@ window.addEventListener('unhandledrejection',function(e){
   d.textContent='PROMISE ERROR\n'+(e.reason&&e.reason.stack||e.reason);});
 </script>
 <script>
-/* AudioWorklet must live OUTSIDE the Babel block — no backtick template literals inside Babel */
-window._CHUNKER_TARGET=Math.round(16000*0.96);
-window._CHUNKER_SRC=[
-  'class Chunker extends AudioWorkletProcessor {',
-  '  constructor(){super();this._buf=[];this._target='+window._CHUNKER_TARGET+';}',
-  '  process(inputs){',
-  '    var ch=inputs[0][0];if(!ch)return true;',
-  '    for(var i=0;i<ch.length;i++){this._buf.push(ch[i]);}',
-  '    while(this._buf.length>=this._target){',
-  '      this.port.postMessage(this._buf.splice(0,this._target));',
-  '    }',
-  '    return true;',
-  '  }',
-  '}',
-  'registerProcessor("chunker",Chunker);'
-].join('\n');
-window._CHUNKER_URL=URL.createObjectURL(new Blob([window._CHUNKER_SRC],{type:'application/javascript'}));
+/* AudioWorklet — chunk size synced from /api/caps (default 2.0 s @ 16 kHz) */
+window._AUDIO_CHUNK_SAMPLES=32000;
+window._makeChunkerUrl=function(target){
+  var src=[
+    'class Chunker extends AudioWorkletProcessor {',
+    '  constructor(){super();this._buf=[];this._target='+target+';}',
+    '  process(inputs){',
+    '    var ch=inputs[0][0];if(!ch)return true;',
+    '    for(var i=0;i<ch.length;i++){this._buf.push(ch[i]);}',
+    '    while(this._buf.length>=this._target){',
+    '      this.port.postMessage(this._buf.splice(0,this._target));',
+    '    }',
+    '    return true;',
+    '  }',
+    '}',
+    'registerProcessor("chunker",Chunker);'
+  ].join('\n');
+  return URL.createObjectURL(new Blob([src],{type:'application/javascript'}));
+};
+window._CHUNKER_URL=window._makeChunkerUrl(window._AUDIO_CHUNK_SAMPLES);
 </script>
 
 <script type="text/babel" data-presets="react">
@@ -677,7 +683,8 @@ function AudioWidget({ws,liveAudio,audio,send,playTrigger,stopTrigger,pipelineDe
     ctxRef.current=actx;
     var an=actx.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=0.6;
     analyserRef.current=an;
-    await actx.audioWorklet.addModule(window._CHUNKER_URL);
+    var chunkTarget=window._AUDIO_CHUNK_SAMPLES||32000;
+    await actx.audioWorklet.addModule(window._makeChunkerUrl(chunkTarget));
     var chunker=new AudioWorkletNode(actx,'chunker');
     chunker.port.onmessage=function(e){
       if(pipelineDebugRef&&pipelineDebugRef.current)
@@ -2360,6 +2367,8 @@ var DBG_MODEL_NAMES={
   qwen2vl_cpu:'Qwen2-VL-2B-Instruct (CPU)',
   qwen2vl_gpu:'Qwen2-VL-2B-Instruct (GPU 4-bit)',
   mediapipe:'MediaPipe Face + YOLOv8n',
+  mediapipe_yolo:'MediaPipe Face + YOLOv8n localization',
+  yunet_hsemotion_yolo:'YuNet + HSEmotion + YOLOv8n',
   none:'not loaded'
 };
 
@@ -2371,7 +2380,57 @@ var SEAT_DBG_RECTS={
   rear_right:{x:.76,y:.54,w:.18,h:.40}
 };
 
-function DebugVisionCanvas({pipelineDebugRef,visionObjects,visionDriver,visionAllSeats}){
+var DBG_THRESH_DEFAULTS={
+  yolo_conf_thresh:0.35,yunet_score_thresh:0.55,emotion_min_conf:0.35,
+  display_conf_thresh:0.6,temporal_min_hits:3
+};
+function dbgFilterDets(dets,minConf){
+  var m=minConf!=null?minConf:DBG_THRESH_DEFAULTS.display_conf_thresh;
+  return (dets||[]).filter(function(d){return (d.confidence||0)>=m;});
+}
+function dbgFilterFaces(faces,minConf){
+  var m=minConf!=null?minConf:DBG_THRESH_DEFAULTS.display_conf_thresh;
+  return (faces||[]).filter(function(f){return (f.confidence||0)>=m;});
+}
+
+function DebugVisionThresholds({thresholds,onChange}){
+  var t=Object.assign({},DBG_THRESH_DEFAULTS,thresholds||{});
+  var rows=[
+    {k:'yolo_conf_thresh',label:'YOLO detect',pct:true},
+    {k:'yunet_score_thresh',label:'Face (YuNet)',pct:true},
+    {k:'emotion_min_conf',label:'Emotion',pct:true},
+    {k:'display_conf_thresh',label:'Show boxes ≥',pct:true},
+    {k:'temporal_min_hits',label:'Confirm frames',pct:false,min:1,max:5,step:1}
+  ];
+  return (
+    <div className="dbg-thresh-strip">
+      <div className="dbg-viz-lbl">Detection thresholds</div>
+      {rows.map(function(r){
+        var raw=t[r.k];
+        var sliderVal=r.pct?Math.round(raw*100):raw;
+        var min=r.min!=null?r.min:(r.pct?5:1);
+        var max=r.max!=null?r.max:(r.pct?95:5);
+        var step=r.step||(r.pct?5:1);
+        var shown=r.pct?(sliderVal+'%'):String(sliderVal);
+        return (
+          <div key={r.k} className="dbg-thresh-row">
+            <span className="dbg-thresh-lbl">{r.label}</span>
+            <input type="range" min={min} max={max} step={step} value={sliderVal}
+              onChange={function(e){
+                var v=Number(e.target.value);
+                var next=Object.assign({},t);
+                next[r.k]=r.pct?v/100:v;
+                onChange(next);
+              }}/>
+            <span className="dbg-thresh-val">{shown}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DebugVisionCanvas({pipelineDebugRef,visionObjects,visionFaces,visionDriver,visionAllSeats,visionThresh}){
   const cvRef=useRef(null);
   const imgRef=useRef(new Image());
   const srcRef=useRef('');
@@ -2417,7 +2476,22 @@ function DebugVisionCanvas({pipelineDebugRef,visionObjects,visionDriver,visionAl
           ctx.fillStyle='#0c1220';ctx.fillText(lbl,rx+4,Math.max(dy+2,ry-3));
         }
       });
-      var dets=(visionObjects&&visionObjects.detections)||[];
+      var dispMin=(visionThresh&&visionThresh.display_conf_thresh)!=null
+        ?visionThresh.display_conf_thresh:DBG_THRESH_DEFAULTS.display_conf_thresh;
+      var faceDets=dbgFilterFaces((visionFaces&&visionFaces.faces)||[],dispMin);
+      faceDets.forEach(function(fh){
+        var b=fh.box;if(!b||b.length<4)return;
+        var bx=dx+(b[0]/imgW)*dw,by=dy+(b[1]/imgH)*dh;
+        var bw=((b[2]-b[0])/imgW)*dw,bh=((b[3]-b[1])/imgH)*dh;
+        ctx.strokeStyle='#22d3ee';ctx.lineWidth=2;ctx.strokeRect(bx,by,bw,bh);
+        var tag=(fh.emotion||'?')+' '+Math.round((fh.confidence||0)*100)+'%';
+        if(fh.seat)tag=fh.seat.replace(/_/g,' ')+' · '+tag;
+        ctx.font='bold 10px monospace';ctx.textAlign='left';
+        var tw=ctx.measureText(tag).width+8;
+        ctx.fillStyle='rgba(34,211,238,.9)';ctx.fillRect(bx,Math.max(dy,by-14),tw,14);
+        ctx.fillStyle='#0c1220';ctx.fillText(tag,bx+4,Math.max(dy+2,by-3));
+      });
+      var dets=dbgFilterDets(visionObjects&&visionObjects.detections,dispMin);
       dets.forEach(function(det){
         var b=det.box;if(!b||b.length<4)return;
         var bx=dx+(b[0]/imgW)*dw,by=dy+(b[1]/imgH)*dh;
@@ -2440,17 +2514,19 @@ function DebugVisionCanvas({pipelineDebugRef,visionObjects,visionDriver,visionAl
       id=requestAnimationFrame(draw);
     };
     draw();return function(){cancelAnimationFrame(id);};
-  },[visionObjects,visionDriver,visionAllSeats,pipelineDebugRef]);
+  },[visionObjects,visionFaces,visionDriver,visionAllSeats,visionThresh,pipelineDebugRef]);
   return <canvas ref={cvRef} className="dbg-viz-canvas"/>;
 }
 
-function DebugVisionPanel({pipelineDebugRef,visionDriver,visionObjects,visionAllSeats,seatConfigs,caps}){
+function DebugVisionPanel({pipelineDebugRef,visionDriver,visionObjects,visionFaces,visionAllSeats,seatConfigs,caps,visionThresh,onVisionThreshChange}){
   var dbg=pipelineDebugRef&&pipelineDebugRef.current||{};
   var hasFrame=!!(dbg.lastFrame&&dbg.lastFrame.b64);
   var vd=visionDriver||{};
   var vis=visionAllSeats||{};
   var sc=seatConfigs||{};
-  var dets=(visionObjects&&visionObjects.detections)||[];
+  var dispMin=(visionThresh&&visionThresh.display_conf_thresh)!=null
+    ?visionThresh.display_conf_thresh:DBG_THRESH_DEFAULTS.display_conf_thresh;
+  var dets=dbgFilterDets(visionObjects&&visionObjects.detections,dispMin);
   var c=caps||{};
   var visionNode=c.vision_node||'none';
   var modelName=DBG_MODEL_NAMES[visionNode]||visionNode;
@@ -2470,9 +2546,13 @@ function DebugVisionPanel({pipelineDebugRef,visionDriver,visionObjects,visionAll
     <div className="dbg-viz-audio">
       <div className="dbg-viz-lbl">Live frame (mirrored from Sensor tab)</div>
       <DebugVisionCanvas pipelineDebugRef={pipelineDebugRef}
-        visionObjects={visionObjects} visionDriver={visionDriver} visionAllSeats={visionAllSeats}/>
+        visionObjects={visionObjects} visionFaces={visionFaces}
+        visionDriver={visionDriver} visionAllSeats={visionAllSeats}
+        visionThresh={visionThresh}/>
+      <DebugVisionThresholds thresholds={visionThresh} onChange={onVisionThreshChange}/>
       <div className="dbg-viz-legend">
-        <span className="dbg-viz-leg"><span className="dbg-viz-swatch" style={{background:'#f59e0b'}}/>YOLO box</span>
+        <span className="dbg-viz-leg"><span className="dbg-viz-swatch" style={{background:'#22d3ee'}}/>Face emotion (HSEmotion)</span>
+        <span className="dbg-viz-leg"><span className="dbg-viz-swatch" style={{background:'#f59e0b'}}/>YOLO box ≥{Math.round(dispMin*100)}%</span>
         <span className="dbg-viz-leg"><span className="dbg-viz-swatch" style={{background:'#14b8a6'}}/>Seat region</span>
         <span className="dbg-viz-leg"><span className="dbg-viz-swatch" style={{background:'#fc8181'}}/>Driver drowsy</span>
       </div>
@@ -2682,7 +2762,7 @@ function DebugAudioPanel({pipelineDebugRef,audio,audioEffective}){
 }
 
 /* ── DebugView ── */
-function DebugView({state,pipelineDebugRef,caps}){
+function DebugView({state,pipelineDebugRef,caps,visionThresh,onVisionThreshChange}){
   var radar=state.radar||{};
   var radarSeats=radar.seats||[];
   var audio=state.audio||{};
@@ -2692,6 +2772,7 @@ function DebugView({state,pipelineDebugRef,caps}){
   var vis=state.vision_all_seats||{};
   var visDrv=state.vision_driver||{};
   var visObj=state.vision_objects||{};
+  var visFaces=state.vision_faces||{};
   var sc=state.seat_configs||{};
 
   function Card({title,badge,badgeCls,children}){
@@ -2738,7 +2819,9 @@ function DebugView({state,pipelineDebugRef,caps}){
   /* fusion badge */
   var load=state.cognitive_load||0;
   var fBadgeCls=load>=66?'crit':load>=33?'warn':'ok';
-  var yoloDets=(visObj.detections||[]);
+  var yoloDets=dbgFilterDets(visObj.detections,
+    (visionThresh&&visionThresh.display_conf_thresh)!=null
+      ?visionThresh.display_conf_thresh:DBG_THRESH_DEFAULTS.display_conf_thresh);
   var c=caps||{};
   var audioNode=c.audio_node||'none';
   var visionNode=c.vision_node||'none';
@@ -2763,7 +2846,7 @@ function DebugView({state,pipelineDebugRef,caps}){
           <span className="dbg-model-name">{visionModel}</span>
           <span className={'dbg-model-status'+(c.vision_ready?'':' off')}>
             {c.vision_ready
-              ?('● '+visionNode+(c.vision_device?' on '+c.vision_device:''))
+              ?('● '+visionNode+(c.vision_device?' on '+c.vision_device:'')+(c.yolo_ready?' · YOLO':'')+(c.emotion_ready?' · HSEmotion':''))
               :('○ '+(c.vision_status||'not loaded'))}
           </span>
         </div>
@@ -2790,8 +2873,9 @@ function DebugView({state,pipelineDebugRef,caps}){
         <div className="dbg-viz-panel">
           <Card title="Video Frame + Classification" badge={vBadge} badgeCls={vBadgeCls}>
             <DebugVisionPanel pipelineDebugRef={pipelineDebugRef}
-              visionDriver={visDrv} visionObjects={visObj} visionAllSeats={vis}
-              seatConfigs={sc} caps={caps}/>
+              visionDriver={visDrv} visionObjects={visObj} visionFaces={visFaces}
+              visionAllSeats={vis} seatConfigs={sc} caps={caps}
+              visionThresh={visionThresh} onVisionThreshChange={onVisionThreshChange}/>
           </Card>
         </div>
         <div className="dbg-viz-panel">
@@ -2999,7 +3083,7 @@ function App(){
     },
     driver_emotion:'calm',vib_override:false,vib_road_quality:'smooth',vib_rms:0.05,
     world_speed_kmh:60,world_visibility:'good',world_pothole_ahead_m:null,
-    vision_driver:null,vision_objects:null,vibration:{},
+    vision_driver:null,vision_objects:null,vision_faces:null,vibration:{},
   };
   const [state,setState]=useState(INIT);
   const [conn,setConn]=useState(false);
@@ -3007,6 +3091,8 @@ function App(){
   const [liveAudio,setLiveAudio]=useState(false);
   const [liveVision,setLiveVision]=useState(false);
   const [caps,setCaps]=useState({});
+  const [visionThresh,setVisionThresh]=useState(DBG_THRESH_DEFAULTS);
+  const visionThreshTimer=useRef(null);
   const [tab,setTab]=useState('sensor');
   const [selSeat,setSelSeat]=useState(null);
   const [demoTrigger,setDemoTrigger]=useState(0);
@@ -3042,7 +3128,15 @@ function App(){
     fetch('/api/scenarios').then(function(r){return r.json();})
       .then(function(d){setScenarios(d.scenarios||[]);}).catch(function(){});
     fetch('/api/caps').then(function(r){return r.json();})
-      .then(function(d){setCaps(d);setLiveAudio(d.live_audio);setLiveVision(!!d.vision_ready);}).catch(function(){});
+      .then(function(d){
+        setCaps(d);setLiveAudio(d.live_audio);setLiveVision(!!d.vision_ready);
+        if(d.vision_thresholds){
+          setVisionThresh(Object.assign({},DBG_THRESH_DEFAULTS,d.vision_thresholds));
+        }
+        if(d.audio_chunk_samples){
+          window._AUDIO_CHUNK_SAMPLES=d.audio_chunk_samples;
+        }
+      }).catch(function(){});
     var proto=location.protocol==='https:'?'wss:':'ws:';
     var sock=new WebSocket(proto+'//'+location.host+'/ws');
     ws.current=sock;
@@ -3054,6 +3148,18 @@ function App(){
 
   const send=useCallback(function(msg){
     if(ws.current&&ws.current.readyState===1)ws.current.send(JSON.stringify(msg));
+  },[]);
+
+  var onVisionThreshChange=useCallback(function(next){
+    setVisionThresh(next);
+    if(visionThreshTimer.current)clearTimeout(visionThreshTimer.current);
+    visionThreshTimer.current=setTimeout(function(){
+      fetch('/api/vision-thresholds',{
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({thresholds:next})
+      }).catch(function(){});
+    },300);
   },[]);
 
   return (
@@ -3089,7 +3195,8 @@ function App(){
           <InfotainmentView state={state} send={send}/>
         </div>
         <div className="view iv-shell info-shell" style={{display:tab==='debug'?undefined:'none'}}>
-          <DebugView state={state} pipelineDebugRef={pipelineDebugRef} caps={caps}/>
+          <DebugView state={state} pipelineDebugRef={pipelineDebugRef} caps={caps}
+            visionThresh={visionThresh} onVisionThreshChange={onVisionThreshChange}/>
         </div>
       </div>
       <div className="hmi-tabs">

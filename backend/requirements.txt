@@ -8,6 +8,7 @@ bitsandbytes          # 4-bit quantisation for Qwen2-VL
 accelerate            # device_map support
 qwen-vl-utils         # Qwen2-VL image preprocessing
 Pillow                # image handling for Qwen
-# MediaPipe / YOLO fallback vision (optional):
+# MediaPipe / YOLO / YuNet+HSEmotion vision (optional):
 # mediapipe
 # ultralytics
+# onnxruntime

@@ -21,7 +21,7 @@ from world import world
 # latest frame per modality
 _latest: dict[str, dict] = {
     "radar": {}, "audio": {}, "vehicle": {},
-    "vision_driver": {}, "vision_objects": {},
+    "vision_driver": {}, "vision_objects": {}, "vision_faces": {},
     "vibration": {}, "vision_all_seats": {},
 }
 
@@ -174,7 +174,10 @@ def _cognitive_load() -> tuple[int, list[str]]:
 
     # ── Vision: loose object (YOLOv8n) ───────────────────────────────────
     for det in _latest["vision_objects"].get("detections", []):
-        if det["label"] in ("backpack", "suitcase", "bottle", "cup", "book", "laptop"):
+        if det["label"] in (
+            "backpack", "suitcase", "bottle", "cup", "book", "laptop",
+            "handbag", "cell phone", "remote", "mouse", "teddy bear", "wine glass",
+        ):
             score += S.yolo_object_score; factors.append(f"loose {det['label']} (camera)"); break
 
     # ── Vision: loose objects on seats (Qwen) ────────────────────────────
@@ -305,7 +308,10 @@ def _proposed() -> list[dict]:
     # --- vision: unsecured object → pre-empt pothole advisory ---
     yolo_obj = next(
         (d for d in _latest["vision_objects"].get("detections", [])
-         if d["label"] in ("backpack", "suitcase", "bottle", "cup", "book", "laptop")),
+         if d["label"] in (
+             "backpack", "suitcase", "bottle", "cup", "book", "laptop",
+             "handbag", "cell phone", "remote", "mouse", "teddy bear", "wine glass",
+         )),
         None)
     if yolo_obj and veh.get("pothole_ahead_m") is not None:
         dist = veh["pothole_ahead_m"]
@@ -435,6 +441,7 @@ def reset_vision() -> None:
     _latest["vision_all_seats"] = {}
     _latest["vision_driver"] = {}
     _latest["vision_objects"] = {}
+    _latest["vision_faces"] = {}
 
 
 def confirm(mitigation_id: str) -> None:
@@ -510,7 +517,7 @@ async def _consume(topic: str) -> None:
 
 async def run() -> None:
     for t in ("radar", "audio", "vehicle", "vibration",
-              "vision_driver", "vision_objects", "vision_all_seats"):
+              "vision_driver", "vision_objects", "vision_all_seats", "vision_faces"):
         asyncio.create_task(_consume(t))
     while True:
         t0 = time.perf_counter()
@@ -528,6 +535,7 @@ async def run() -> None:
             vehicle=_latest["vehicle"],
             vision_driver=_latest["vision_driver"],
             vision_objects=_latest["vision_objects"],
+            vision_faces=_latest.get("vision_faces", {}),
             vibration=_latest["vibration"],
             mitigations=mitigations,
             latency_ms=round((time.perf_counter() - t0) * 1000, 2),
